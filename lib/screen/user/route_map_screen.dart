@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math'; // Wajib untuk menghitung rotasi (pi)
+import 'dart:math' show pi;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_compass/flutter_compass.dart'; // Package kompas baru
+import 'package:flutter_compass/flutter_compass.dart';
+import '../../core/app_colors.dart';
 
 class RouteMapScreen extends StatefulWidget {
   final double destinationLat;
@@ -56,7 +57,10 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   Future<void> _initLocationAndRoute() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 10,
+        ),
       );
 
       final startLng = position.longitude;
@@ -162,14 +166,24 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
+      backgroundColor: AppColors.bgBase,
       appBar: AppBar(
-        title: Text('Rute ke ${widget.destinationName}'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 1,
+        title: Text(
+          'Rute ke ${widget.destinationName}',
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+        ),
+        backgroundColor: AppColors.bgBase,
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        elevation: 0,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.iconColor),
+            )
           : Stack(
               children: [
                 FlutterMap(
@@ -191,8 +205,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                       polylines: [
                         Polyline(
                           points: _routePoints,
-                          color: Colors.redAccent,
-                          strokeWidth: 5.0, // Ditebalkan sedikit biar jelas
+                          color: AppColors.borderFocus,
+                          strokeWidth: 5.0,
                         ),
                       ],
                     ),
@@ -244,8 +258,14 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                   bottom: 140 + bottomPadding,
                   child: FloatingActionButton(
                     onPressed: _recenterMap,
-                    backgroundColor: Colors.white,
-                    child: const Icon(Icons.my_location, color: Colors.blue),
+                    backgroundColor: AppColors.bgSurface,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: const BorderSide(color: AppColors.border),
+                    ),
+                    child: const Icon(Icons.my_location,
+                        color: AppColors.iconColor),
                   ),
                 ),
 
@@ -259,13 +279,14 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                       horizontal: 16,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.bgSurface,
                       borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: AppColors.border),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
@@ -278,8 +299,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                             const Text(
                               'Jarak',
                               style: TextStyle(
-                                color: Colors.grey,
-                                fontWeight: FontWeight.bold,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -289,8 +311,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                                   : '-',
                               style: const TextStyle(
                                 fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ],
@@ -298,7 +320,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                         Container(
                           width: 1,
                           height: 40,
-                          color: Colors.grey[300],
+                          color: AppColors.border,
                         ),
                         Column(
                           mainAxisSize: MainAxisSize.min,
@@ -306,8 +328,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                             const Text(
                               'Waktu Tempuh',
                               style: TextStyle(
-                                color: Colors.grey,
-                                fontWeight: FontWeight.bold,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -317,8 +340,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                                   : '-',
                               style: const TextStyle(
                                 fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ],

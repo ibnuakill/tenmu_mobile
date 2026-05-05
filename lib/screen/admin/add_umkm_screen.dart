@@ -1,7 +1,13 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
+import 'dart:io';
+import '../../core/app_colors.dart';
 
 class AddUmkmScreen extends StatefulWidget {
   const AddUmkmScreen({super.key});
@@ -12,33 +18,79 @@ class AddUmkmScreen extends StatefulWidget {
 
 class _AddUmkmScreenState extends State<AddUmkmScreen> {
   final _namaController = TextEditingController();
-  final _deskripsiController = TextEditingController();
   final _alamatController = TextEditingController();
-  final _latitudeController = TextEditingController();
-  final _longitudeController = TextEditingController();
+  final _deskripsiController = TextEditingController();
+  final _gambarUrlController = TextEditingController();
 
-  bool _isFeatured = false;
+  final _searchController = TextEditingController();
+  final _latController = TextEditingController();
+  final _lngController = TextEditingController();
+
   bool _isLoading = false;
-  File? _imageFile;
+  File? _selectedImage;
+  bool _isUploadingImage = false;
 
-  // Fungsi untuk memilih gambar dari galeri
-  Future<void> _pickImage() async {
+  Future<void> _pickAndUploadImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+    );
 
-    if (pickedFile != null) {
+    if (pickedFile == null) return;
+
+    setState(() {
+      _selectedImage = File(pickedFile.path);
+      _isUploadingImage = true;
+    });
+
+    try {
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${pickedFile.name}';
+
+      // Menggunakan bucket 'umkm_images' di Supabase
+      await Supabase.instance.client.storage
+          .from('umkm_images')
+          .upload(fileName, _selectedImage!);
+
+      final imageUrl = Supabase.instance.client.storage
+          .from('umkm_images')
+          .getPublicUrl(fileName);
+
       setState(() {
-        _imageFile = File(pickedFile.path);
+        _gambarUrlController.text = imageUrl;
       });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gambar berhasil diunggah! ✅'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal mengunggah gambar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isUploadingImage = false);
     }
   }
 
-  // Fungsi utama untuk menyimpan data
-  Future<void> _simpanData() async {
-    // Validasi sederhana
-    if (_namaController.text.isEmpty || _alamatController.text.isEmpty) {
+  Future<void> _searchLocationOSM() async {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nama dan Alamat wajib diisi!')),
+        const SnackBar(
+          content: Text('Masukkan nama tempat atau alamat untuk dicari!'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -46,152 +98,768 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
     setState(() => _isLoading = true);
 
     try {
-      String? imageUrl;
+      final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(query)}&format=json&limit=5',
+      );
 
-      // 1. Jika ada gambar, upload dulu ke Supabase Storage
-      if (_imageFile != null) {
-        final fileExt = _imageFile!.path.split('.').last;
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExt';
-        final filePath = fileName; // path di dalam bucket
+      final response = await http.get(
+        url,
+        headers: {'User-Agent': 'TenMuMobileApp/1.0'},
+      );
 
-        await Supabase.instance.client.storage
-            .from('umkm_images')
-            .upload(filePath, _imageFile!);
+      if (response.statusCode == 200) {
+        final List data = json.decode(response.body);
 
-        // Ambil URL publik dari gambar yang baru diupload
-        imageUrl = Supabase.instance.client.storage
-            .from('umkm_images')
-            .getPublicUrl(filePath);
+        if (data.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Lokasi tidak ditemukan. Coba kata kunci lain.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        }
+
+        if (mounted) {
+          showModalBottomSheet(
+            context: context,
+            backgroundColor: AppColors.bgSurface,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              side: BorderSide(color: AppColors.border),
+            ),
+            builder: (context) {
+              return Container(
+                padding: const EdgeInsets.all(16),
+                color: AppColors.bgSurface,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.border,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const Text(
+                      'Pilih Lokasi yang Sesuai',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: data.length,
+                        itemBuilder: (context, index) {
+                          final item = data[index];
+                          return ListTile(
+                            leading: const Icon(
+                              Icons.location_on_outlined,
+                              color: AppColors.iconColor,
+                            ),
+                            title: Text(
+                              item['name'] ?? 'Lokasi',
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              item['display_name'] ?? '',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                            onTap: () {
+                              setState(() {
+                                if (_alamatController.text.isEmpty) {
+                                  _alamatController.text = item['display_name'];
+                                }
+                                if (_namaController.text.isEmpty &&
+                                    item['name'] != null &&
+                                    item['name'] != '') {
+                                  _namaController.text = item['name'];
+                                }
+                                _latController.text = item['lat'];
+                                _lngController.text = item['lon'];
+                              });
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    'Alamat & Koordinat berhasil didapatkan! 📍',
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  backgroundColor: AppColors.snackSuccess,
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    side: const BorderSide(
+                                      color: AppColors.snackSuccessBorder,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        }
+      } else {
+        throw Exception('Gagal menghubungi server pencarian peta.');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error jaringan: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    setState(() => _isLoading = true);
+
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    try {
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw Exception('Layanan lokasi GPS dinonaktifkan.');
       }
 
-      // 2. Simpan data teks + URL gambar ke tabel umkm
-      await Supabase.instance.client.from('umkm').insert({
-        'nama_tempat': _namaController.text.trim(),
-        'deskripsi': _deskripsiController.text.trim(),
-        'alamat': _alamatController.text.trim(),
-        'latitude': double.tryParse(_latitudeController.text.trim()),
-        'longitude': double.tryParse(_longitudeController.text.trim()),
-        'gambar_url': imageUrl,
-        'is_featured': _isFeatured,
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw Exception('Izin akses lokasi ditolak.');
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw Exception(
+          'Izin akses lokasi ditolak permanen, buka pengaturan HP.',
+        );
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      setState(() {
+        _latController.text = position.latitude.toString();
+        _lngController.text = position.longitude.toString();
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Data Tempat Nongkrong berhasil ditambahkan!'),
+            content: Text('Lokasi saat ini berhasil didapatkan! 📍✅'),
+            backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context); // Kembali ke halaman sebelumnya
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Gagal mendapatkan lokasi: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _bukaPetaPilihLokasi() async {
+    // Default location (misal Jakarta)
+    LatLng center = const LatLng(-6.200000, 106.816666);
+
+    // Jika sudah ada koordinat, gunakan itu sebagai titik tengah
+    if (_latController.text.isNotEmpty && _lngController.text.isNotEmpty) {
+      double? lat = double.tryParse(_latController.text);
+      double? lng = double.tryParse(_lngController.text);
+      if (lat != null && lng != null) {
+        center = LatLng(lat, lng);
       }
     }
+
+    LatLng? pickedLocation = center;
+    final mapController = MapController();
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return Dialog(
+              insetPadding: const EdgeInsets.all(16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  width: double.infinity,
+                  child: Stack(
+                    children: [
+                      FlutterMap(
+                        mapController: mapController,
+                        options: MapOptions(
+                          initialCenter: center,
+                          initialZoom: 15.0,
+                          onTap: (tapPosition, point) {
+                            setStateDialog(() {
+                              pickedLocation = point;
+                            });
+                          },
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate:
+                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.example.tenmu',
+                          ),
+                          if (pickedLocation != null)
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: pickedLocation!,
+                                  width: 50,
+                                  height: 50,
+                                  child: const Icon(
+                                    Icons.location_on,
+                                    color: Colors.red,
+                                    size: 50,
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                      Positioned(
+                        right: 16,
+                        bottom: 80,
+                        child: FloatingActionButton(
+                          mini: true,
+                          onPressed: () async {
+                            try {
+                              Position position =
+                                  await Geolocator.getCurrentPosition(
+                                    locationSettings: const LocationSettings(
+                                      accuracy: LocationAccuracy.high,
+                                    ),
+                                  );
+                              if (!context.mounted) return;
+                              mapController.move(
+                                LatLng(position.latitude, position.longitude),
+                                16.0,
+                              );
+                              setStateDialog(() {
+                                pickedLocation = LatLng(
+                                  position.latitude,
+                                  position.longitude,
+                                );
+                              });
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Gagal mendapatkan lokasi saat ini.',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          backgroundColor: Colors.white,
+                          child: const Icon(
+                            Icons.my_location,
+                            color: Colors.blue,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 16,
+                        left: 16,
+                        right: 60, // Hindari tombol close
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black26, blurRadius: 4),
+                            ],
+                          ),
+                          child: const Text(
+                            'Sentuh peta pada lokasi yang diinginkan',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 16,
+                        left: 16,
+                        right: 16,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context, pickedLocation);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueAccent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: const Text(
+                            'Konfirmasi Lokasi Ini',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 10,
+                        right: 10,
+                        child: CircleAvatar(
+                          backgroundColor: Colors.white,
+                          child: IconButton(
+                            icon: const Icon(Icons.close, color: Colors.black),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).then((result) {
+      if (!mounted) return;
+      if (result != null && result is LatLng) {
+        setState(() {
+          _latController.text = result.latitude.toString();
+          _lngController.text = result.longitude.toString();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Lokasi berhasil dipilih dari peta! 🗺️✅'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    });
+  }
+
+  // FUNGSI SIMPAN DATA YANG SEMPAT HILANG (Lengkap dengan pengunci anti-kosong)
+  Future<void> _simpanData() async {
+    // Pengunci biar Admin nggak bisa asal simpan kalau koordinat kosong
+    if (_namaController.text.isEmpty ||
+        _latController.text.isEmpty ||
+        _lngController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Gagal! Pastikan Nama, Latitude, dan Longitude sudah terisi.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await Supabase.instance.client.from('umkm').insert({
+        'nama_tempat': _namaController.text.trim(),
+        'alamat': _alamatController.text.trim().isNotEmpty
+            ? _alamatController.text.trim()
+            : 'Lokasi: ${_latController.text}, ${_lngController.text}',
+        'deskripsi': _deskripsiController.text.trim(),
+        'gambar_url': _gambarUrlController.text.isNotEmpty
+            ? _gambarUrlController.text
+            : null,
+        'latitude': double.tryParse(_latController.text),
+        'longitude': double.tryParse(_lngController.text),
+        'is_featured': false,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tempat nongkrong berhasil ditambahkan! 🎉'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal menyimpan: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // ── Helper: Dark Mode TextField ─────────────────────────────────────────
+  Widget _darkField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
+    Widget? suffixIcon,
+    ValueChanged<String>? onSubmitted,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      onSubmitted: onSubmitted,
+      style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+      cursorColor: AppColors.borderFocus,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 13,
+        ),
+        hintText: hint,
+        hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 14),
+        prefixIcon: maxLines == 1
+            ? Icon(icon, color: AppColors.iconColor, size: 20)
+            : null,
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: AppColors.bgElevated,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: maxLines > 1 ? 14 : 0,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: AppColors.borderFocus,
+            width: 1.5,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tambah Tempat Baru')),
-      // SingleChildScrollView agar form bisa di-scroll jika keyboard muncul
-      body: SingleChildScrollView(
+      backgroundColor: AppColors.bgBase,
+      appBar: AppBar(
+        title: const Text(
+          'Tambah Tempat Baru',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        backgroundColor: AppColors.bgBase,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+      ),
+      body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Area Preview Gambar
-            GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _darkField(
+                controller: _namaController,
+                label: 'Nama Tempat',
+                hint: 'Contoh: Kopi Kenangan Merdeka',
+                icon: Icons.storefront_outlined,
+              ),
+              const SizedBox(height: 12),
+              _darkField(
+                controller: _deskripsiController,
+                label: 'Deskripsi Singkat',
+                hint: 'Ceritakan keunikan tempat ini...',
+                icon: Icons.description_outlined,
+                maxLines: 3,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Gambar Tempat',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              if (_selectedImage != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    _selectedImage!,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                )
+              else if (_gambarUrlController.text.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    _gambarUrlController.text,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                )
+              else
+                Container(
+                  height: 180,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: AppColors.bgElevated,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.image_outlined,
+                      size: 50,
+                      color: AppColors.textHint,
+                    ),
+                  ),
                 ),
-                child: _imageFile != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.file(_imageFile!, fit: BoxFit.cover),
-                      )
-                    : const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_a_photo, size: 50, color: Colors.grey),
-                          SizedBox(height: 8),
-                          Text('Ketuk untuk pilih gambar'),
-                        ],
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _isUploadingImage ? null : _pickAndUploadImage,
+                  icon: _isUploadingImage
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.textSecondary,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.photo_library_outlined,
+                          size: 18,
+                          color: AppColors.iconColor,
+                        ),
+                  label: Text(
+                    _isUploadingImage
+                        ? 'Mengunggah Gambar...'
+                        : 'Upload Gambar dari Galeri HP',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.border),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16.0),
+                child: Divider(color: AppColors.border),
+              ),
+              const Text(
+                'Lokasi Maps',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              _darkField(
+                controller: _searchController,
+                label: 'Cari Nama Tempat / Jalan (Gratis)',
+                hint: 'Contoh: Alun-alun Bandung',
+                icon: Icons.search,
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.search, color: AppColors.iconColor),
+                  onPressed: _searchLocationOSM,
+                  tooltip: 'Cari Lokasi',
+                ),
+                onSubmitted: (_) => _searchLocationOSM(),
+              ),
+              const SizedBox(height: 12),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _getCurrentLocation,
+                  icon: const Icon(
+                    Icons.my_location,
+                    color: AppColors.btnLabel,
+                  ),
+                  label: const Text(
+                    'Dapatkan Lokasi Saat Ini (GPS)',
+                    style: TextStyle(color: AppColors.btnLabel),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.btnPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _isLoading ? null : _bukaPetaPilihLokasi,
+                  icon: const Icon(
+                    Icons.map_outlined,
+                    color: AppColors.iconColor,
+                  ),
+                  label: const Text(
+                    'Pilih Manual dari Peta',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.border),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _darkField(
+                      controller: _latController,
+                      label: 'Latitude',
+                      hint: '-6.917464',
+                      icon: Icons.my_location,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                        signed: true,
                       ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _namaController,
-              decoration: const InputDecoration(
-                labelText: 'Nama Tempat Nongkrong*',
-              ),
-            ),
-            TextField(
-              controller: _deskripsiController,
-              decoration: const InputDecoration(labelText: 'Deskripsi Singkat'),
-              maxLines: 3,
-            ),
-            TextField(
-              controller: _alamatController,
-              decoration: const InputDecoration(labelText: 'Alamat Lengkap*'),
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _latitudeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Latitude (Opsional)',
                     ),
-                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _darkField(
+                      controller: _lngController,
+                      label: 'Longitude',
+                      hint: '107.619123',
+                      icon: Icons.my_location,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                        signed: true,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _simpanData,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.btnLabel,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.check_rounded,
+                          color: AppColors.btnLabel,
+                          size: 20,
+                        ),
+                  label: const Text(
+                    'Simpan Data',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.btnLabel,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.btnPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextField(
-                    controller: _longitudeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Longitude (Opsional)',
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: const Text('Jadikan Tempat Unggulan (Featured)?'),
-              value: _isFeatured,
-              onChanged: (bool value) {
-                setState(() => _isFeatured = value);
-              },
-            ),
-            const SizedBox(height: 32),
-            _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ElevatedButton(
-                    onPressed: _simpanData,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: const Text(
-                      'Simpan Data',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                  ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
