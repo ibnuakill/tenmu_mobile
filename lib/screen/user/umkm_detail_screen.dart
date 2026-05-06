@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import 'route_map_screen.dart';
+import 'review_section.dart';
 
 class UmkmDetailScreen extends StatelessWidget {
   final Map<String, dynamic> umkm;
@@ -251,6 +252,11 @@ class UmkmDetailScreen extends StatelessWidget {
                         ],
                       ),
                     ),
+
+                  // ── Rating & Komentar ────────────────────
+                  const SizedBox(height: 28),
+                  if (umkm['id'] != null)
+                    ReviewSection(umkmId: umkm['id'] as int),
                 ],
               ),
             ),

@@ -1,34 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'login_screen.dart';
 import 'role_checker.dart';
+import '../user/home_screen.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // StreamBuilder akan terus memantau status login (AuthState) dari Supabase
     return StreamBuilder<AuthState>(
       stream: Supabase.instance.client.auth.onAuthStateChange,
       builder: (context, snapshot) {
-        // Saat aplikasi baru dibuka, tampilkan loading sebentar sambil mengecek sesi
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            backgroundColor: Color(0xFF0A0A0A),
+            body: Center(
+              child: CircularProgressIndicator(color: Color(0xFF9E9E9E)),
+            ),
           );
         }
 
-        // Ambil data sesi (session)
         final session = snapshot.hasData ? snapshot.data!.session : null;
 
-        // Jika session tidak kosong (artinya user sudah login)
+        // Sudah login → cek role (admin / user biasa)
         if (session != null) {
-          return const RoleChecker(); // Lempar ke penyeleksi role
+          return const RoleChecker();
         }
 
-        // Jika session kosong (belum login atau sudah logout), tampilkan LoginScreen
-        return const LoginScreen();
+        // Belum login → langsung ke HomeScreen sebagai guest
+        return const HomeScreen();
       },
     );
   }

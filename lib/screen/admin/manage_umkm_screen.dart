@@ -13,7 +13,8 @@ class ManageUmkmScreen extends StatefulWidget {
 class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
   final _umkmStream = Supabase.instance.client
       .from('umkm')
-      .stream(primaryKey: ['id']).order('created_at', ascending: false);
+      .stream(primaryKey: ['id'])
+      .order('created_at', ascending: false);
 
   Future<void> _hapusData(int id, String nama) async {
     final confirm = await showDialog<bool>(
@@ -26,7 +27,10 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
         ),
         title: const Text(
           'Hapus Data?',
-          style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         content: Text(
           'Kamu yakin ingin menghapus "$nama"? Tindakan ini tidak bisa dibatalkan.',
@@ -35,8 +39,10 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal',
-                style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text(
+              'Batal',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -44,7 +50,8 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
               backgroundColor: const Color(0xFF8B0000),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: const Text('Hapus'),
           ),
@@ -58,8 +65,10 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Data berhasil dihapus.',
-                  style: TextStyle(color: AppColors.textPrimary)),
+              content: const Text(
+                'Data berhasil dihapus.',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
               backgroundColor: AppColors.snackSuccess,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
@@ -73,8 +82,10 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Gagal menghapus: $e',
-                  style: const TextStyle(color: AppColors.textPrimary)),
+              content: Text(
+                'Gagal menghapus: $e',
+                style: const TextStyle(color: AppColors.textPrimary),
+              ),
               backgroundColor: AppColors.snackError,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
@@ -104,8 +115,11 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.border),
             ),
-            child: const Icon(Icons.arrow_back_ios_new,
-                color: AppColors.textPrimary, size: 16),
+            child: const Icon(
+              Icons.arrow_back_ios_new,
+              color: AppColors.textPrimary,
+              size: 16,
+            ),
           ),
         ),
         title: const Text(
@@ -128,8 +142,10 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
 
           if (snapshot.hasError) {
             return Center(
-              child: Text('Error: ${snapshot.error}',
-                  style: const TextStyle(color: AppColors.textSecondary)),
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
             );
           }
 
@@ -140,8 +156,11 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.inbox_outlined,
-                      size: 56, color: AppColors.textHint),
+                  const Icon(
+                    Icons.inbox_outlined,
+                    size: 56,
+                    color: AppColors.textHint,
+                  ),
                   const SizedBox(height: 12),
                   const Text(
                     'Belum ada data.',
@@ -174,20 +193,26 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
                             width: 58,
                             height: 58,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
+                            errorBuilder: (_, _, _) => Container(
                               width: 58,
                               height: 58,
                               color: AppColors.bgElevated,
-                              child: const Icon(Icons.image_not_supported_outlined,
-                                  color: AppColors.textHint, size: 24),
+                              child: const Icon(
+                                Icons.image_not_supported_outlined,
+                                color: AppColors.textHint,
+                                size: 24,
+                              ),
                             ),
                           )
                         : Container(
                             width: 58,
                             height: 58,
                             color: AppColors.bgElevated,
-                            child: const Icon(Icons.storefront_outlined,
-                                color: AppColors.iconColor, size: 26),
+                            child: const Icon(
+                              Icons.storefront_outlined,
+                              color: AppColors.iconColor,
+                              size: 26,
+                            ),
                           ),
                   ),
                   title: Text(
@@ -227,7 +252,8 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
                       _iconBtn(
                         icon: Icons.delete_outline,
                         color: const Color(0xFF8B2020),
-                        onTap: () => _hapusData(umkm['id'], umkm['nama_tempat']),
+                        onTap: () =>
+                            _hapusData(umkm['id'], umkm['nama_tempat']),
                       ),
                     ],
                   ),
@@ -251,9 +277,9 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Icon(icon, color: color, size: 18),
       ),

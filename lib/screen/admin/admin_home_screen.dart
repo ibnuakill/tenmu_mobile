@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/app_colors.dart';
 import 'add_umkm_screen.dart';
 import 'manage_umkm_screen.dart';
+import 'manage_users_screen.dart';
 import 'admin_profile_screen.dart';
 
 class AdminHomeScreen extends StatelessWidget {
@@ -170,6 +171,22 @@ class AdminHomeScreen extends StatelessWidget {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const ManageUmkmScreen()),
+                ),
+                isPrimary: false,
+              ),
+
+              const SizedBox(height: 12),
+
+              _menuButton(
+                context: context,
+                icon: Icons.rate_review_outlined,
+                title: 'Kelola User & Ulasan',
+                subtitle: 'Hapus komentar tidak pantas atau akun bermasalah',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ManageUsersScreen(),
+                  ),
                 ),
                 isPrimary: false,
               ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/app_colors.dart';
+import '../auth/login_screen.dart';
 import 'umkm_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -13,12 +14,20 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _umkmStream = Supabase.instance.client
       .from('umkm')
-      .stream(primaryKey: ['id']).order('created_at', ascending: false);
+      .stream(primaryKey: ['id'])
+      .order('created_at', ascending: false);
 
   String _searchQuery = '';
 
   Future<void> _signOut(BuildContext context) async {
     await Supabase.instance.client.auth.signOut();
+  }
+
+  void _goToLogin(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
   }
 
   @override
@@ -56,21 +65,65 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   const Spacer(),
-                  GestureDetector(
-                    onTap: () => _signOut(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgElevated,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const Icon(
-                        Icons.logout_rounded,
-                        color: AppColors.iconColor,
-                        size: 20,
-                      ),
-                    ),
+                  StreamBuilder<AuthState>(
+                    stream: Supabase.instance.client.auth.onAuthStateChange,
+                    builder: (ctx, snapshot) {
+                      final isLoggedIn =
+                          Supabase.instance.client.auth.currentUser != null;
+                      if (isLoggedIn) {
+                        // ── Tombol Logout (user sudah login) ────────────
+                        return GestureDetector(
+                          onTap: () => _signOut(ctx),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.bgElevated,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: const Icon(
+                              Icons.logout_rounded,
+                              color: AppColors.iconColor,
+                              size: 20,
+                            ),
+                          ),
+                        );
+                      } else {
+                        // ── Tombol Login (guest) ─────────────────────────
+                        return GestureDetector(
+                          onTap: () => _goToLogin(ctx),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 9,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.btnPrimary,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.login_rounded,
+                                  color: AppColors.btnLabel,
+                                  size: 16,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Masuk',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.btnLabel,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                    },
                   ),
                 ],
               ),
@@ -88,15 +141,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   border: Border.all(color: AppColors.border),
                 ),
                 child: TextField(
-                  onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+                  onChanged: (v) =>
+                      setState(() => _searchQuery = v.toLowerCase()),
                   style: const TextStyle(color: AppColors.textPrimary),
                   cursorColor: AppColors.borderFocus,
                   decoration: const InputDecoration(
                     hintText: 'Cari nama tempat atau alamat...',
-                    hintStyle: TextStyle(color: AppColors.textHint, fontSize: 14),
-                    prefixIcon: Icon(Icons.search, color: AppColors.iconColor, size: 20),
+                    hintStyle: TextStyle(
+                      color: AppColors.textHint,
+                      fontSize: 14,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: AppColors.iconColor,
+                      size: 20,
+                    ),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                   ),
                 ),
               ),
@@ -111,7 +175,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
-                      child: CircularProgressIndicator(color: AppColors.iconColor),
+                      child: CircularProgressIndicator(
+                        color: AppColors.iconColor,
+                      ),
                     );
                   }
 
@@ -139,8 +205,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.storefront_outlined,
-                              size: 56, color: AppColors.textHint),
+                          Icon(
+                            Icons.storefront_outlined,
+                            size: 56,
+                            color: AppColors.textHint,
+                          ),
                           const SizedBox(height: 12),
                           const Text(
                             'Belum ada tempat ditemukan.',
@@ -207,12 +276,15 @@ class _UmkmCard extends StatelessWidget {
                     height: 180,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       height: 180,
                       color: AppColors.bgElevated,
                       child: const Center(
-                        child: Icon(Icons.broken_image,
-                            size: 40, color: AppColors.textHint),
+                        child: Icon(
+                          Icons.broken_image,
+                          size: 40,
+                          color: AppColors.textHint,
+                        ),
                       ),
                     ),
                   ),
@@ -222,16 +294,21 @@ class _UmkmCard extends StatelessWidget {
                       right: 12,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: AppColors.bgBase.withOpacity(0.85),
+                          color: AppColors.bgBase.withValues(alpha: 0.85),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: AppColors.border),
                         ),
                         child: const Row(
                           children: [
-                            Icon(Icons.star_rounded,
-                                size: 14, color: AppColors.textPrimary),
+                            Icon(
+                              Icons.star_rounded,
+                              size: 14,
+                              color: AppColors.textPrimary,
+                            ),
                             SizedBox(width: 4),
                             Text(
                               'Rekomendasi',
@@ -252,8 +329,11 @@ class _UmkmCard extends StatelessWidget {
                 height: 120,
                 color: AppColors.bgElevated,
                 child: const Center(
-                  child: Icon(Icons.storefront_outlined,
-                      size: 40, color: AppColors.textHint),
+                  child: Icon(
+                    Icons.storefront_outlined,
+                    size: 40,
+                    color: AppColors.textHint,
+                  ),
                 ),
               ),
 
@@ -286,8 +366,11 @@ class _UmkmCard extends StatelessWidget {
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined,
-                          size: 14, color: AppColors.iconColor),
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
+                        color: AppColors.iconColor,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(

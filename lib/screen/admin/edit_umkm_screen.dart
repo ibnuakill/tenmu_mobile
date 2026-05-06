@@ -14,29 +14,29 @@ class EditUmkmScreen extends StatefulWidget {
 }
 
 class _EditUmkmScreenState extends State<EditUmkmScreen> {
-  final _namaController     = TextEditingController();
-  final _alamatController   = TextEditingController();
+  final _namaController = TextEditingController();
+  final _alamatController = TextEditingController();
   final _deskripsiController = TextEditingController();
-  final _latController      = TextEditingController();
-  final _lngController      = TextEditingController();
+  final _latController = TextEditingController();
+  final _lngController = TextEditingController();
 
-  bool _isLoading        = false;
+  bool _isLoading = false;
   bool _isUploadingImage = false;
 
   // Gambar: bisa dari URL lama atau file baru
-  File?   _newImageFile;
+  File? _newImageFile;
   String? _currentImageUrl;
 
   @override
   void initState() {
     super.initState();
     // Isi semua field dengan data lama
-    _namaController.text      = widget.umkm['nama_tempat'] ?? '';
-    _alamatController.text    = widget.umkm['alamat'] ?? '';
+    _namaController.text = widget.umkm['nama_tempat'] ?? '';
+    _alamatController.text = widget.umkm['alamat'] ?? '';
     _deskripsiController.text = widget.umkm['deskripsi'] ?? '';
-    _latController.text       = widget.umkm['latitude']?.toString() ?? '';
-    _lngController.text       = widget.umkm['longitude']?.toString() ?? '';
-    _currentImageUrl          = widget.umkm['gambar_url'];
+    _latController.text = widget.umkm['latitude']?.toString() ?? '';
+    _lngController.text = widget.umkm['longitude']?.toString() ?? '';
+    _currentImageUrl = widget.umkm['gambar_url'];
   }
 
   @override
@@ -52,16 +52,20 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
   // ── Ganti Gambar ────────────────────────────────────────────────────────
   Future<void> _pickAndUploadImage() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+    );
     if (picked == null) return;
 
     setState(() {
-      _newImageFile     = File(picked.path);
+      _newImageFile = File(picked.path);
       _isUploadingImage = true;
     });
 
     try {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${picked.name}';
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${picked.name}';
       await Supabase.instance.client.storage
           .from('umkm_images')
           .upload(fileName, _newImageFile!);
@@ -89,14 +93,17 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await Supabase.instance.client.from('umkm').update({
-        'nama_tempat': _namaController.text.trim(),
-        'alamat'     : _alamatController.text.trim(),
-        'deskripsi'  : _deskripsiController.text.trim(),
-        'latitude'   : double.tryParse(_latController.text.trim()),
-        'longitude'  : double.tryParse(_lngController.text.trim()),
-        'gambar_url' : _currentImageUrl,   // ← ikut terupdate
-      }).eq('id', widget.umkm['id']);
+      await Supabase.instance.client
+          .from('umkm')
+          .update({
+            'nama_tempat': _namaController.text.trim(),
+            'alamat': _alamatController.text.trim(),
+            'deskripsi': _deskripsiController.text.trim(),
+            'latitude': double.tryParse(_latController.text.trim()),
+            'longitude': double.tryParse(_lngController.text.trim()),
+            'gambar_url': _currentImageUrl, // ← ikut terupdate
+          })
+          .eq('id', widget.umkm['id']);
 
       if (mounted) {
         _toast('Data berhasil diperbarui!');
@@ -112,9 +119,13 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
   void _toast(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg, style: const TextStyle(color: AppColors.textPrimary)),
-        backgroundColor:
-            isError ? AppColors.snackError : AppColors.snackSuccess,
+        content: Text(
+          msg,
+          style: const TextStyle(color: AppColors.textPrimary),
+        ),
+        backgroundColor: isError
+            ? AppColors.snackError
+            : AppColors.snackSuccess,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
@@ -150,7 +161,6 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             // ── PRATINJAU GAMBAR ──────────────────────────────────────────
             _buildImageSection(),
 
@@ -199,7 +209,9 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                           hint: 'Latitude',
                           icon: Icons.my_location,
                           keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true, signed: true),
+                            decimal: true,
+                            signed: true,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -209,7 +221,9 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                           hint: 'Longitude',
                           icon: Icons.my_location,
                           keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true, signed: true),
+                            decimal: true,
+                            signed: true,
+                          ),
                         ),
                       ),
                     ],
@@ -237,8 +251,11 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                     )
                   : ElevatedButton.icon(
                       onPressed: _updateData,
-                      icon: const Icon(Icons.check_rounded,
-                          color: AppColors.btnLabel, size: 20),
+                      icon: const Icon(
+                        Icons.check_rounded,
+                        color: AppColors.btnLabel,
+                        size: 20,
+                      ),
                       label: const Text(
                         'Simpan Perubahan',
                         style: TextStyle(
@@ -292,7 +309,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                  errorBuilder: (_, _, _) => _imagePlaceholder(),
                 ),
                 // Label "Gambar Saat Ini"
                 Positioned(
@@ -300,9 +317,11 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                   left: 10,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: AppColors.bgBase.withOpacity(0.75),
+                      color: AppColors.bgBase.withValues(alpha: 0.75),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: AppColors.border),
                     ),
@@ -338,14 +357,17 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                           color: AppColors.textSecondary,
                         ),
                       )
-                    : const Icon(Icons.photo_library_outlined,
-                        size: 18, color: AppColors.iconColor),
+                    : const Icon(
+                        Icons.photo_library_outlined,
+                        size: 18,
+                        color: AppColors.iconColor,
+                      ),
                 label: Text(
                   _isUploadingImage
                       ? 'Mengunggah...'
                       : (_currentImageUrl != null
-                          ? 'Ganti Gambar'
-                          : 'Pilih Gambar dari Galeri'),
+                            ? 'Ganti Gambar'
+                            : 'Pilih Gambar dari Galeri'),
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 13,
@@ -367,33 +389,33 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
   }
 
   Widget _imagePlaceholder() => Container(
-        height: 160,
-        color: AppColors.bgElevated,
-        child: const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.image_outlined, size: 40, color: AppColors.textHint),
-              SizedBox(height: 8),
-              Text(
-                'Belum ada gambar',
-                style: TextStyle(color: AppColors.textHint, fontSize: 13),
-              ),
-            ],
+    height: 160,
+    color: AppColors.bgElevated,
+    child: const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.image_outlined, size: 40, color: AppColors.textHint),
+          SizedBox(height: 8),
+          Text(
+            'Belum ada gambar',
+            style: TextStyle(color: AppColors.textHint, fontSize: 13),
           ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 
   // ── Helper Widgets ─────────────────────────────────────────────────────────
   Widget _label(String text) => Text(
-        text,
-        style: const TextStyle(
-          color: AppColors.textSecondary,
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
-          letterSpacing: 0.5,
-        ),
-      );
+    text,
+    style: const TextStyle(
+      color: AppColors.textSecondary,
+      fontWeight: FontWeight.w600,
+      fontSize: 12,
+      letterSpacing: 0.5,
+    ),
+  );
 
   Widget _field({
     required TextEditingController controller,
@@ -430,8 +452,10 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: AppColors.borderFocus, width: 1.5),
+          borderSide: const BorderSide(
+            color: AppColors.borderFocus,
+            width: 1.5,
+          ),
         ),
       ),
     );

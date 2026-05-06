@@ -32,6 +32,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   double? _distanceInKm;
   int? _estimatedTimeInMins;
   bool _isLoading = true;
+  String? _errorMessage;
 
   // Arah kompas (0.0 berarti menghadap Utara)
   double _currentHeading = 0.0;
@@ -54,6 +55,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     super.dispose();
   }
 
+  // True jika OSRM gagal, tampilkan garis lurus sebagai fallback
+  bool _useFallback = false;
+
   Future<void> _initLocationAndRoute() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
@@ -63,55 +67,94 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         ),
       );
 
-      final startLng = position.longitude;
-      final startLat = position.latitude;
-      final endLng = widget.destinationLng;
-      final endLat = widget.destinationLat;
+      // Coba ambil rute dari OSRM dengan timeout 10 detik
+      final osrmPoints = await _fetchOsrmRoute(position);
 
+      if (osrmPoints != null) {
+        // OSRM berhasil → tampilkan rute sesungguhnya
+        final distanceMeters = Geolocator.distanceBetween(
+          position.latitude,
+          position.longitude,
+          widget.destinationLat,
+          widget.destinationLng,
+        );
+
+        setState(() {
+          _currentPosition = position;
+          _routePoints = osrmPoints;
+          _distanceInKm = distanceMeters / 1000;
+          _estimatedTimeInMins = ((_distanceInKm! / 30) * 60).round();
+          _useFallback = false;
+          _isLoading = false;
+        });
+      } else {
+        // OSRM gagal/timeout → fallback ke garis lurus
+        _applyFallbackRoute(position);
+      }
+
+      // Nyalakan Live Tracking & Kompas
+      _startLiveTracking();
+      _startCompass();
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            'Gagal mengambil lokasi GPS.\nPastikan izin lokasi sudah diaktifkan.';
+      });
+    }
+  }
+
+  /// Ambil rute dari OSRM, return null jika gagal atau timeout
+  Future<List<LatLng>?> _fetchOsrmRoute(Position position) async {
+    try {
       final url = Uri.parse(
-        'https://router.project-osrm.org/route/v1/driving/$startLng,$startLat;$endLng,$endLat?geometries=geojson',
+        'https://router.project-osrm.org/route/v1/driving/'
+        '${position.longitude},${position.latitude};'
+        '${widget.destinationLng},${widget.destinationLat}'
+        '?geometries=geojson',
       );
 
-      final response = await http.get(url);
+      final response = await http
+          .get(url)
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final routes = data['routes'] as List;
-
         if (routes.isNotEmpty) {
-          final route = routes[0];
-
-          final distanceMeters = route['distance'];
-          final durationSeconds = route['duration'];
-
-          final geometry = route['geometry']['coordinates'] as List;
-          List<LatLng> points = geometry.map((coord) {
-            return LatLng(coord[1], coord[0]);
-          }).toList();
-
-          setState(() {
-            _currentPosition = position;
-            _routePoints = points;
-            _distanceInKm = distanceMeters / 1000;
-            _estimatedTimeInMins = (durationSeconds / 60).round();
-            _isLoading = false;
-          });
-
-          // Nyalakan Live Tracking & Kompas
-          _startLiveTracking();
-          _startCompass();
+          final geometry = routes[0]['geometry']['coordinates'] as List;
+          return geometry
+              .map((coord) => LatLng(coord[1] as double, coord[0] as double))
+              .toList();
         }
-      } else {
-        setState(() => _isLoading = false);
       }
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Gagal mengambil rute.')));
-      }
+      return null;
+    } catch (_) {
+      return null; // timeout atau network error → fallback
     }
+  }
+
+  /// Fallback: tampilkan garis lurus + estimasi jarak burung
+  void _applyFallbackRoute(Position position) {
+    final distanceMeters = Geolocator.distanceBetween(
+      position.latitude,
+      position.longitude,
+      widget.destinationLat,
+      widget.destinationLng,
+    );
+
+    setState(() {
+      _currentPosition = position;
+      _routePoints = [
+        LatLng(position.latitude, position.longitude),
+        LatLng(widget.destinationLat, widget.destinationLng),
+      ];
+      _distanceInKm = distanceMeters / 1000;
+      // Estimasi ~30 km/h berkendara
+      _estimatedTimeInMins = ((_distanceInKm! / 30) * 60).round();
+      _useFallback = true;
+      _isLoading = false;
+    });
   }
 
   void _startLiveTracking() {
@@ -184,6 +227,56 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           ? const Center(
               child: CircularProgressIndicator(color: AppColors.iconColor),
             )
+          : _errorMessage != null || _currentPosition == null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.location_off_outlined,
+                      size: 64,
+                      color: AppColors.textHint,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage ?? 'Lokasi tidak tersedia.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        height: 1.6,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _isLoading = true;
+                          _errorMessage = null;
+                        });
+                        _initLocationAndRoute();
+                      },
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Coba Lagi'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.bgElevated,
+                        foregroundColor: AppColors.textPrimary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: AppColors.border),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
           : Stack(
               children: [
                 FlutterMap(
@@ -205,8 +298,14 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                       polylines: [
                         Polyline(
                           points: _routePoints,
-                          color: AppColors.borderFocus,
-                          strokeWidth: 5.0,
+                          // Jika fallback, tampilkan garis abu-abu putus-putus
+                          color: _useFallback
+                              ? Colors.grey.withValues(alpha: 0.8)
+                              : AppColors.borderFocus,
+                          strokeWidth: _useFallback ? 3.0 : 5.0,
+                          pattern: _useFallback
+                              ? StrokePattern.dashed(segments: [12, 8])
+                              : StrokePattern.solid(),
                         ),
                       ],
                     ),
@@ -252,6 +351,47 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                     ),
                   ],
                 ),
+
+                // Banner peringatan jika pakai mode fallback (OSRM gagal)
+                if (_useFallback)
+                  Positioned(
+                    top: 12,
+                    left: 16,
+                    right: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgElevated.withValues(alpha: 0.95),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.orange.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline_rounded,
+                            size: 16,
+                            color: Colors.orange,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Server rute tidak tersedia. Menampilkan jarak lurus ke tujuan.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                 Positioned(
                   right: 16,
