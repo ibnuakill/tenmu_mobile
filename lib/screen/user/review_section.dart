@@ -296,7 +296,7 @@ class _ReviewSectionState extends State<ReviewSection> {
             physics: const NeverScrollableScrollPhysics(),
             shrinkWrap: true,
             itemCount: _reviews.length,
-            separatorBuilder: (_, __) =>
+            separatorBuilder: (_, _) =>
                 const Divider(color: AppColors.border, height: 1),
             itemBuilder: (context, index) {
               final review = _reviews[index];

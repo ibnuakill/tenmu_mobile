@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' show pi;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -114,9 +113,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         '?geometries=geojson',
       );
 
-      final response = await http
-          .get(url)
-          .timeout(const Duration(seconds: 10));
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -404,8 +401,10 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                       borderRadius: BorderRadius.circular(16),
                       side: const BorderSide(color: AppColors.border),
                     ),
-                    child: const Icon(Icons.my_location,
-                        color: AppColors.iconColor),
+                    child: const Icon(
+                      Icons.my_location,
+                      color: AppColors.iconColor,
+                    ),
                   ),
                 ),
 

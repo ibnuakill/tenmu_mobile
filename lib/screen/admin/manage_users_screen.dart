@@ -359,7 +359,7 @@ class _AllReviewsTab extends StatelessWidget {
                 : ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: filtered.length,
-                    separatorBuilder: (_, __) =>
+                    separatorBuilder: (_, _) =>
                         const Divider(color: AppColors.border),
                     itemBuilder: (context, i) {
                       final review = filtered[i];
@@ -412,7 +412,7 @@ class _UserListTab extends StatelessWidget {
           : ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: users.length,
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (_, _) =>
                   const Divider(color: AppColors.border),
               itemBuilder: (context, i) {
                 final user = users[i];
