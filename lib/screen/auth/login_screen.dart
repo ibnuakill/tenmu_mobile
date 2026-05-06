@@ -53,17 +53,25 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _signIn() async {
+    if (_isLoading) return;
+
     if (_emailController.text.trim().isEmpty ||
         _passwordController.text.trim().isEmpty) {
       _toast('Email dan password tidak boleh kosong.', isError: true);
       return;
     }
+
+    FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
     try {
       await Supabase.instance.client.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+      }
     } on AuthException catch (e) {
       _toast(e.message, isError: true);
     } catch (_) {

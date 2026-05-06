@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -7,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_compass/flutter_compass.dart';
 import '../../core/app_colors.dart';
+import '../../core/location_permission_helper.dart';
 
 class RouteMapScreen extends StatefulWidget {
   final double destinationLat;
@@ -59,6 +61,28 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
   Future<void> _initLocationAndRoute() async {
     try {
+      final accessStatus = await LocationPermissionHelper.ensureAccess(
+        context,
+        featureLabel: 'melihat rute lokasi',
+      );
+
+      if (accessStatus != LocationAccessStatus.granted) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _errorMessage = switch (accessStatus) {
+            LocationAccessStatus.serviceDisabled =>
+              'GPS belum aktif.\nAktifkan lokasi lalu coba lagi.',
+            LocationAccessStatus.permissionDenied =>
+              'Izin lokasi belum diberikan.\nIzinkan akses lokasi lalu coba lagi.',
+            LocationAccessStatus.permissionDeniedForever =>
+              'Izin lokasi ditolak permanen.\nBuka pengaturan aplikasi lalu aktifkan izin lokasi.',
+            LocationAccessStatus.granted => null,
+          };
+        });
+        return;
+      }
+
       Position position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,

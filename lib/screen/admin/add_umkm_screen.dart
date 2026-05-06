@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'dart:io';
 import '../../core/app_colors.dart';
+import '../../core/location_permission_helper.dart';
 
 class AddUmkmScreen extends StatefulWidget {
   const AddUmkmScreen({super.key});
@@ -245,27 +246,22 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
   Future<void> _getCurrentLocation() async {
     setState(() => _isLoading = true);
 
-    bool serviceEnabled;
-    LocationPermission permission;
-
     try {
-      serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        throw Exception('Layanan lokasi GPS dinonaktifkan.');
-      }
+      final accessStatus = await LocationPermissionHelper.ensureAccess(
+        context,
+        featureLabel: 'mengambil lokasi tempat',
+      );
 
-      permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw Exception('Izin akses lokasi ditolak.');
+      if (accessStatus != LocationAccessStatus.granted) {
+        if (mounted && accessStatus == LocationAccessStatus.permissionDenied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Izin lokasi belum diberikan.'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        throw Exception(
-          'Izin akses lokasi ditolak permanen, buka pengaturan HP.',
-        );
+        return;
       }
 
       Position position = await Geolocator.getCurrentPosition(
@@ -375,6 +371,27 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                           mini: true,
                           onPressed: () async {
                             try {
+                              final accessStatus =
+                                  await LocationPermissionHelper.ensureAccess(
+                                    context,
+                                    featureLabel: 'mengambil lokasi saat ini',
+                                  );
+                              if (accessStatus !=
+                                  LocationAccessStatus.granted) {
+                                if (!context.mounted) return;
+                                if (accessStatus ==
+                                    LocationAccessStatus.permissionDenied) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Izin lokasi belum diberikan.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
+
                               Position position =
                                   await Geolocator.getCurrentPosition(
                                     locationSettings: const LocationSettings(
