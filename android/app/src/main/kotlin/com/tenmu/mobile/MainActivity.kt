@@ -1,4 +1,4 @@
-package com.example.tenmu
+package com.tenmu.mobile
 
 import io.flutter.embedding.android.FlutterActivity
 

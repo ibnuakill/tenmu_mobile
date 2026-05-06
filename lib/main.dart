@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tenmu/screen/auth/auth_gate.dart';
+import 'package:tenmu/screen/splash/animated_splash_screen.dart';
 
 // Fungsi main() adalah titik awal berjalannya aplikasi Flutter
 Future<void> main() async {
@@ -24,10 +25,10 @@ class TenMuApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'TenMu Mobile',
+      debugShowCheckedModeBanner: false,
+      title: 'TenMu',
       theme: ThemeData(primarySwatch: Colors.blue),
-      // Ubah bagian ini untuk mengarah ke LoginScreen
-      home: const AuthGate(),
+      home: const AnimatedSplashScreen(nextScreen: AuthGate()),
     );
   }
 }
