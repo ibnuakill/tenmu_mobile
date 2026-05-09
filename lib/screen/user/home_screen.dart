@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/app_colors.dart';
+import '../../core/theme_provider.dart';
+import '../../core/theme_toggle_button.dart';
 import '../auth/login_screen.dart';
 import 'umkm_detail_screen.dart';
 
@@ -32,8 +34,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
-      backgroundColor: AppColors.bgBase,
+      backgroundColor: theme.bgBase,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,12 +50,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'TenMu',
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
+                          color: theme.textPrimary,
                           letterSpacing: 2,
                         ),
                       ),
@@ -59,12 +63,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         'Temukan tempat nongkrong favoritmu',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: theme.textSecondary,
                         ),
                       ),
                     ],
                   ),
                   const Spacer(),
+                  const ThemeToggleButton(),
+                  const SizedBox(width: 8),
                   StreamBuilder<AuthState>(
                     stream: Supabase.instance.client.auth.onAuthStateChange,
                     builder: (ctx, snapshot) {
@@ -77,13 +83,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: AppColors.bgElevated,
+                              color: theme.bgElevated,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.border),
+                              border: Border.all(color: theme.border),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.logout_rounded,
-                              color: AppColors.iconColor,
+                              color: theme.iconColor,
                               size: 20,
                             ),
                           ),
@@ -98,24 +104,24 @@ class _HomeScreenState extends State<HomeScreen> {
                               vertical: 9,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.btnPrimary,
+                              color: theme.btnPrimary,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
                                   Icons.login_rounded,
-                                  color: AppColors.btnLabel,
+                                  color: theme.btnLabel,
                                   size: 16,
                                 ),
-                                SizedBox(width: 6),
+                                const SizedBox(width: 6),
                                 Text(
                                   'Masuk',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.btnLabel,
+                                    color: theme.btnLabel,
                                   ),
                                 ),
                               ],
@@ -136,28 +142,28 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.bgSurface,
+                  color: theme.bgSurface,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: theme.border),
                 ),
                 child: TextField(
                   onChanged: (v) =>
                       setState(() => _searchQuery = v.toLowerCase()),
-                  style: const TextStyle(color: AppColors.textPrimary),
-                  cursorColor: AppColors.borderFocus,
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: theme.textPrimary),
+                  cursorColor: theme.borderFocus,
+                  decoration: InputDecoration(
                     hintText: 'Cari nama tempat atau alamat...',
                     hintStyle: TextStyle(
-                      color: AppColors.textHint,
+                      color: theme.textHint,
                       fontSize: 14,
                     ),
                     prefixIcon: Icon(
                       Icons.search,
-                      color: AppColors.iconColor,
+                      color: theme.iconColor,
                       size: 20,
                     ),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
+                    contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 14,
                     ),
@@ -174,9 +180,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 stream: _umkmStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
+                    return Center(
                       child: CircularProgressIndicator(
-                        color: AppColors.iconColor,
+                        color: theme.iconColor,
                       ),
                     );
                   }
@@ -185,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     return Center(
                       child: Text(
                         'Terjadi kesalahan.',
-                        style: const TextStyle(color: AppColors.textSecondary),
+                        style: TextStyle(color: theme.textSecondary),
                       ),
                     );
                   }
@@ -208,12 +214,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           Icon(
                             Icons.storefront_outlined,
                             size: 56,
-                            color: AppColors.textHint,
+                            color: theme.textHint,
                           ),
                           const SizedBox(height: 12),
-                          const Text(
+                          Text(
                             'Belum ada tempat ditemukan.',
-                            style: TextStyle(color: AppColors.textSecondary),
+                            style: TextStyle(color: theme.textSecondary),
                           ),
                         ],
                       ),
@@ -254,14 +260,16 @@ class _UmkmCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
-          color: AppColors.bgSurface,
+          color: theme.bgSurface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: theme.border),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -278,12 +286,12 @@ class _UmkmCard extends StatelessWidget {
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, _) => Container(
                       height: 180,
-                      color: AppColors.bgElevated,
-                      child: const Center(
+                      color: theme.bgElevated,
+                      child: Center(
                         child: Icon(
                           Icons.broken_image,
                           size: 40,
-                          color: AppColors.textHint,
+                          color: theme.textHint,
                         ),
                       ),
                     ),
@@ -298,24 +306,24 @@ class _UmkmCard extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.bgBase.withValues(alpha: 0.85),
+                          color: theme.bgBase.withValues(alpha: 0.85),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.border),
+                          border: Border.all(color: theme.border),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
                             Icon(
                               Icons.star_rounded,
                               size: 14,
-                              color: AppColors.textPrimary,
+                              color: theme.textPrimary,
                             ),
-                            SizedBox(width: 4),
+                            const SizedBox(width: 4),
                             Text(
                               'Rekomendasi',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
+                                color: theme.textPrimary,
                               ),
                             ),
                           ],
@@ -327,12 +335,12 @@ class _UmkmCard extends StatelessWidget {
             else
               Container(
                 height: 120,
-                color: AppColors.bgElevated,
-                child: const Center(
+                color: theme.bgElevated,
+                child: Center(
                   child: Icon(
                     Icons.storefront_outlined,
                     size: 40,
-                    color: AppColors.textHint,
+                    color: theme.textHint,
                   ),
                 ),
               ),
@@ -345,10 +353,10 @@ class _UmkmCard extends StatelessWidget {
                 children: [
                   Text(
                     umkm['nama_tempat'] ?? 'Tanpa Nama',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: theme.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -357,19 +365,19 @@ class _UmkmCard extends StatelessWidget {
                       umkm['deskripsi'],
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: AppColors.textSecondary,
+                        color: theme.textSecondary,
                         height: 1.5,
                       ),
                     ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.location_on_outlined,
                         size: 14,
-                        color: AppColors.iconColor,
+                        color: theme.iconColor,
                       ),
                       const SizedBox(width: 4),
                       Expanded(
@@ -377,9 +385,9 @@ class _UmkmCard extends StatelessWidget {
                           umkm['alamat'] ?? 'Alamat tidak diketahui',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: theme.textSecondary,
                           ),
                         ),
                       ),

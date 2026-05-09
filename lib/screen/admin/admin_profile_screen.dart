@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/app_colors.dart';
+import 'package:provider/provider.dart';
+import '../../core/theme_provider.dart';
 
 class AdminProfileScreen extends StatefulWidget {
   const AdminProfileScreen({super.key});
@@ -134,18 +135,16 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
   }
 
   void _toast(String msg, {bool isError = false}) {
+    final theme = Provider.of<ThemeProvider>(context, listen: false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg, style: const TextStyle(color: AppColors.textPrimary)),
-        backgroundColor:
-            isError ? AppColors.snackError : AppColors.snackSuccess,
+        content: Text(msg, style: TextStyle(color: theme.textPrimary)),
+        backgroundColor: isError ? theme.snackError : theme.snackSuccess,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
           side: BorderSide(
-            color: isError
-                ? AppColors.snackErrorBorder
-                : AppColors.snackSuccessBorder,
+            color: isError ? theme.snackErrorBorder : theme.snackSuccessBorder,
           ),
         ),
       ),
@@ -154,28 +153,32 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     return Scaffold(
-      backgroundColor: AppColors.bgBase,
+      backgroundColor: theme.bgBase,
       appBar: AppBar(
-        backgroundColor: AppColors.bgBase,
+        backgroundColor: theme.bgBase,
         elevation: 0,
         leading: GestureDetector(
           onTap: () => Navigator.pop(context),
           child: Container(
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.bgElevated,
+              color: theme.bgElevated,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: theme.border),
             ),
-            child: const Icon(Icons.arrow_back_ios_new,
-                color: AppColors.textPrimary, size: 16),
+            child: Icon(
+              Icons.arrow_back_ios_new,
+              color: theme.textPrimary,
+              size: 16,
+            ),
           ),
         ),
-        title: const Text(
+        title: Text(
           'Pengaturan Akun',
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: theme.textPrimary,
             fontWeight: FontWeight.w700,
             fontSize: 18,
           ),
@@ -189,9 +192,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.bgSurface,
+                color: theme.bgSurface,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: theme.border),
               ),
               child: Row(
                 children: [
@@ -199,31 +202,34 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: AppColors.bgElevated,
+                      color: theme.bgElevated,
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.borderFocus),
+                      border: Border.all(color: theme.borderFocus),
                     ),
-                    child: const Icon(Icons.admin_panel_settings_outlined,
-                        color: AppColors.textPrimary, size: 24),
+                    child: Icon(
+                      Icons.admin_panel_settings_outlined,
+                      color: theme.textPrimary,
+                      size: 24,
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Admin TenMu',
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                          color: theme.textPrimary,
                           fontSize: 15,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         _currentEmail,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: theme.textSecondary,
                         ),
                       ),
                     ],
@@ -240,20 +246,20 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Container(
               decoration: BoxDecoration(
-                color: AppColors.bgSurface,
+                color: theme.bgSurface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: theme.border),
               ),
               child: TabBar(
                 controller: _tabController,
                 indicator: BoxDecoration(
-                  color: AppColors.btnPrimary,
+                  color: theme.btnPrimary,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 indicatorSize: TabBarIndicatorSize.tab,
                 dividerColor: Colors.transparent,
-                labelColor: AppColors.btnLabel,
-                unselectedLabelColor: AppColors.textSecondary,
+                labelColor: theme.btnLabel,
+                unselectedLabelColor: theme.textSecondary,
                 labelStyle: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
@@ -274,9 +280,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
               controller: _tabController,
               children: [
                 // ── TAB EMAIL ──────────────────────────────────────────────
-                _buildEmailTab(),
+                _buildEmailTab(theme),
                 // ── TAB PASSWORD ───────────────────────────────────────────
-                _buildPasswordTab(),
+                _buildPasswordTab(theme),
               ],
             ),
           ),
@@ -285,63 +291,63 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
     );
   }
 
-  Widget _buildEmailTab() {
+  Widget _buildEmailTab(ThemeProvider theme) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: AppColors.bgSurface,
+          color: theme.bgSurface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: theme.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Ganti Email',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: theme.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Link konfirmasi akan dikirim ke email baru sebelum perubahan berlaku.',
               style: TextStyle(
                 fontSize: 12,
-                color: AppColors.textSecondary,
+                color: theme.textSecondary,
                 height: 1.5,
               ),
             ),
             const SizedBox(height: 24),
 
-            _label('Email Saat Ini'),
+            _label('Email Saat Ini', theme),
             const SizedBox(height: 8),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: AppColors.bgBase,
+                color: theme.bgBase,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: theme.border),
               ),
               child: Text(
                 _currentEmail,
-                style: const TextStyle(
-                    color: AppColors.textHint, fontSize: 14),
+                style: TextStyle(color: theme.textHint, fontSize: 14),
               ),
             ),
 
             const SizedBox(height: 18),
-            _label('Email Baru'),
+            _label('Email Baru', theme),
             const SizedBox(height: 8),
             _field(
               controller: _newEmailController,
               hint: 'admin@email-baru.com',
               icon: Icons.alternate_email,
               keyboardType: TextInputType.emailAddress,
+              theme: theme,
             ),
 
             const SizedBox(height: 28),
@@ -349,6 +355,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
               label: 'Kirim Link Konfirmasi',
               onTap: _isLoadingEmail ? null : _gantiEmail,
               isLoading: _isLoadingEmail,
+              theme: theme,
             ),
           ],
         ),
@@ -356,39 +363,39 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
     );
   }
 
-  Widget _buildPasswordTab() {
+  Widget _buildPasswordTab(ThemeProvider theme) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: AppColors.bgSurface,
+          color: theme.bgSurface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: theme.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Ganti Password',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: theme.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Masukkan password saat ini untuk memverifikasi identitasmu.',
               style: TextStyle(
                 fontSize: 12,
-                color: AppColors.textSecondary,
+                color: theme.textSecondary,
                 height: 1.5,
               ),
             ),
             const SizedBox(height: 24),
 
-            _label('Password Saat Ini'),
+            _label('Password Saat Ini', theme),
             const SizedBox(height: 8),
             _field(
               controller: _currentPasswordController,
@@ -398,13 +405,14 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
               obscure: _obscureCurrent,
               onToggle: () =>
                   setState(() => _obscureCurrent = !_obscureCurrent),
+              theme: theme,
             ),
 
             const SizedBox(height: 18),
-            const Divider(color: AppColors.border),
+            Divider(color: theme.border),
             const SizedBox(height: 18),
 
-            _label('Password Baru'),
+            _label('Password Baru', theme),
             const SizedBox(height: 8),
             _field(
               controller: _newPasswordController,
@@ -413,10 +421,11 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
               isPassword: true,
               obscure: _obscureNew,
               onToggle: () => setState(() => _obscureNew = !_obscureNew),
+              theme: theme,
             ),
 
             const SizedBox(height: 18),
-            _label('Konfirmasi Password Baru'),
+            _label('Konfirmasi Password Baru', theme),
             const SizedBox(height: 8),
             _field(
               controller: _confirmPasswordController,
@@ -424,7 +433,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
               icon: Icons.lock_outline,
               isPassword: true,
               obscure: _obscureConfirm,
-              onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
+              onToggle: () =>
+                  setState(() => _obscureConfirm = !_obscureConfirm),
+              theme: theme,
             ),
 
             const SizedBox(height: 28),
@@ -432,6 +443,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
               label: 'Simpan Password Baru',
               onTap: _isLoadingPassword ? null : _gantiPassword,
               isLoading: _isLoadingPassword,
+              theme: theme,
             ),
           ],
         ),
@@ -441,15 +453,15 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
 
   // ── Helper Widgets ─────────────────────────────────────────────────────────
 
-  Widget _label(String text) => Text(
-        text,
-        style: const TextStyle(
-          color: AppColors.textSecondary,
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
-          letterSpacing: 0.5,
-        ),
-      );
+  Widget _label(String text, ThemeProvider theme) => Text(
+    text,
+    style: TextStyle(
+      color: theme.textSecondary,
+      fontWeight: FontWeight.w600,
+      fontSize: 12,
+      letterSpacing: 0.5,
+    ),
+  );
 
   Widget _field({
     required TextEditingController controller,
@@ -459,45 +471,47 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
     bool isPassword = false,
     bool obscure = false,
     VoidCallback? onToggle,
+    required ThemeProvider theme,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
       obscureText: isPassword ? obscure : false,
-      style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
-      cursorColor: AppColors.borderFocus,
+      style: TextStyle(color: theme.textPrimary, fontSize: 15),
+      cursorColor: theme.borderFocus,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 15),
-        prefixIcon: Icon(icon, color: AppColors.iconColor, size: 20),
+        hintStyle: TextStyle(color: theme.textHint, fontSize: 15),
+        prefixIcon: Icon(icon, color: theme.iconColor, size: 20),
         suffixIcon: isPassword
             ? IconButton(
                 icon: Icon(
                   obscure
                       ? Icons.visibility_off_outlined
                       : Icons.visibility_outlined,
-                  color: AppColors.textHint,
+                  color: theme.textHint,
                   size: 20,
                 ),
                 onPressed: onToggle,
               )
             : null,
         filled: true,
-        fillColor: AppColors.bgElevated,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        fillColor: theme.bgElevated,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: theme.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: theme.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: AppColors.borderFocus, width: 1.5),
+          borderSide: BorderSide(color: theme.borderFocus, width: 1.5),
         ),
       ),
     );
@@ -507,17 +521,18 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
     required String label,
     required VoidCallback? onTap,
     bool isLoading = false,
+    required ThemeProvider theme,
   }) {
     return SizedBox(
       width: double.infinity,
       height: 52,
       child: isLoading
-          ? const Center(
+          ? Center(
               child: SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
-                  color: AppColors.textSecondary,
+                  color: theme.textSecondary,
                   strokeWidth: 2,
                 ),
               ),
@@ -525,8 +540,8 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
           : ElevatedButton(
               onPressed: onTap,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.btnPrimary,
-                foregroundColor: AppColors.btnLabel,
+                backgroundColor: theme.btnPrimary,
+                foregroundColor: theme.btnLabel,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),

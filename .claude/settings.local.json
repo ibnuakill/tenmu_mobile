@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze *)",
+      "Bash(sed -i 's/const Icon\\(Icons\\\\.arrow_back_ios_new, *color: theme\\\\./Icon\\(Icons.arrow_back_ios_new, color: theme./g' lib/screen/admin/*.dart)",
+      "Bash(sed -i 's/const Icon\\(Icons\\\\.admin_panel_settings_outlined, *color: theme\\\\./Icon\\(Icons.admin_panel_settings_outlined, color: theme./g' lib/screen/admin/*.dart)"
+    ]
+  }
+}

@@ -7,7 +7,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_compass/flutter_compass.dart';
-import '../../core/app_colors.dart';
+import 'package:provider/provider.dart';
+import '../../core/theme_provider.dart';
 import '../../core/location_permission_helper.dart';
 
 class RouteMapScreen extends StatefulWidget {
@@ -227,26 +228,27 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
-      backgroundColor: AppColors.bgBase,
+      backgroundColor: theme.bgBase,
       appBar: AppBar(
         title: Text(
           'Rute ke ${widget.destinationName}',
-          style: const TextStyle(
-            color: AppColors.textPrimary,
+          style: TextStyle(
+            color: theme.textPrimary,
             fontWeight: FontWeight.w700,
             fontSize: 16,
           ),
         ),
-        backgroundColor: AppColors.bgBase,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        backgroundColor: theme.bgBase,
+        iconTheme: IconThemeData(color: theme.textPrimary),
         elevation: 0,
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.iconColor),
+          ? Center(
+              child: CircularProgressIndicator(color: theme.iconColor),
             )
           : _errorMessage != null || _currentPosition == null
           ? Center(
@@ -255,17 +257,17 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.location_off_outlined,
                       size: 64,
-                      color: AppColors.textHint,
+                      color: theme.textHint,
                     ),
                     const SizedBox(height: 16),
                     Text(
                       _errorMessage ?? 'Lokasi tidak tersedia.',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
+                      style: TextStyle(
+                        color: theme.textSecondary,
                         fontSize: 14,
                         height: 1.6,
                       ),
@@ -282,15 +284,15 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                       icon: const Icon(Icons.refresh_rounded),
                       label: const Text('Coba Lagi'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.bgElevated,
-                        foregroundColor: AppColors.textPrimary,
+                        backgroundColor: theme.bgElevated,
+                        foregroundColor: theme.textPrimary,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 24,
                           vertical: 12,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(color: AppColors.border),
+                          side: BorderSide(color: theme.border),
                         ),
                       ),
                     ),
@@ -322,7 +324,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                           // Jika fallback, tampilkan garis abu-abu putus-putus
                           color: _useFallback
                               ? Colors.grey.withValues(alpha: 0.8)
-                              : AppColors.borderFocus,
+                              : theme.borderFocus,
                           strokeWidth: _useFallback ? 3.0 : 5.0,
                           pattern: _useFallback
                               ? StrokePattern.dashed(segments: [12, 8])
@@ -385,26 +387,26 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.bgElevated.withValues(alpha: 0.95),
+                        color: theme.bgElevated.withValues(alpha: 0.95),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: Colors.orange.withValues(alpha: 0.5),
                         ),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.info_outline_rounded,
                             size: 16,
                             color: Colors.orange,
                           ),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'Server rute tidak tersedia. Menampilkan jarak lurus ke tujuan.',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: AppColors.textSecondary,
+                                color: theme.textSecondary,
                                 height: 1.4,
                               ),
                             ),
@@ -419,15 +421,15 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                   bottom: 140 + bottomPadding,
                   child: FloatingActionButton(
                     onPressed: _recenterMap,
-                    backgroundColor: AppColors.bgSurface,
+                    backgroundColor: theme.bgSurface,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
-                      side: const BorderSide(color: AppColors.border),
+                      side: BorderSide(color: theme.border),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.my_location,
-                      color: AppColors.iconColor,
+                      color: theme.iconColor,
                     ),
                   ),
                 ),
@@ -442,9 +444,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                       horizontal: 16,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.bgSurface,
+                      color: theme.bgSurface,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: AppColors.border),
+                      border: Border.all(color: theme.border),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.3),
@@ -459,10 +461,10 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                         Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text(
+                            Text(
                               'Jarak',
                               style: TextStyle(
-                                color: AppColors.textSecondary,
+                                color: theme.textSecondary,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 12,
                               ),
@@ -472,10 +474,10 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                               _distanceInKm != null
                                   ? '${_distanceInKm!.toStringAsFixed(1)} km'
                                   : '-',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimary,
+                                color: theme.textPrimary,
                               ),
                             ),
                           ],
@@ -483,15 +485,15 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                         Container(
                           width: 1,
                           height: 40,
-                          color: AppColors.border,
+                          color: theme.border,
                         ),
                         Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text(
+                            Text(
                               'Waktu Tempuh',
                               style: TextStyle(
-                                color: AppColors.textSecondary,
+                                color: theme.textSecondary,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 12,
                               ),
@@ -501,10 +503,10 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                               _estimatedTimeInMins != null
                                   ? '$_estimatedTimeInMins mnt'
                                   : '-',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimary,
+                                color: theme.textPrimary,
                               ),
                             ),
                           ],

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/app_colors.dart';
+import '../../core/theme_provider.dart';
+import '../../core/theme_toggle_button.dart';
 import 'add_umkm_screen.dart';
 import 'manage_umkm_screen.dart';
 import 'manage_users_screen.dart';
@@ -15,8 +17,10 @@ class AdminHomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
-      backgroundColor: AppColors.bgBase,
+      backgroundColor: theme.bgBase,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -32,51 +36,53 @@ class AdminHomeScreen extends StatelessWidget {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: AppColors.bgElevated,
+                      color: theme.bgElevated,
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.border),
+                      border: Border.all(color: theme.border),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.admin_panel_settings_outlined,
-                      color: AppColors.textPrimary,
+                      color: theme.textPrimary,
                       size: 24,
                     ),
                   ),
                   const SizedBox(width: 14),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'Dashboard Admin',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                          color: theme.textPrimary,
                         ),
                       ),
                       Text(
                         'TenMu Management',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: theme.textSecondary,
                           letterSpacing: 1,
                         ),
                       ),
                     ],
                   ),
                   const Spacer(),
+                  const ThemeToggleButton(),
+                  const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () => _signOut(context),
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppColors.bgElevated,
+                        color: theme.bgElevated,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(color: theme.border),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.logout_rounded,
-                        color: AppColors.iconColor,
+                        color: theme.iconColor,
                         size: 20,
                       ),
                     ),
@@ -91,9 +97,9 @@ class AdminHomeScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: AppColors.bgSurface,
+                  color: theme.bgSurface,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: theme.border),
                 ),
                 child: Column(
                   children: [
@@ -101,32 +107,32 @@ class AdminHomeScreen extends StatelessWidget {
                       width: 64,
                       height: 64,
                       decoration: BoxDecoration(
-                        color: AppColors.bgElevated,
+                        color: theme.bgElevated,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.borderFocus),
+                        border: Border.all(color: theme.borderFocus),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.storefront_rounded,
-                        color: AppColors.textPrimary,
+                        color: theme.textPrimary,
                         size: 32,
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Selamat Datang, Admin! 👋',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: theme.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
+                    Text(
                       'Kamu punya kendali penuh untuk mengelola data tempat nongkrong.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
-                        color: AppColors.textSecondary,
+                        color: theme.textSecondary,
                         height: 1.5,
                       ),
                     ),
@@ -136,12 +142,12 @@ class AdminHomeScreen extends StatelessWidget {
 
               const SizedBox(height: 32),
 
-              const Text(
+              Text(
                 'MENU UTAMA',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                  color: theme.textSecondary,
                   letterSpacing: 2,
                 ),
               ),
@@ -150,6 +156,7 @@ class AdminHomeScreen extends StatelessWidget {
               // ── MENU CARD: TAMBAH ─────────────────────────────────────────
               _menuButton(
                 context: context,
+                theme: theme,
                 icon: Icons.add_location_alt_outlined,
                 title: 'Tambah Tempat Baru',
                 subtitle: 'Tambahkan UMKM atau spot nongkrong baru',
@@ -165,6 +172,7 @@ class AdminHomeScreen extends StatelessWidget {
               // ── MENU CARD: KELOLA ─────────────────────────────────────────
               _menuButton(
                 context: context,
+                theme: theme,
                 icon: Icons.tune_rounded,
                 title: 'Kelola / Edit / Hapus Data',
                 subtitle: 'Lihat semua data dan lakukan perubahan',
@@ -179,6 +187,7 @@ class AdminHomeScreen extends StatelessWidget {
 
               _menuButton(
                 context: context,
+                theme: theme,
                 icon: Icons.rate_review_outlined,
                 title: 'Kelola User & Ulasan',
                 subtitle: 'Hapus komentar tidak pantas atau akun bermasalah',
@@ -195,6 +204,7 @@ class AdminHomeScreen extends StatelessWidget {
 
               _menuButton(
                 context: context,
+                theme: theme,
                 icon: Icons.manage_accounts_outlined,
                 title: 'Pengaturan Akun',
                 subtitle: 'Ganti email atau password admin',
@@ -215,6 +225,7 @@ class AdminHomeScreen extends StatelessWidget {
 
   Widget _menuButton({
     required BuildContext context,
+    required ThemeProvider theme,
     required IconData icon,
     required String title,
     required String subtitle,
@@ -226,10 +237,10 @@ class AdminHomeScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: isPrimary ? AppColors.btnPrimary : AppColors.bgSurface,
+          color: isPrimary ? theme.btnPrimary : theme.bgSurface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isPrimary ? AppColors.btnPrimary : AppColors.border,
+            color: isPrimary ? theme.btnPrimary : theme.border,
           ),
         ),
         child: Row(
@@ -239,13 +250,13 @@ class AdminHomeScreen extends StatelessWidget {
               height: 46,
               decoration: BoxDecoration(
                 color: isPrimary
-                    ? AppColors.bgBase.withValues(alpha: 0.1)
-                    : AppColors.bgElevated,
+                    ? theme.bgBase.withValues(alpha: 0.1)
+                    : theme.bgElevated,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 icon,
-                color: isPrimary ? AppColors.btnLabel : AppColors.textPrimary,
+                color: isPrimary ? theme.btnLabel : theme.textPrimary,
                 size: 22,
               ),
             ),
@@ -260,8 +271,8 @@ class AdminHomeScreen extends StatelessWidget {
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: isPrimary
-                          ? AppColors.btnLabel
-                          : AppColors.textPrimary,
+                          ? theme.btnLabel
+                          : theme.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -270,8 +281,8 @@ class AdminHomeScreen extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       color: isPrimary
-                          ? AppColors.btnLabel.withValues(alpha: 0.6)
-                          : AppColors.textSecondary,
+                          ? theme.btnLabel.withValues(alpha: 0.6)
+                          : theme.textSecondary,
                     ),
                   ),
                 ],
@@ -280,8 +291,8 @@ class AdminHomeScreen extends StatelessWidget {
             Icon(
               Icons.chevron_right_rounded,
               color: isPrimary
-                  ? AppColors.btnLabel.withValues(alpha: 0.5)
-                  : AppColors.iconColor,
+                  ? theme.btnLabel.withValues(alpha: 0.5)
+                  : theme.iconColor,
             ),
           ],
         ),

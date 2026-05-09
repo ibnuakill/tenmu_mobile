@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/app_colors.dart';
+import 'package:provider/provider.dart';
+import '../../core/theme_provider.dart';
 import 'edit_umkm_screen.dart';
 
 class ManageUmkmScreen extends StatefulWidget {
@@ -17,32 +18,30 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
       .order('created_at', ascending: false);
 
   Future<void> _hapusData(int id, String nama) async {
+    final theme = Provider.of<ThemeProvider>(context, listen: false);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.bgSurface,
+        backgroundColor: theme.bgSurface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.border),
+          side: BorderSide(color: theme.border),
         ),
-        title: const Text(
+        title: Text(
           'Hapus Data?',
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: theme.textPrimary,
             fontWeight: FontWeight.w700,
           ),
         ),
         content: Text(
           'Kamu yakin ingin menghapus "$nama"? Tindakan ini tidak bisa dibatalkan.',
-          style: const TextStyle(color: AppColors.textSecondary, height: 1.5),
+          style: TextStyle(color: theme.textSecondary, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'Batal',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
+            child: Text('Batal', style: TextStyle(color: theme.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -63,34 +62,36 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
       try {
         await Supabase.instance.client.from('umkm').delete().eq('id', id);
         if (mounted) {
+          final theme = Provider.of<ThemeProvider>(context, listen: false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text(
+              content: Text(
                 'Data berhasil dihapus.',
-                style: TextStyle(color: AppColors.textPrimary),
+                style: TextStyle(color: theme.textPrimary),
               ),
-              backgroundColor: AppColors.snackSuccess,
+              backgroundColor: theme.snackSuccess,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
-                side: const BorderSide(color: AppColors.snackSuccessBorder),
+                side: BorderSide(color: theme.snackSuccessBorder),
               ),
             ),
           );
         }
       } catch (e) {
         if (mounted) {
+          final theme = Provider.of<ThemeProvider>(context, listen: false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
                 'Gagal menghapus: $e',
-                style: const TextStyle(color: AppColors.textPrimary),
+                style: TextStyle(color: theme.textPrimary),
               ),
-              backgroundColor: AppColors.snackError,
+              backgroundColor: theme.snackError,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
-                side: const BorderSide(color: AppColors.snackErrorBorder),
+                side: BorderSide(color: theme.snackErrorBorder),
               ),
             ),
           );
@@ -101,31 +102,32 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     return Scaffold(
-      backgroundColor: AppColors.bgBase,
+      backgroundColor: theme.bgBase,
       appBar: AppBar(
-        backgroundColor: AppColors.bgBase,
+        backgroundColor: theme.bgBase,
         elevation: 0,
         leading: GestureDetector(
           onTap: () => Navigator.pop(context),
           child: Container(
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.bgElevated,
+              color: theme.bgElevated,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: theme.border),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.arrow_back_ios_new,
-              color: AppColors.textPrimary,
+              color: theme.textPrimary,
               size: 16,
             ),
           ),
         ),
-        title: const Text(
+        title: Text(
           'Kelola Data UMKM',
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: theme.textPrimary,
             fontWeight: FontWeight.w700,
             fontSize: 18,
           ),
@@ -135,8 +137,8 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
         stream: _umkmStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.iconColor),
+            return Center(
+              child: CircularProgressIndicator(color: theme.iconColor),
             );
           }
 
@@ -144,7 +146,7 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
             return Center(
               child: Text(
                 'Error: ${snapshot.error}',
-                style: const TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: theme.textSecondary),
               ),
             );
           }
@@ -156,15 +158,11 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
-                    Icons.inbox_outlined,
-                    size: 56,
-                    color: AppColors.textHint,
-                  ),
+                  Icon(Icons.inbox_outlined, size: 56, color: theme.textHint),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'Belum ada data.',
-                    style: TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(color: theme.textSecondary),
                   ),
                 ],
               ),
@@ -179,9 +177,9 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: AppColors.bgSurface,
+                  color: theme.bgSurface,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: theme.border),
                 ),
                 child: ListTile(
                   contentPadding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
@@ -196,10 +194,10 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
                             errorBuilder: (_, _, _) => Container(
                               width: 58,
                               height: 58,
-                              color: AppColors.bgElevated,
-                              child: const Icon(
+                              color: theme.bgElevated,
+                              child: Icon(
                                 Icons.image_not_supported_outlined,
-                                color: AppColors.textHint,
+                                color: theme.textHint,
                                 size: 24,
                               ),
                             ),
@@ -207,19 +205,19 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
                         : Container(
                             width: 58,
                             height: 58,
-                            color: AppColors.bgElevated,
-                            child: const Icon(
+                            color: theme.bgElevated,
+                            child: Icon(
                               Icons.storefront_outlined,
-                              color: AppColors.iconColor,
+                              color: theme.iconColor,
                               size: 26,
                             ),
                           ),
                   ),
                   title: Text(
                     umkm['nama_tempat'] ?? 'Tanpa Nama',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: theme.textPrimary,
                       fontSize: 15,
                     ),
                   ),
@@ -229,8 +227,8 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
                       umkm['alamat'] ?? '-',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
+                      style: TextStyle(
+                        color: theme.textSecondary,
                         fontSize: 12,
                       ),
                     ),
@@ -240,7 +238,7 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
                     children: [
                       _iconBtn(
                         icon: Icons.edit_outlined,
-                        color: AppColors.borderFocus,
+                        color: theme.borderFocus,
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(

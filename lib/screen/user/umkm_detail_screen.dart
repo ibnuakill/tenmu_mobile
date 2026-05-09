@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../core/app_colors.dart';
+import 'package:provider/provider.dart';
+import '../../core/theme_provider.dart';
 import 'route_map_screen.dart';
 import 'review_section.dart';
 
@@ -10,6 +11,7 @@ class UmkmDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     final double? lat = umkm['latitude'] != null
         ? (umkm['latitude'] is int
               ? (umkm['latitude'] as int).toDouble()
@@ -23,26 +25,26 @@ class UmkmDetailScreen extends StatelessWidget {
     final bool hasLocation = lat != null && lng != null;
 
     return Scaffold(
-      backgroundColor: AppColors.bgBase,
+      backgroundColor: theme.bgBase,
       body: CustomScrollView(
         slivers: [
           // ── HERO IMAGE APP BAR ────────────────────────────────────────────
           SliverAppBar(
             expandedHeight: 280,
             pinned: true,
-            backgroundColor: AppColors.bgBase,
+            backgroundColor: theme.bgBase,
             leading: GestureDetector(
               onTap: () => Navigator.pop(context),
               child: Container(
                 margin: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.bgBase.withValues(alpha: 0.7),
+                  color: theme.bgBase.withValues(alpha: 0.7),
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: theme.border),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.arrow_back_ios_new,
-                  color: AppColors.textPrimary,
+                  color: theme.textPrimary,
                   size: 16,
                 ),
               ),
@@ -61,7 +63,7 @@ class UmkmDetailScreen extends StatelessWidget {
                               end: Alignment.bottomCenter,
                               colors: [
                                 Colors.transparent,
-                                AppColors.bgBase.withValues(alpha: 0.9),
+                                theme.bgBase.withValues(alpha: 0.9),
                               ],
                             ),
                           ),
@@ -69,12 +71,12 @@ class UmkmDetailScreen extends StatelessWidget {
                       ],
                     )
                   : Container(
-                      color: AppColors.bgSurface,
-                      child: const Center(
+                      color: theme.bgSurface,
+                      child: Center(
                         child: Icon(
                           Icons.storefront_outlined,
                           size: 64,
-                          color: AppColors.textHint,
+                          color: theme.textHint,
                         ),
                       ),
                     ),
@@ -95,10 +97,10 @@ class UmkmDetailScreen extends StatelessWidget {
                       Expanded(
                         child: Text(
                           umkm['nama_tempat'] ?? 'Tanpa Nama',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
+                            color: theme.textPrimary,
                           ),
                         ),
                       ),
@@ -110,24 +112,24 @@ class UmkmDetailScreen extends StatelessWidget {
                             vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.bgElevated,
+                            color: theme.bgElevated,
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: AppColors.borderFocus),
+                            border: Border.all(color: theme.borderFocus),
                           ),
-                          child: const Row(
+                          child: Row(
                             children: [
                               Icon(
                                 Icons.star_rounded,
                                 size: 14,
-                                color: AppColors.textPrimary,
+                                color: theme.textPrimary,
                               ),
-                              SizedBox(width: 4),
+                              const SizedBox(width: 4),
                               Text(
                                 'Rekomendasi',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
+                                  color: theme.textPrimary,
                                 ),
                               ),
                             ],
@@ -143,18 +145,18 @@ class UmkmDetailScreen extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.location_on_outlined,
                         size: 16,
-                        color: AppColors.iconColor,
+                        color: theme.iconColor,
                       ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           umkm['alamat'] ?? '-',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            color: AppColors.textSecondary,
+                            color: theme.textSecondary,
                             height: 1.4,
                           ),
                         ),
@@ -163,25 +165,25 @@ class UmkmDetailScreen extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 28),
-                  const Divider(color: AppColors.border),
+                  Divider(color: theme.border),
                   const SizedBox(height: 20),
 
                   // Deskripsi
-                  const Text(
+                  Text(
                     'Tentang Tempat Ini',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: theme.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 10),
                   Text(
                     umkm['deskripsi'] ?? 'Tidak ada deskripsi yang tersedia.',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       height: 1.7,
-                      color: AppColors.textSecondary,
+                      color: theme.textSecondary,
                     ),
                   ),
 
@@ -205,21 +207,21 @@ class UmkmDetailScreen extends StatelessWidget {
                             ),
                           );
                         },
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.directions_rounded,
-                          color: AppColors.btnLabel,
+                          color: theme.btnLabel,
                           size: 20,
                         ),
-                        label: const Text(
+                        label: Text(
                           'Lihat Rute Lokasi',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.btnLabel,
+                            color: theme.btnLabel,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.btnPrimary,
+                          backgroundColor: theme.btnPrimary,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -232,22 +234,22 @@ class UmkmDetailScreen extends StatelessWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: AppColors.bgSurface,
+                        color: theme.bgSurface,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(color: theme.border),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
                             Icons.location_off_outlined,
                             size: 16,
-                            color: AppColors.textHint,
+                            color: theme.textHint,
                           ),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Text(
                             'Koordinat lokasi belum tersedia.',
-                            style: TextStyle(color: AppColors.textHint),
+                            style: TextStyle(color: theme.textHint),
                           ),
                         ],
                       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/app_colors.dart';
+import 'package:provider/provider.dart';
+import '../../core/theme_provider.dart';
 
 /// Screen Admin: Kelola User & Hapus Review yang tidak pantas.
 class ManageUsersScreen extends StatefulWidget {
@@ -41,7 +42,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
     setState(() => _loadingUsers = true);
     try {
       // Mengambil dari tabel profiles atau reviews untuk mendapatkan user_id unik
-      // Supabase auth.users tidak bisa diakses langsung dari client, 
+      // Supabase auth.users tidak bisa diakses langsung dari client,
       // jadi kita ambil user_id unik dari tabel reviews
       final data = await _client
           .from('reviews')
@@ -124,32 +125,27 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
     required String title,
     required String content,
   }) {
+    final theme = Provider.of<ThemeProvider>(context, listen: false);
     return showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: AppColors.bgSurface,
+        backgroundColor: theme.bgSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           title,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
+          style: TextStyle(
+            color: theme.textPrimary,
             fontWeight: FontWeight.w700,
           ),
         ),
         content: Text(
           content,
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            height: 1.5,
-          ),
+          style: TextStyle(color: theme.textSecondary, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'Batal',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
+            child: Text('Batal', style: TextStyle(color: theme.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -168,20 +164,16 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
   }
 
   void _snack(String msg, {required bool isError}) {
+    final theme = Provider.of<ThemeProvider>(context, listen: false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          msg,
-          style: const TextStyle(color: AppColors.textPrimary),
-        ),
-        backgroundColor: isError ? AppColors.snackError : AppColors.snackSuccess,
+        content: Text(msg, style: TextStyle(color: theme.textPrimary)),
+        backgroundColor: isError ? theme.snackError : theme.snackSuccess,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
           side: BorderSide(
-            color: isError
-                ? AppColors.snackErrorBorder
-                : AppColors.snackSuccessBorder,
+            color: isError ? theme.snackErrorBorder : theme.snackSuccessBorder,
           ),
         ),
       ),
@@ -190,44 +182,42 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     return Scaffold(
-      backgroundColor: AppColors.bgBase,
+      backgroundColor: theme.bgBase,
       appBar: AppBar(
-        backgroundColor: AppColors.bgBase,
+        backgroundColor: theme.bgBase,
         elevation: 0,
         leading: GestureDetector(
           onTap: () => Navigator.pop(context),
           child: Container(
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.bgElevated,
+              color: theme.bgElevated,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: theme.border),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.arrow_back_ios_new,
-              color: AppColors.textPrimary,
+              color: theme.textPrimary,
               size: 16,
             ),
           ),
         ),
-        title: const Text(
+        title: Text(
           'Kelola User & Ulasan',
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: theme.textPrimary,
             fontWeight: FontWeight.w700,
             fontSize: 16,
           ),
         ),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: AppColors.textPrimary,
-          labelColor: AppColors.textPrimary,
-          unselectedLabelColor: AppColors.textHint,
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-          ),
+          indicatorColor: theme.textPrimary,
+          labelColor: theme.textPrimary,
+          unselectedLabelColor: theme.textHint,
+          labelStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           tabs: const [
             Tab(text: 'Semua Ulasan'),
             Tab(text: 'Per User'),
@@ -281,6 +271,7 @@ class _AllReviewsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     final filtered = searchQuery.isEmpty
         ? reviews
         : reviews.where((r) {
@@ -292,8 +283,8 @@ class _AllReviewsTab extends StatelessWidget {
 
     return RefreshIndicator(
       onRefresh: onRefresh,
-      color: AppColors.iconColor,
-      backgroundColor: AppColors.bgSurface,
+      color: theme.iconColor,
+      backgroundColor: theme.bgSurface,
       child: Column(
         children: [
           // Search bar
@@ -301,20 +292,20 @@ class _AllReviewsTab extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Container(
               decoration: BoxDecoration(
-                color: AppColors.bgSurface,
+                color: theme.bgSurface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: theme.border),
               ),
               child: TextField(
                 onChanged: onSearchChanged,
-                style: const TextStyle(color: AppColors.textPrimary),
-                cursorColor: AppColors.borderFocus,
-                decoration: const InputDecoration(
+                style: TextStyle(color: theme.textPrimary),
+                cursorColor: theme.borderFocus,
+                decoration: InputDecoration(
                   hintText: 'Cari komentar atau user ID...',
-                  hintStyle: TextStyle(color: AppColors.textHint, fontSize: 13),
+                  hintStyle: TextStyle(color: theme.textHint, fontSize: 13),
                   prefixIcon: Icon(
                     Icons.search,
-                    color: AppColors.iconColor,
+                    color: theme.iconColor,
                     size: 18,
                   ),
                   border: InputBorder.none,
@@ -333,10 +324,7 @@ class _AllReviewsTab extends StatelessWidget {
               children: [
                 Text(
                   '${filtered.length} ulasan',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textHint,
-                  ),
+                  style: TextStyle(fontSize: 12, color: theme.textHint),
                 ),
               ],
             ),
@@ -344,23 +332,20 @@ class _AllReviewsTab extends StatelessWidget {
 
           Expanded(
             child: isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.iconColor,
-                    ),
+                ? Center(
+                    child: CircularProgressIndicator(color: theme.iconColor),
                   )
                 : filtered.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       'Tidak ada ulasan.',
-                      style: TextStyle(color: AppColors.textSecondary),
+                      style: TextStyle(color: theme.textSecondary),
                     ),
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: filtered.length,
-                    separatorBuilder: (_, _) =>
-                        const Divider(color: AppColors.border),
+                    separatorBuilder: (_, _) => Divider(color: theme.border),
                     itemBuilder: (context, i) {
                       final review = filtered[i];
                       return _AdminReviewTile(
@@ -394,31 +379,30 @@ class _UserListTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     return RefreshIndicator(
       onRefresh: onRefresh,
-      color: AppColors.iconColor,
-      backgroundColor: AppColors.bgSurface,
+      color: theme.iconColor,
+      backgroundColor: theme.bgSurface,
       child: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.iconColor),
-            )
+          ? Center(child: CircularProgressIndicator(color: theme.iconColor))
           : users.isEmpty
-          ? const Center(
+          ? Center(
               child: Text(
                 'Belum ada user yang memberikan ulasan.',
-                style: TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: theme.textSecondary),
               ),
             )
           : ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: users.length,
-              separatorBuilder: (_, _) =>
-                  const Divider(color: AppColors.border),
+              separatorBuilder: (_, _) => Divider(color: theme.border),
               itemBuilder: (context, i) {
                 final user = users[i];
                 final userId = user['user_id'] as String;
-                final userReviews =
-                    reviews.where((r) => r['user_id'] == userId).toList();
+                final userReviews = reviews
+                    .where((r) => r['user_id'] == userId)
+                    .toList();
 
                 return _UserTile(
                   userId: userId,
@@ -441,6 +425,7 @@ class _AdminReviewTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     final rating = review['rating'] as int;
     final komentar = review['komentar'] as String?;
     final userId = review['user_id'] as String;
@@ -462,9 +447,9 @@ class _AdminReviewTile extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: AppColors.bgElevated,
+              color: theme.bgElevated,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: theme.border),
             ),
             child: Center(
               child: Text(
@@ -475,7 +460,7 @@ class _AdminReviewTile extends StatelessWidget {
                   color: rating >= 4
                       ? const Color(0xFFFFB800)
                       : rating >= 3
-                      ? AppColors.textSecondary
+                      ? theme.textSecondary
                       : const Color(0xFF8B2020),
                 ),
               ),
@@ -490,19 +475,16 @@ class _AdminReviewTile extends StatelessWidget {
                   children: [
                     Text(
                       'User: $shortId',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.textHint,
+                        color: theme.textHint,
                         fontFamily: 'monospace',
                       ),
                     ),
                     const Spacer(),
                     Text(
                       dateStr,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textHint,
-                      ),
+                      style: TextStyle(fontSize: 11, color: theme.textHint),
                     ),
                   ],
                 ),
@@ -510,18 +492,18 @@ class _AdminReviewTile extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     komentar,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: AppColors.textSecondary,
+                      color: theme.textSecondary,
                       height: 1.4,
                     ),
                   ),
                 ] else
-                  const Text(
+                  Text(
                     'Tidak ada komentar.',
                     style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.textHint,
+                      color: theme.textHint,
                       fontStyle: FontStyle.italic,
                     ),
                   ),
@@ -541,7 +523,7 @@ class _AdminReviewTile extends StatelessWidget {
                   color: const Color(0xFF8B0000).withValues(alpha: 0.3),
                 ),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.delete_outline,
                 size: 16,
                 color: Color(0xFF8B2020),
@@ -570,41 +552,39 @@ class _UserTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shortId =
-        userId.length > 12 ? '${userId.substring(0, 12)}...' : userId;
+    final theme = Provider.of<ThemeProvider>(context);
+    final shortId = userId.length > 12
+        ? '${userId.substring(0, 12)}...'
+        : userId;
 
     return ExpansionTile(
       tilePadding: EdgeInsets.zero,
       childrenPadding: const EdgeInsets.only(left: 8, bottom: 8),
-      iconColor: AppColors.iconColor,
-      collapsedIconColor: AppColors.iconColor,
+      iconColor: theme.iconColor,
+      collapsedIconColor: theme.iconColor,
       leading: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: AppColors.bgElevated,
+          color: theme.bgElevated,
           shape: BoxShape.circle,
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: theme.border),
         ),
-        child: const Center(
-          child: Icon(
-            Icons.person_outline,
-            size: 20,
-            color: AppColors.iconColor,
-          ),
+        child: Center(
+          child: Icon(Icons.person_outline, size: 20, color: theme.iconColor),
         ),
       ),
       title: Text(
         shortId,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
-          color: AppColors.textPrimary,
+          color: theme.textPrimary,
           fontFamily: 'monospace',
         ),
       ),
       subtitle: Text(
         '$reviewCount ulasan',
-        style: const TextStyle(fontSize: 11, color: AppColors.textHint),
+        style: TextStyle(fontSize: 11, color: theme.textHint),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -620,7 +600,7 @@ class _UserTile extends StatelessWidget {
                   color: const Color(0xFF8B0000).withValues(alpha: 0.3),
                 ),
               ),
-              child: const Text(
+              child: Text(
                 'Hapus Semua',
                 style: TextStyle(
                   fontSize: 11,
@@ -640,18 +620,18 @@ class _UserTile extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.bgElevated,
+                  color: theme.bgElevated,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: theme.border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '${r['rating']}★ — UMKM ID: ${r['umkm_id']}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary,
+                        color: theme.textSecondary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -659,9 +639,9 @@ class _UserTile extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         r['komentar'],
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: AppColors.textSecondary,
+                          color: theme.textSecondary,
                         ),
                       ),
                     ],

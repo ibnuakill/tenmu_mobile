@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
@@ -7,7 +8,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'dart:io';
-import '../../core/app_colors.dart';
+import '../../core/theme_provider.dart';
 import '../../core/location_permission_helper.dart';
 
 class AddUmkmScreen extends StatefulWidget {
@@ -124,17 +125,20 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
         }
 
         if (mounted) {
+          final theme = Provider.of<ThemeProvider>(context, listen: false);
           showModalBottomSheet(
             context: context,
-            backgroundColor: AppColors.bgSurface,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              side: BorderSide(color: AppColors.border),
+            backgroundColor: theme.bgSurface,
+            shape: RoundedRectangleBorder(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+              side: BorderSide(color: theme.border),
             ),
             builder: (context) {
               return Container(
                 padding: const EdgeInsets.all(16),
-                color: AppColors.bgSurface,
+                color: theme.bgSurface,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -143,16 +147,16 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
-                        color: AppColors.border,
+                        color: theme.border,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    const Text(
+                    Text(
                       'Pilih Lokasi yang Sesuai',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: theme.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -163,14 +167,14 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                         itemBuilder: (context, index) {
                           final item = data[index];
                           return ListTile(
-                            leading: const Icon(
+                            leading: Icon(
                               Icons.location_on_outlined,
-                              color: AppColors.iconColor,
+                              color: theme.iconColor,
                             ),
                             title: Text(
                               item['name'] ?? 'Lokasi',
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
+                              style: TextStyle(
+                                color: theme.textPrimary,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -178,8 +182,8 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                               item['display_name'] ?? '',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
+                              style: TextStyle(
+                                color: theme.textSecondary,
                                 fontSize: 12,
                               ),
                             ),
@@ -199,18 +203,16 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: const Text(
+                                  content: Text(
                                     'Alamat & Koordinat berhasil didapatkan! 📍',
-                                    style: TextStyle(
-                                      color: AppColors.textPrimary,
-                                    ),
+                                    style: TextStyle(color: theme.textPrimary),
                                   ),
-                                  backgroundColor: AppColors.snackSuccess,
+                                  backgroundColor: theme.snackSuccess,
                                   behavior: SnackBarBehavior.floating,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
-                                    side: const BorderSide(
-                                      color: AppColors.snackSuccessBorder,
+                                    side: BorderSide(
+                                      color: theme.snackSuccessBorder,
                                     ),
                                   ),
                                 ),
@@ -573,45 +575,40 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
     Widget? suffixIcon,
     ValueChanged<String>? onSubmitted,
   }) {
+    final theme = Provider.of<ThemeProvider>(context);
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
       onSubmitted: onSubmitted,
-      style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
-      cursorColor: AppColors.borderFocus,
+      style: TextStyle(color: theme.textPrimary, fontSize: 15),
+      cursorColor: theme.borderFocus,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(
-          color: AppColors.textSecondary,
-          fontSize: 13,
-        ),
+        labelStyle: TextStyle(color: theme.textSecondary, fontSize: 13),
         hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 14),
+        hintStyle: TextStyle(color: theme.textHint, fontSize: 14),
         prefixIcon: maxLines == 1
-            ? Icon(icon, color: AppColors.iconColor, size: 20)
+            ? Icon(icon, color: theme.iconColor, size: 20)
             : null,
         suffixIcon: suffixIcon,
         filled: true,
-        fillColor: AppColors.bgElevated,
+        fillColor: theme.bgElevated,
         contentPadding: EdgeInsets.symmetric(
           horizontal: 16,
           vertical: maxLines > 1 ? 14 : 0,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: theme.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: theme.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: AppColors.borderFocus,
-            width: 1.5,
-          ),
+          borderSide: BorderSide(color: theme.borderFocus, width: 1.5),
         ),
       ),
     );
@@ -619,19 +616,20 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     return Scaffold(
-      backgroundColor: AppColors.bgBase,
+      backgroundColor: theme.bgBase,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Tambah Tempat Baru',
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: theme.textPrimary,
             fontWeight: FontWeight.w700,
           ),
         ),
-        backgroundColor: AppColors.bgBase,
+        backgroundColor: theme.bgBase,
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        iconTheme: IconThemeData(color: theme.textPrimary),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -684,15 +682,15 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                   height: 180,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: AppColors.bgElevated,
+                    color: theme.bgElevated,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: theme.border),
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Icon(
                       Icons.image_outlined,
                       size: 50,
-                      color: AppColors.textHint,
+                      color: theme.textHint,
                     ),
                   ),
                 ),
@@ -702,30 +700,27 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _isUploadingImage ? null : _pickAndUploadImage,
                   icon: _isUploadingImage
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: AppColors.textSecondary,
+                            color: theme.textSecondary,
                           ),
                         )
-                      : const Icon(
+                      : Icon(
                           Icons.photo_library_outlined,
                           size: 18,
-                          color: AppColors.iconColor,
+                          color: theme.iconColor,
                         ),
                   label: Text(
                     _isUploadingImage
                         ? 'Mengunggah Gambar...'
                         : 'Upload Gambar dari Galeri HP',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: theme.textSecondary, fontSize: 14),
                   ),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.border),
+                    side: BorderSide(color: theme.border),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -734,16 +729,16 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                 ),
               ),
 
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16.0),
-                child: Divider(color: AppColors.border),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                child: Divider(color: theme.border),
               ),
-              const Text(
+              Text(
                 'Lokasi Maps',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: theme.textPrimary,
                 ),
               ),
               const SizedBox(height: 12),
@@ -754,7 +749,7 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                 hint: 'Contoh: Alun-alun Bandung',
                 icon: Icons.search,
                 suffixIcon: IconButton(
-                  icon: const Icon(Icons.search, color: AppColors.iconColor),
+                  icon: Icon(Icons.search, color: theme.iconColor),
                   onPressed: _searchLocationOSM,
                   tooltip: 'Cari Lokasi',
                 ),
@@ -766,16 +761,13 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _isLoading ? null : _getCurrentLocation,
-                  icon: const Icon(
-                    Icons.my_location,
-                    color: AppColors.btnLabel,
-                  ),
-                  label: const Text(
+                  icon: Icon(Icons.my_location, color: theme.btnLabel),
+                  label: Text(
                     'Dapatkan Lokasi Saat Ini (GPS)',
-                    style: TextStyle(color: AppColors.btnLabel),
+                    style: TextStyle(color: theme.btnLabel),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.btnPrimary,
+                    backgroundColor: theme.btnPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -789,16 +781,13 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: _isLoading ? null : _bukaPetaPilihLokasi,
-                  icon: const Icon(
-                    Icons.map_outlined,
-                    color: AppColors.iconColor,
-                  ),
-                  label: const Text(
+                  icon: Icon(Icons.map_outlined, color: theme.iconColor),
+                  label: Text(
                     'Pilih Manual dari Peta',
-                    style: TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(color: theme.textSecondary),
                   ),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.border),
+                    side: BorderSide(color: theme.border),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -845,29 +834,29 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                 child: ElevatedButton.icon(
                   onPressed: _isLoading ? null : _simpanData,
                   icon: _isLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: AppColors.btnLabel,
+                            color: theme.btnLabel,
                           ),
                         )
-                      : const Icon(
+                      : Icon(
                           Icons.check_rounded,
-                          color: AppColors.btnLabel,
+                          color: theme.btnLabel,
                           size: 20,
                         ),
-                  label: const Text(
+                  label: Text(
                     'Simpan Data',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.btnLabel,
+                      color: theme.btnLabel,
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.btnPrimary,
+                    backgroundColor: theme.btnPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

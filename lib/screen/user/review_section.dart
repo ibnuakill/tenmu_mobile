@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/app_colors.dart';
+import '../../core/theme_provider.dart';
 import '../auth/login_screen.dart';
 
 /// Widget lengkap Rating & Komentar untuk halaman detail UMKM.
@@ -67,28 +68,29 @@ class _ReviewSectionState extends State<ReviewSection> {
 
   // ── Buka dialog prompt login untuk guest ───────────────────
   void _promptLogin(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context, listen: false);
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: AppColors.bgSurface,
+        backgroundColor: theme.bgSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
+        title: Text(
           'Login Diperlukan',
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: theme.textPrimary,
             fontWeight: FontWeight.w700,
           ),
         ),
-        content: const Text(
+        content: Text(
           'Kamu perlu login terlebih dahulu untuk memberikan ulasan.',
-          style: TextStyle(color: AppColors.textSecondary, height: 1.5),
+          style: TextStyle(color: theme.textSecondary, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Nanti',
-              style: TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(color: theme.textSecondary),
             ),
           ),
           ElevatedButton(
@@ -100,8 +102,8 @@ class _ReviewSectionState extends State<ReviewSection> {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.btnPrimary,
-              foregroundColor: AppColors.btnLabel,
+              backgroundColor: theme.btnPrimary,
+              foregroundColor: theme.btnLabel,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -116,11 +118,12 @@ class _ReviewSectionState extends State<ReviewSection> {
 
   // ── Buka bottom sheet untuk tulis/edit review ─────────────
   void _openReviewSheet() {
+    final theme = Provider.of<ThemeProvider>(context, listen: false);
     final isEdit = _myReview != null;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.bgSurface,
+      backgroundColor: theme.bgSurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -136,28 +139,29 @@ class _ReviewSectionState extends State<ReviewSection> {
   // ── Hapus review milik sendiri ─────────────────────────────
   Future<void> _deleteMyReview() async {
     if (_myReview == null) return;
+    final theme = Provider.of<ThemeProvider>(context, listen: false);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: AppColors.bgSurface,
+        backgroundColor: theme.bgSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
+        title: Text(
           'Hapus Ulasan?',
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: theme.textPrimary,
             fontWeight: FontWeight.w700,
           ),
         ),
-        content: const Text(
+        content: Text(
           'Ulasan kamu akan dihapus secara permanen.',
-          style: TextStyle(color: AppColors.textSecondary),
+          style: TextStyle(color: theme.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(
+            child: Text(
               'Batal',
-              style: TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(color: theme.textSecondary),
             ),
           ),
           ElevatedButton(
@@ -186,24 +190,25 @@ class _ReviewSectionState extends State<ReviewSection> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     final userId = _client.auth.currentUser?.id;
     final isLoggedIn = userId != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Divider(color: AppColors.border),
+        Divider(color: theme.border),
         const SizedBox(height: 20),
 
         // ── Header: judul + tombol beri ulasan ──────────────
         Row(
           children: [
-            const Text(
+            Text(
               'Ulasan',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: theme.textPrimary,
               ),
             ),
             const Spacer(),
@@ -216,9 +221,9 @@ class _ReviewSectionState extends State<ReviewSection> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.bgElevated,
+                  color: theme.bgElevated,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: theme.border),
                 ),
                 child: Row(
                   children: [
@@ -229,16 +234,16 @@ class _ReviewSectionState extends State<ReviewSection> {
                               : Icons.rate_review_outlined)
                           : Icons.lock_outline,
                       size: 14,
-                      color: AppColors.iconColor,
+                      color: theme.iconColor,
                     ),
                     const SizedBox(width: 6),
                     Text(
                       isLoggedIn
                           ? (_myReview != null ? 'Edit Ulasan' : 'Beri Ulasan')
                           : 'Login untuk beri ulasan',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary,
+                        color: theme.textSecondary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -262,10 +267,10 @@ class _ReviewSectionState extends State<ReviewSection> {
 
         // ── Konten ──────────────────────────────────────────
         if (_isLoading)
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: CircularProgressIndicator(color: AppColors.iconColor),
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: CircularProgressIndicator(color: theme.iconColor),
             ),
           )
         else if (_reviews.isEmpty)
@@ -274,16 +279,16 @@ class _ReviewSectionState extends State<ReviewSection> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Column(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.chat_bubble_outline_rounded,
                     size: 40,
-                    color: AppColors.textHint,
+                    color: theme.textHint,
                   ),
                   const SizedBox(height: 10),
-                  const Text(
+                  Text(
                     'Belum ada ulasan. Jadilah yang pertama!',
                     style: TextStyle(
-                      color: AppColors.textSecondary,
+                      color: theme.textSecondary,
                       fontSize: 13,
                     ),
                   ),
@@ -297,7 +302,7 @@ class _ReviewSectionState extends State<ReviewSection> {
             shrinkWrap: true,
             itemCount: _reviews.length,
             separatorBuilder: (_, _) =>
-                const Divider(color: AppColors.border, height: 1),
+                Divider(color: theme.border, height: 1),
             itemBuilder: (context, index) {
               final review = _reviews[index];
               final isOwn = review['user_id'] == userId;
@@ -323,21 +328,23 @@ class _AverageBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: AppColors.bgElevated,
+        color: theme.bgElevated,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: theme.border),
       ),
       child: Row(
         children: [
           Text(
             average.toStringAsFixed(1),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 36,
               fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
+              color: theme.textPrimary,
             ),
           ),
           const SizedBox(width: 14),
@@ -348,9 +355,9 @@ class _AverageBadge extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 '$totalReviews ulasan',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.textSecondary,
+                  color: theme.textSecondary,
                 ),
               ),
             ],
@@ -377,6 +384,7 @@ class _ReviewTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     final rating = review['rating'] as int;
     final komentar = review['komentar'] as String?;
     final createdAt = review['created_at'] != null
@@ -398,15 +406,15 @@ class _ReviewTile extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: AppColors.bgElevated,
+                  color: theme.bgElevated,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: theme.border),
                 ),
                 child: Center(
                   child: Text(
                     isOwn ? 'K' : 'U',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
+                    style: TextStyle(
+                      color: theme.textSecondary,
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
                     ),
@@ -422,10 +430,10 @@ class _ReviewTile extends StatelessWidget {
                       children: [
                         Text(
                           isOwn ? 'Kamu' : 'Pengguna',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                            color: theme.textPrimary,
                           ),
                         ),
                         if (isOwn) ...[
@@ -436,15 +444,15 @@ class _ReviewTile extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.bgElevated,
+                              color: theme.bgElevated,
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: AppColors.border),
+                              border: Border.all(color: theme.border),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Saya',
                               style: TextStyle(
                                 fontSize: 10,
-                                color: AppColors.iconColor,
+                                color: theme.iconColor,
                               ),
                             ),
                           ),
@@ -453,9 +461,9 @@ class _ReviewTile extends StatelessWidget {
                     ),
                     Text(
                       dateStr,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.textHint,
+                        color: theme.textHint,
                       ),
                     ),
                   ],
@@ -464,14 +472,14 @@ class _ReviewTile extends StatelessWidget {
               // Menu edit/hapus jika milik sendiri
               if (isOwn)
                 PopupMenuButton<String>(
-                  color: AppColors.bgElevated,
+                  color: theme.bgElevated,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    side: const BorderSide(color: AppColors.border),
+                    side: BorderSide(color: theme.border),
                   ),
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.more_vert,
-                    color: AppColors.iconColor,
+                    color: theme.iconColor,
                     size: 18,
                   ),
                   onSelected: (value) {
@@ -479,16 +487,16 @@ class _ReviewTile extends StatelessWidget {
                     if (value == 'delete') onDelete?.call();
                   },
                   itemBuilder: (_) => [
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'edit',
                       child: Row(
                         children: [
                           Icon(Icons.edit_outlined,
-                              size: 16, color: AppColors.iconColor),
-                          SizedBox(width: 8),
+                              size: 16, color: theme.iconColor),
+                          const SizedBox(width: 8),
                           Text(
                             'Edit',
-                            style: TextStyle(color: AppColors.textPrimary),
+                            style: TextStyle(color: theme.textPrimary),
                           ),
                         ],
                       ),
@@ -517,9 +525,9 @@ class _ReviewTile extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               komentar,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary,
+                color: theme.textSecondary,
                 height: 1.5,
               ),
             ),
@@ -539,13 +547,14 @@ class _StarRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (i) {
         return Icon(
           i < rating ? Icons.star_rounded : Icons.star_outline_rounded,
           size: size,
-          color: i < rating ? const Color(0xFFFFB800) : AppColors.textHint,
+          color: i < rating ? const Color(0xFFFFB800) : theme.textHint,
         );
       }),
     );
@@ -593,11 +602,12 @@ class _ReviewInputSheetState extends State<_ReviewInputSheet> {
   }
 
   Future<void> _submit() async {
+    final theme = Provider.of<ThemeProvider>(context, listen: false);
     if (_selectedRating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pilih bintang terlebih dahulu.'),
-          backgroundColor: AppColors.snackError,
+        SnackBar(
+          content: const Text('Pilih bintang terlebih dahulu.'),
+          backgroundColor: theme.snackError,
         ),
       );
       return;
@@ -636,13 +646,13 @@ class _ReviewInputSheetState extends State<_ReviewInputSheet> {
               widget.isEdit
                   ? 'Ulasan berhasil diperbarui.'
                   : 'Ulasan berhasil dikirim.',
-              style: const TextStyle(color: AppColors.textPrimary),
+              style: TextStyle(color: theme.textPrimary),
             ),
-            backgroundColor: AppColors.snackSuccess,
+            backgroundColor: theme.snackSuccess,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
-              side: const BorderSide(color: AppColors.snackSuccessBorder),
+              side: BorderSide(color: theme.snackSuccessBorder),
             ),
           ),
         );
@@ -654,13 +664,13 @@ class _ReviewInputSheetState extends State<_ReviewInputSheet> {
           SnackBar(
             content: Text(
               'Gagal mengirim ulasan: $e',
-              style: const TextStyle(color: AppColors.textPrimary),
+              style: TextStyle(color: theme.textPrimary),
             ),
-            backgroundColor: AppColors.snackError,
+            backgroundColor: theme.snackError,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
-              side: const BorderSide(color: AppColors.snackErrorBorder),
+              side: BorderSide(color: theme.snackErrorBorder),
             ),
           ),
         );
@@ -670,6 +680,7 @@ class _ReviewInputSheetState extends State<_ReviewInputSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 24, 20, 24 + bottomInset),
@@ -683,7 +694,7 @@ class _ReviewInputSheetState extends State<_ReviewInputSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.border,
+                color: theme.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -692,16 +703,16 @@ class _ReviewInputSheetState extends State<_ReviewInputSheet> {
 
           Text(
             widget.isEdit ? 'Edit Ulasan' : 'Beri Ulasan',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
+              color: theme.textPrimary,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Bagaimana pengalamanmu di tempat ini?',
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 13, color: theme.textSecondary),
           ),
 
           const SizedBox(height: 20),
@@ -723,7 +734,7 @@ class _ReviewInputSheetState extends State<_ReviewInputSheet> {
                       size: 40,
                       color: starValue <= _selectedRating
                           ? const Color(0xFFFFB800)
-                          : AppColors.textHint,
+                          : theme.textHint,
                     ),
                   ),
                 );
@@ -741,7 +752,7 @@ class _ReviewInputSheetState extends State<_ReviewInputSheet> {
                 fontSize: 13,
                 color: _selectedRating > 0
                     ? const Color(0xFFFFB800)
-                    : AppColors.textHint,
+                    : theme.textHint,
               ),
             ),
           ),
@@ -751,23 +762,23 @@ class _ReviewInputSheetState extends State<_ReviewInputSheet> {
           // ── Input komentar ────────────────────────────────
           Container(
             decoration: BoxDecoration(
-              color: AppColors.bgElevated,
+              color: theme.bgElevated,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: theme.border),
             ),
             child: TextField(
               controller: _controller,
               maxLines: 4,
               maxLength: 300,
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-              cursorColor: AppColors.borderFocus,
-              decoration: const InputDecoration(
+              style: TextStyle(color: theme.textPrimary, fontSize: 14),
+              cursorColor: theme.borderFocus,
+              decoration: InputDecoration(
                 hintText:
                     'Tulis komentarmu (opsional)...',
-                hintStyle: TextStyle(color: AppColors.textHint, fontSize: 14),
+                hintStyle: TextStyle(color: theme.textHint, fontSize: 14),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.all(14),
-                counterStyle: TextStyle(color: AppColors.textHint, fontSize: 11),
+                contentPadding: const EdgeInsets.all(14),
+                counterStyle: TextStyle(color: theme.textHint, fontSize: 11),
               ),
             ),
           ),
@@ -781,27 +792,27 @@ class _ReviewInputSheetState extends State<_ReviewInputSheet> {
             child: ElevatedButton(
               onPressed: _isSubmitting ? null : _submit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.btnPrimary,
+                backgroundColor: theme.btnPrimary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 elevation: 0,
               ),
               child: _isSubmitting
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: AppColors.btnLabel,
+                        color: theme.btnLabel,
                       ),
                     )
                   : Text(
                       widget.isEdit ? 'Perbarui Ulasan' : 'Kirim Ulasan',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.btnLabel,
+                        color: theme.btnLabel,
                       ),
                     ),
             ),

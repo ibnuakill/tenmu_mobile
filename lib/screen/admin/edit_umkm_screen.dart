@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import '../../core/app_colors.dart';
+import 'package:provider/provider.dart';
+import '../../core/theme_provider.dart';
 
 class EditUmkmScreen extends StatefulWidget {
   final Map<String, dynamic> umkm;
@@ -117,22 +118,16 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
   }
 
   void _toast(String msg, {bool isError = false}) {
+    final theme = Provider.of<ThemeProvider>(context, listen: false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          msg,
-          style: const TextStyle(color: AppColors.textPrimary),
-        ),
-        backgroundColor: isError
-            ? AppColors.snackError
-            : AppColors.snackSuccess,
+        content: Text(msg, style: TextStyle(color: theme.textPrimary)),
+        backgroundColor: isError ? theme.snackError : theme.snackSuccess,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
           side: BorderSide(
-            color: isError
-                ? AppColors.snackErrorBorder
-                : AppColors.snackSuccessBorder,
+            color: isError ? theme.snackErrorBorder : theme.snackSuccessBorder,
           ),
         ),
       ),
@@ -141,20 +136,21 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
     return Scaffold(
-      backgroundColor: AppColors.bgBase,
+      backgroundColor: theme.bgBase,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Edit Tempat',
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: theme.textPrimary,
             fontWeight: FontWeight.w700,
             fontSize: 18,
           ),
         ),
-        backgroundColor: AppColors.bgBase,
+        backgroundColor: theme.bgBase,
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        iconTheme: IconThemeData(color: theme.textPrimary),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
@@ -162,7 +158,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── PRATINJAU GAMBAR ──────────────────────────────────────────
-            _buildImageSection(),
+            _buildImageSection(theme),
 
             const SizedBox(height: 24),
 
@@ -170,36 +166,38 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppColors.bgSurface,
+                color: theme.bgSurface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: theme.border),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _label('Nama Tempat'),
+                  _label('Nama Tempat', theme),
                   const SizedBox(height: 8),
                   _field(
                     controller: _namaController,
                     hint: 'Nama tempat nongkrong',
                     icon: Icons.storefront_outlined,
+                    theme: theme,
                   ),
 
                   const SizedBox(height: 16),
-                  _label('Deskripsi'),
+                  _label('Deskripsi', theme),
                   const SizedBox(height: 8),
                   _field(
                     controller: _deskripsiController,
                     hint: 'Deskripsikan tempat ini...',
                     icon: Icons.description_outlined,
                     maxLines: 3,
+                    theme: theme,
                   ),
 
                   const SizedBox(height: 16),
-                  const Divider(color: AppColors.border),
+                  Divider(color: theme.border),
                   const SizedBox(height: 16),
 
-                  _label('Koordinat Lokasi'),
+                  _label('Koordinat Lokasi', theme),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -212,6 +210,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                             decimal: true,
                             signed: true,
                           ),
+                          theme: theme,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -224,6 +223,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                             decimal: true,
                             signed: true,
                           ),
+                          theme: theme,
                         ),
                       ),
                     ],
@@ -239,33 +239,33 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
               width: double.infinity,
               height: 52,
               child: _isLoading
-                  ? const Center(
+                  ? Center(
                       child: SizedBox(
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator(
-                          color: AppColors.textSecondary,
+                          color: theme.textSecondary,
                           strokeWidth: 2,
                         ),
                       ),
                     )
                   : ElevatedButton.icon(
                       onPressed: _updateData,
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.check_rounded,
-                        color: AppColors.btnLabel,
+                        color: theme.btnLabel,
                         size: 20,
                       ),
-                      label: const Text(
+                      label: Text(
                         'Simpan Perubahan',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.btnLabel,
+                          color: theme.btnLabel,
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.btnPrimary,
+                        backgroundColor: theme.btnPrimary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -280,12 +280,12 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
   }
 
   // ── Seksi Gambar ────────────────────────────────────────────────────────
-  Widget _buildImageSection() {
+  Widget _buildImageSection(ThemeProvider theme) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.bgSurface,
+        color: theme.bgSurface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: theme.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -309,7 +309,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => _imagePlaceholder(),
+                  errorBuilder: (_, _, _) => _imagePlaceholder(theme),
                 ),
                 // Label "Gambar Saat Ini"
                 Positioned(
@@ -321,15 +321,15 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.bgBase.withValues(alpha: 0.75),
+                      color: theme.bgBase.withValues(alpha: 0.75),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.border),
+                      border: Border.all(color: theme.border),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Gambar Saat Ini',
                       style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.textSecondary,
+                        color: theme.textSecondary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -338,9 +338,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
               ],
             )
           else
-            _imagePlaceholder(),
-
-          // Tombol ganti gambar
+            _imagePlaceholder(theme),
           Padding(
             padding: const EdgeInsets.all(14),
             child: SizedBox(
@@ -349,18 +347,18 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
               child: OutlinedButton.icon(
                 onPressed: _isUploadingImage ? null : _pickAndUploadImage,
                 icon: _isUploadingImage
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: AppColors.textSecondary,
+                          color: theme.textSecondary,
                         ),
                       )
-                    : const Icon(
+                    : Icon(
                         Icons.photo_library_outlined,
                         size: 18,
-                        color: AppColors.iconColor,
+                        color: theme.iconColor,
                       ),
                 label: Text(
                   _isUploadingImage
@@ -368,14 +366,14 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                       : (_currentImageUrl != null
                             ? 'Ganti Gambar'
                             : 'Pilih Gambar dari Galeri'),
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
+                  style: TextStyle(
+                    color: theme.textSecondary,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.border),
+                  side: BorderSide(color: theme.border),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -388,18 +386,18 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
     );
   }
 
-  Widget _imagePlaceholder() => Container(
+  Widget _imagePlaceholder(ThemeProvider theme) => Container(
     height: 160,
-    color: AppColors.bgElevated,
-    child: const Center(
+    color: theme.bgElevated,
+    child: Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.image_outlined, size: 40, color: AppColors.textHint),
-          SizedBox(height: 8),
+          Icon(Icons.image_outlined, size: 40, color: theme.textHint),
+          const SizedBox(height: 8),
           Text(
             'Belum ada gambar',
-            style: TextStyle(color: AppColors.textHint, fontSize: 13),
+            style: TextStyle(color: theme.textHint, fontSize: 13),
           ),
         ],
       ),
@@ -407,10 +405,10 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
   );
 
   // ── Helper Widgets ─────────────────────────────────────────────────────────
-  Widget _label(String text) => Text(
+  Widget _label(String text, ThemeProvider theme) => Text(
     text,
-    style: const TextStyle(
-      color: AppColors.textSecondary,
+    style: TextStyle(
+      color: theme.textSecondary,
       fontWeight: FontWeight.w600,
       fontSize: 12,
       letterSpacing: 0.5,
@@ -423,39 +421,37 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
+    required ThemeProvider theme,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
-      style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
-      cursorColor: AppColors.borderFocus,
+      style: TextStyle(color: theme.textPrimary, fontSize: 15),
+      cursorColor: theme.borderFocus,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 14),
+        hintStyle: TextStyle(color: theme.textHint, fontSize: 14),
         prefixIcon: maxLines == 1
-            ? Icon(icon, color: AppColors.iconColor, size: 20)
+            ? Icon(icon, color: theme.iconColor, size: 20)
             : null,
         filled: true,
-        fillColor: AppColors.bgElevated,
+        fillColor: theme.bgElevated,
         contentPadding: EdgeInsets.symmetric(
           horizontal: 16,
           vertical: maxLines > 1 ? 14 : 0,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: theme.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: theme.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: AppColors.borderFocus,
-            width: 1.5,
-          ),
+          borderSide: BorderSide(color: theme.borderFocus, width: 1.5),
         ),
       ),
     );
