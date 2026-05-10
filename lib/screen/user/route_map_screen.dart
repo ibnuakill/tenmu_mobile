@@ -492,7 +492,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                 // Button Recenter
                 Positioned(
                   right: 16,
-                  bottom: (isNavigating ? 140 : 80) + bottomPadding,
+                  bottom: (isNavigating ? 140 : 100) + bottomPadding, // ← Diubah dari 80 ke 100 agar lebih naik
                   child: FloatingActionButton(
                     onPressed: _recenterMap,
                     backgroundColor: theme.bgSurface,
@@ -683,20 +683,38 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
   Widget _buildBrowseInfo(ThemeProvider theme) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(
+        vertical: 16,
+        horizontal: 16,
+      ),
       decoration: BoxDecoration(
         color: theme.bgSurface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: theme.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          Icon(Icons.touch_app_rounded, color: theme.iconColor),
+          Icon(
+            Icons.touch_app_rounded,
+            color: theme.iconColor,
+            size: 24,
+          ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Tap pada marker merah untuk melihat rute.',
-              style: TextStyle(fontSize: 13),
+              'Tap pada marker (lokasi merah) untuk melihat rute ke UMKM tersebut.',
+              style: TextStyle(
+                color: theme.textPrimary, // ← Menggunakan textPrimary agar putih di dark mode, hitam di light mode
+                fontSize: 13,
+                height: 1.4,
+              ),
             ),
           ),
         ],

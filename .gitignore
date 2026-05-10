@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+
+git commit -m "Chore: exclude CLAUDE.md from repository"

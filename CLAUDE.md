@@ -8,10 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Key tech stack:
 - **Flutter** (Dart): Mobile UI framework
-- **Supabase**: Authentication and real-time database
+- **Supabase**: Authentication, database, and storage
 - **Provider**: State management and theme management
-- **Flutter Map**: Geographic location mapping
-- **Geolocator**: GPS-based location services
+- **Flutter Map**: Geographic location mapping & navigation
+- **Geolocator & Flutter Compass**: GPS-based location services and heading
 
 ## Common Development Commands
 
@@ -41,85 +41,74 @@ dart format lib/                      # Format Dart code
 dart fix lib/ --apply                 # Apply automated fixes
 ```
 
-### Development Tips
-```bash
-flutter clean               # Clean build artifacts
-flutter create .            # Regenerate project files if needed
-flutter devices             # List available devices/emulators
-```
-
 ## Architecture & Code Structure
 
 ### Directory Organization
 ```
 lib/
 ├── main.dart              # App entry point, Supabase initialization
-├── core/                  # Shared utilities and theme management
+├── core/                  # Shared utilities and constants
 │   ├── theme_provider.dart       # ChangeNotifier for dark/light theme
 │   ├── app_colors.dart           # Dark theme color constants
 │   ├── app_colors_light.dart     # Light theme color constants
-│   ├── app_text_styles.dart      # Typography definitions
+│   ├── umkm_category.dart        # Category definitions and helper methods
 │   └── location_permission_helper.dart
 ├── screen/
 │   ├── auth/              # Authentication screens
 │   │   ├── auth_gate.dart        # StreamBuilder checking auth state
 │   │   ├── role_checker.dart     # Routes to admin/user based on role
-│   │   ├── login_screen.dart     # Login UI
-│   │   └── register_screen.dart  # Registration UI
 │   ├── user/              # User-facing screens
-│   │   ├── home_screen.dart      # Main user feed (streams UMKM data)
+│   │   ├── widgets/              # Reusable UI components
+│   │   │   ├── category_filter_widget.dart
+│   │   │   └── price_range_filter_widget.dart
+│   │   ├── home_screen.dart      # Main feed (Filter logic + Supabase Stream)
 │   │   ├── umkm_detail_screen.dart
-│   │   ├── route_map_screen.dart # Map navigation for UMKM locations
-│   │   └── review_section.dart
+│   │   └── route_map_screen.dart # Interactive Map (Browse & Navigate mode)
 │   ├── admin/             # Admin management screens
-│   │   ├── admin_home_screen.dart
-│   │   ├── add_umkm_screen.dart
-│   │   ├── edit_umkm_screen.dart
-│   │   ├── manage_umkm_screen.dart
-│   │   └── manage_users_screen.dart
-│   └── splash/
-│       └── animated_splash_screen.dart
+│   │   ├── add_umkm_screen.dart  # Form handles Location, Category, Price, Image
+│   │   ├── edit_umkm_screen.dart # Auto-fill existing UMKM data
+│   │   └── manage_umkm_screen.dart
 ```
 
 ### Key Architectural Patterns
 
-**1. Authentication Flow**
-- `AuthGate` listens to Supabase auth state via `onAuthStateChange` stream
-- Unauthenticated users see `HomeScreen` as guests
-- Authenticated users route through `RoleChecker` which queries the `profiles` table for their role
-- Role-based UI: admin → `AdminHomeScreen`, user → `HomeScreen`
+**1. Data Filtering & Streams (HomeScreen)**
+- UMKM list is streamed real-time from Supabase (`_umkmStream`).
+- The stream data is loaded entirely, then filtered locally based on:
+  - Search Query (Title & Address)
+  - Category Selection (Multi-select via `CategoryFilterWidget`)
+  - Price Range (Range slider via `PriceRangeFilterWidget`)
+- The Filter UI is rendered compactly inside a `showModalBottomSheet`.
 
-**2. Theme System**
-- `ThemeProvider` (ChangeNotifier) manages dark/light mode state
-- Colors are defined in separate `AppColors` and `AppColorsLight` files
-- Theme preference is persisted to `SharedPreferences` with key `'isDarkMode'`
-- Screens access theme via `Provider.of<ThemeProvider>(context)`
-- All color references use provider getters (e.g., `theme.bgBase`, `theme.textPrimary`)
+**2. Interactive Map (RouteMapScreen)**
+- Acts in two main modes:
+  - **Browse Mode**: Receives `umkmList`, displays all locations as red markers. Tapping a marker brings up an Info Overlay.
+  - **Navigation Mode**: Triggered via "Mulai Rute". Connects to OSRM API for Polylines, turns on Compass (for map marker rotation), and tracks live GPS via Geolocator.
 
-**3. Data Management**
-- Supabase real-time streams used for UMKM list (e.g., in `HomeScreen`)
-- Direct queries for role checking in `RoleChecker`
-- No local state management layer; screens handle data directly via Supabase client
+**3. Authentication Flow**
+- `AuthGate` listens to Supabase auth state via `onAuthStateChange`.
+- Unauthenticated users see `HomeScreen` as guests.
+- Authenticated users route through `RoleChecker` which queries the `profiles` table for their role (admin vs user).
 
-**4. Screen Structure**
-- Most screens are `StatefulWidget` (or `StatelessWidget` for admin screens)
-- Use `Provider.of<ThemeProvider>` to access theme colors
-- Navigation via `Navigator.push()` and `MaterialPageRoute`
-- No centralized routing system
+**4. Theme System**
+- `ThemeProvider` (ChangeNotifier) manages dark/light mode state.
+- Colors are defined in separate `AppColors` and `AppColorsLight` files.
+- Screens access theme via `Provider.of<ThemeProvider>(context)`.
 
 ### Supabase Integration
 
-- **Initialization**: Done in `main()` with hardcoded URL and anon key (⚠️ see secrets warning below)
-- **Tables**: `profiles` (stores user role), `umkm` (stores business data)
-- **Real-time streams**: Used for auto-updating UMKM list in `HomeScreen`
-- **Auth**: Managed via Supabase Flutter SDK, accessible at `Supabase.instance.client.auth`
+- **Tables**: `profiles` (user role), `umkm` (business data), `reviews` (user feedback).
+- **Storage**: `umkm_images` bucket for uploading venue photos.
+- **Data Model Notes (`umkm` table)**:
+  - Uses `latitude` and `longitude` for maps.
+  - `category` (Text), `min_price` (Int), `max_price` (Int) used for filtering.
 
 ## Important Notes
 
 ### ⚠️ Security Concern
 The Supabase credentials are hardcoded in `main.dart`. For production:
 - Move to environment variables or a secrets management system
-- Use `.env` file with flutter_dotenv package
+- Use `.env` file with `flutter_dotenv` package
 - Never commit credentials to version control
 
 ### Theme Colors
@@ -132,18 +121,15 @@ Container(
 );
 ```
 
-### Adding New Screens
-1. Create file in appropriate `screen/` subdirectory
-2. Import and use `Provider.of<ThemeProvider>(context)` for colors
-3. For authenticated screens, ensure proper role checking in `RoleChecker`
-4. Update navigation in related screens
+### Map / Location Permissions
+Always use `LocationPermissionHelper.ensureAccess(context)` before calling Geolocator/Map services to gracefully handle permissions and inform the user.
 
 ### Dependencies Overview
-- **supabase_flutter**: Backend + auth
+- **supabase_flutter**: Backend + auth + storage
 - **provider**: State management (theme)
 - **flutter_map + latlong2**: Map visualization
-- **geolocator + flutter_compass**: Location services
+- **geolocator + flutter_compass**: Location services & orientation
 - **image_picker**: Photo upload
-- **shared_preferences**: Local persistent storage
-- **http**: Network requests
-- **flutter_lints**: Code quality rules
+- **intl**: Price / Currency formatting
+- **shared_preferences**: Local persistent storage (theme prefs)
+- **http**: Network requests (OSRM / Nominatim Maps API)
