@@ -12,15 +12,20 @@ import '../../core/theme_provider.dart';
 import '../../core/location_permission_helper.dart';
 
 class RouteMapScreen extends StatefulWidget {
-  final double destinationLat;
-  final double destinationLng;
-  final String destinationName;
+  // Opsional: Jika dikasih list UMKM, ini mode "Browse Map"
+  final List<Map<String, dynamic>>? umkmList;
+
+  // Opsional: Jika dikasih 1 destinasi, ini mode "Navigasi"
+  final double? destinationLat;
+  final double? destinationLng;
+  final String? destinationName;
 
   const RouteMapScreen({
     super.key,
-    required this.destinationLat,
-    required this.destinationLng,
-    required this.destinationName,
+    this.umkmList,
+    this.destinationLat,
+    this.destinationLng,
+    this.destinationName,
   });
 
   @override
@@ -39,12 +44,26 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   // Arah kompas (0.0 berarti menghadap Utara)
   double _currentHeading = 0.0;
 
+  // Active UMKM untuk navigasi
+  Map<String, dynamic>? _selectedUmkm;
+  double? _activeDestLat;
+  double? _activeDestLng;
+  String? _activeDestName;
+  bool _isShowingRoute = false; // ← State untuk membedakan antara "Preview Overlay" dan "Sedang Rute"
+
   StreamSubscription<Position>? _positionStreamSubscription;
   StreamSubscription<CompassEvent>? _compassSubscription; // Radar Kompas
 
   @override
   void initState() {
     super.initState();
+    // Setup mode awal
+    if (widget.destinationLat != null && widget.destinationLng != null) {
+      _activeDestLat = widget.destinationLat;
+      _activeDestLng = widget.destinationLng;
+      _activeDestName = widget.destinationName;
+      _isShowingRoute = true;
+    }
     _initLocationAndRoute();
   }
 
@@ -91,29 +110,38 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         ),
       );
 
-      // Coba ambil rute dari OSRM dengan timeout 10 detik
-      final osrmPoints = await _fetchOsrmRoute(position);
+      // Jika ada active destination, ambil rute
+      if (_activeDestLat != null && _activeDestLng != null) {
+        // Coba ambil rute dari OSRM dengan timeout 10 detik
+        final osrmPoints = await _fetchOsrmRoute(position);
 
-      if (osrmPoints != null) {
-        // OSRM berhasil → tampilkan rute sesungguhnya
-        final distanceMeters = Geolocator.distanceBetween(
-          position.latitude,
-          position.longitude,
-          widget.destinationLat,
-          widget.destinationLng,
-        );
+        if (osrmPoints != null) {
+          // OSRM berhasil → tampilkan rute sesungguhnya
+          final distanceMeters = Geolocator.distanceBetween(
+            position.latitude,
+            position.longitude,
+            _activeDestLat!,
+            _activeDestLng!,
+          );
 
+          setState(() {
+            _currentPosition = position;
+            _routePoints = osrmPoints;
+            _distanceInKm = distanceMeters / 1000;
+            _estimatedTimeInMins = ((_distanceInKm! / 30) * 60).round();
+            _useFallback = false;
+            _isLoading = false;
+          });
+        } else {
+          // OSRM gagal/timeout → fallback ke garis lurus
+          _applyFallbackRoute(position);
+        }
+      } else {
+        // Mode Browse Map (tanpa destinasi awal)
         setState(() {
           _currentPosition = position;
-          _routePoints = osrmPoints;
-          _distanceInKm = distanceMeters / 1000;
-          _estimatedTimeInMins = ((_distanceInKm! / 30) * 60).round();
-          _useFallback = false;
           _isLoading = false;
         });
-      } else {
-        // OSRM gagal/timeout → fallback ke garis lurus
-        _applyFallbackRoute(position);
       }
 
       // Nyalakan Live Tracking & Kompas
@@ -130,11 +158,12 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
   /// Ambil rute dari OSRM, return null jika gagal atau timeout
   Future<List<LatLng>?> _fetchOsrmRoute(Position position) async {
+    if (_activeDestLat == null || _activeDestLng == null) return null;
     try {
       final url = Uri.parse(
         'https://router.project-osrm.org/route/v1/driving/'
         '${position.longitude},${position.latitude};'
-        '${widget.destinationLng},${widget.destinationLat}'
+        '${_activeDestLng},${_activeDestLat}'
         '?geometries=geojson',
       );
 
@@ -158,18 +187,20 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
   /// Fallback: tampilkan garis lurus + estimasi jarak burung
   void _applyFallbackRoute(Position position) {
+    if (_activeDestLat == null || _activeDestLng == null) return;
+
     final distanceMeters = Geolocator.distanceBetween(
       position.latitude,
       position.longitude,
-      widget.destinationLat,
-      widget.destinationLng,
+      _activeDestLat!,
+      _activeDestLng!,
     );
 
     setState(() {
       _currentPosition = position;
       _routePoints = [
         LatLng(position.latitude, position.longitude),
-        LatLng(widget.destinationLat, widget.destinationLng),
+        LatLng(_activeDestLat!, _activeDestLng!),
       ];
       _distanceInKm = distanceMeters / 1000;
       // Estimasi ~30 km/h berkendara
@@ -191,15 +222,17 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
             if (newPosition != null && mounted) {
               setState(() {
                 _currentPosition = newPosition;
-                double remainingDistanceMeters = Geolocator.distanceBetween(
-                  newPosition.latitude,
-                  newPosition.longitude,
-                  widget.destinationLat,
-                  widget.destinationLng,
-                );
+                if (_activeDestLat != null && _activeDestLng != null) {
+                  double remainingDistanceMeters = Geolocator.distanceBetween(
+                    newPosition.latitude,
+                    newPosition.longitude,
+                    _activeDestLat!,
+                    _activeDestLng!,
+                  );
 
-                _distanceInKm = remainingDistanceMeters / 1000;
-                _estimatedTimeInMins = ((_distanceInKm! / 30) * 60).round();
+                  _distanceInKm = remainingDistanceMeters / 1000;
+                  _estimatedTimeInMins = ((_distanceInKm! / 30) * 60).round();
+                }
               });
             }
           },
@@ -231,11 +264,18 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     final theme = Provider.of<ThemeProvider>(context);
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
+    final isPreviewing = _selectedUmkm != null && !_isShowingRoute;
+    final isNavigating = _isShowingRoute;
+
+    final title = isNavigating
+        ? 'Rute ke $_activeDestName'
+        : 'Peta Lokasi UMKM';
+
     return Scaffold(
       backgroundColor: theme.bgBase,
       appBar: AppBar(
         title: Text(
-          'Rute ke ${widget.destinationName}',
+          title,
           style: TextStyle(
             color: theme.textPrimary,
             fontWeight: FontWeight.w700,
@@ -245,11 +285,23 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         backgroundColor: theme.bgBase,
         iconTheme: IconThemeData(color: theme.textPrimary),
         elevation: 0,
+        actions: [
+          if (isNavigating && widget.umkmList != null)
+            IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: 'Tutup Rute',
+              onPressed: () {
+                setState(() {
+                  _isShowingRoute = false;
+                  _routePoints = [];
+                });
+                _recenterMap();
+              },
+            ),
+        ],
       ),
       body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(color: theme.iconColor),
-            )
+          ? Center(child: CircularProgressIndicator(color: theme.iconColor))
           : _errorMessage != null || _currentPosition == null
           ? Center(
               child: Padding(
@@ -317,24 +369,63 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                           'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.example.tenmu',
                     ),
-                    PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: _routePoints,
-                          // Jika fallback, tampilkan garis abu-abu putus-putus
-                          color: _useFallback
-                              ? Colors.grey.withValues(alpha: 0.8)
-                              : theme.borderFocus,
-                          strokeWidth: _useFallback ? 3.0 : 5.0,
-                          pattern: _useFallback
-                              ? StrokePattern.dashed(segments: [12, 8])
-                              : StrokePattern.solid(),
-                        ),
-                      ],
-                    ),
+                    if (isNavigating)
+                      PolylineLayer(
+                        polylines: [
+                          Polyline(
+                            points: _routePoints,
+                            color: _useFallback
+                                ? Colors.grey.withAlpha(200)
+                                : theme.borderFocus,
+                            strokeWidth: _useFallback ? 3.0 : 5.0,
+                            pattern: _useFallback
+                                ? StrokePattern.dashed(segments: [12, 8])
+                                : const StrokePattern.solid(),
+                          ),
+                        ],
+                      ),
                     MarkerLayer(
                       markers: [
-                        // MARKER USER: Menggunakan Panah Navigasi & Bisa Berputar!
+                        // MARKER UMKM BROWSE
+                        if (widget.umkmList != null && !isNavigating)
+                          ...widget.umkmList!
+                              .where(
+                                (u) =>
+                                    u['latitude'] != null &&
+                                    u['longitude'] != null,
+                              )
+                              .map((umkm) {
+                                return Marker(
+                                  point: LatLng(
+                                    umkm['latitude'] as double,
+                                    umkm['longitude'] as double,
+                                  ),
+                                  width: 50,
+                                  height: 50,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _activeDestLat = umkm['latitude'] as double;
+                                        _activeDestLng = umkm['longitude'] as double;
+                                        _activeDestName = umkm['nama_tempat'];
+                                        _selectedUmkm = umkm;
+                                        _isShowingRoute = false; // Overlay preview aktif
+                                      });
+                                      _mapController.move(
+                                        LatLng(_activeDestLat!, _activeDestLng!),
+                                        16.0,
+                                      );
+                                    },
+                                    child: Icon(
+                                      Icons.location_on,
+                                      color: _selectedUmkm?['id'] == umkm['id'] ? theme.btnPrimary : Colors.red,
+                                      size: _selectedUmkm?['id'] == umkm['id'] ? 50 : 40,
+                                    ),
+                                  ),
+                                );
+                              }),
+
+                        // MARKER USER
                         Marker(
                           point: LatLng(
                             _currentPosition!.latitude,
@@ -343,39 +434,36 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                           width: 60,
                           height: 60,
                           child: Transform.rotate(
-                            // Mengubah derajat (heading) menjadi radian
                             angle: _currentHeading * (pi / 180),
                             child: const Icon(
-                              Icons
-                                  .navigation, // Ikon panah navigasi ala Google Maps
+                              Icons.navigation,
                               color: Colors.blue,
                               size: 40,
                               shadows: [
                                 Shadow(color: Colors.black45, blurRadius: 5),
-                              ], // Tambah bayangan biar realistis
+                              ],
                             ),
                           ),
                         ),
+
                         // MARKER TUJUAN
-                        Marker(
-                          point: LatLng(
-                            widget.destinationLat,
-                            widget.destinationLng,
+                        if (isNavigating)
+                          Marker(
+                            point: LatLng(_activeDestLat!, _activeDestLng!),
+                            width: 50,
+                            height: 50,
+                            child: const Icon(
+                              Icons.location_on,
+                              color: Colors.red,
+                              size: 45,
+                            ),
                           ),
-                          width: 50,
-                          height: 50,
-                          child: const Icon(
-                            Icons.location_on,
-                            color: Colors.red,
-                            size: 45,
-                          ),
-                        ),
                       ],
                     ),
                   ],
                 ),
 
-                // Banner peringatan jika pakai mode fallback (OSRM gagal)
+                // Banner Fallback
                 if (_useFallback)
                   Positioned(
                     top: 12,
@@ -387,136 +475,249 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
-                        color: theme.bgElevated.withValues(alpha: 0.95),
+                        color: theme.bgElevated.withAlpha(240),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.orange.withValues(alpha: 0.5),
-                        ),
+                        border: Border.all(color: Colors.orange.withAlpha(120)),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.info_outline_rounded,
-                            size: 16,
-                            color: Colors.orange,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Server rute tidak tersedia. Menampilkan jarak lurus ke tujuan.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: theme.textSecondary,
-                                height: 1.4,
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        'Server rute tidak tersedia. Menampilkan jarak lurus.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.textSecondary,
+                        ),
                       ),
                     ),
                   ),
 
+                // Button Recenter
                 Positioned(
                   right: 16,
-                  bottom: 140 + bottomPadding,
+                  bottom: (isNavigating ? 140 : 80) + bottomPadding,
                   child: FloatingActionButton(
                     onPressed: _recenterMap,
                     backgroundColor: theme.bgSurface,
-                    elevation: 0,
+                    elevation: 2,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                       side: BorderSide(color: theme.border),
                     ),
-                    child: Icon(
-                      Icons.my_location,
-                      color: theme.iconColor,
-                    ),
+                    child: Icon(Icons.my_location, color: theme.iconColor),
                   ),
                 ),
 
+                // Info Panel
                 Positioned(
                   left: 16,
                   right: 16,
                   bottom: 30 + bottomPadding,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 20,
-                      horizontal: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.bgSurface,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: theme.border),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Jarak',
-                              style: TextStyle(
-                                color: theme.textSecondary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _distanceInKm != null
-                                  ? '${_distanceInKm!.toStringAsFixed(1)} km'
-                                  : '-',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: theme.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          width: 1,
-                          height: 40,
-                          color: theme.border,
-                        ),
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Waktu Tempuh',
-                              style: TextStyle(
-                                color: theme.textSecondary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _estimatedTimeInMins != null
-                                  ? '$_estimatedTimeInMins mnt'
-                                  : '-',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: theme.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                  child: isNavigating
+                      ? _buildNavigationInfo(theme)
+                      : isPreviewing
+                          ? _buildUmkmPreview(theme)
+                          : _buildBrowseInfo(theme),
                 ),
               ],
             ),
+    );
+  }
+
+  // --- WIDGET INFO PANELS ---
+
+  Widget _buildUmkmPreview(ThemeProvider theme) {
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.bgSurface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          )
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Row atas: Info UMKM
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                // Gambar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: _selectedUmkm!['gambar_url'] != null
+                      ? Image.network(
+                          _selectedUmkm!['gambar_url'],
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, stack) => Container(
+                            width: 60,
+                            height: 60,
+                            color: theme.bgElevated,
+                            child: Icon(Icons.storefront, color: theme.textHint),
+                          ),
+                        )
+                      : Container(
+                          width: 60,
+                          height: 60,
+                          color: theme.bgElevated,
+                          child: Icon(Icons.storefront, color: theme.textHint),
+                        ),
+                ),
+                const SizedBox(width: 16),
+                // Text Detail
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedUmkm!['nama_tempat'] ?? 'Tanpa Nama',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: theme.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _selectedUmkm!['alamat'] ?? '-',
+                        style: TextStyle(fontSize: 12, color: theme.textSecondary),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                // Tombol Close Preview
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    setState(() {
+                      _selectedUmkm = null;
+                      _activeDestLat = null;
+                      _activeDestLng = null;
+                      _activeDestName = null;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          // Divider
+          Container(height: 1, color: theme.border),
+          // Tombol Mulai Rute
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isShowingRoute = true;
+                _isLoading = true;
+              });
+              _initLocationAndRoute();
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              color: theme.btnPrimary,
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.directions, color: theme.btnLabel, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Mulai Rute',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: theme.btnLabel,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper widget agar kode lebih rapi dan menghindari error braket
+  Widget _buildNavigationInfo(ThemeProvider theme) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.bgSurface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.border),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withAlpha(70), blurRadius: 20),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _infoColumn(
+            'Jarak',
+            _distanceInKm != null
+                ? '${_distanceInKm!.toStringAsFixed(1)} km'
+                : '-',
+            theme,
+          ),
+          Container(width: 1, height: 40, color: theme.border),
+          _infoColumn(
+            'Waktu',
+            _estimatedTimeInMins != null ? '$_estimatedTimeInMins mnt' : '-',
+            theme,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBrowseInfo(ThemeProvider theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.bgSurface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.border),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.touch_app_rounded, color: theme.iconColor),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Tap pada marker merah untuk melihat rute.',
+              style: TextStyle(fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoColumn(String label, String value, ThemeProvider theme) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: TextStyle(color: theme.textSecondary, fontSize: 12)),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: theme.textPrimary,
+          ),
+        ),
+      ],
     );
   }
 }

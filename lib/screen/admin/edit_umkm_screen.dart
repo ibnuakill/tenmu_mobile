@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:provider/provider.dart';
 import '../../core/theme_provider.dart';
+import '../../core/umkm_category.dart';
 
 class EditUmkmScreen extends StatefulWidget {
   final Map<String, dynamic> umkm;
@@ -20,6 +21,8 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
   final _deskripsiController = TextEditingController();
   final _latController = TextEditingController();
   final _lngController = TextEditingController();
+  final _minPriceController = TextEditingController();
+  final _maxPriceController = TextEditingController();
 
   bool _isLoading = false;
   bool _isUploadingImage = false;
@@ -27,6 +30,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
   // Gambar: bisa dari URL lama atau file baru
   File? _newImageFile;
   String? _currentImageUrl;
+  String _selectedCategory = UmkmCategory.lainnya;
 
   @override
   void initState() {
@@ -38,6 +42,15 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
     _latController.text = widget.umkm['latitude']?.toString() ?? '';
     _lngController.text = widget.umkm['longitude']?.toString() ?? '';
     _currentImageUrl = widget.umkm['gambar_url'];
+    _minPriceController.text = (widget.umkm['min_price'] ?? 0).toString();
+    _maxPriceController.text = (widget.umkm['max_price'] ?? 100000).toString();
+
+    String cat = widget.umkm['category'] ?? UmkmCategory.lainnya;
+    if (UmkmCategory.isValidCategory(cat)) {
+      _selectedCategory = cat;
+    } else {
+      _selectedCategory = UmkmCategory.lainnya;
+    }
   }
 
   @override
@@ -94,6 +107,9 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
 
     setState(() => _isLoading = true);
     try {
+      final minPrice = int.tryParse(_minPriceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      final maxPrice = int.tryParse(_maxPriceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
+
       await Supabase.instance.client
           .from('umkm')
           .update({
@@ -103,6 +119,9 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
             'latitude': double.tryParse(_latController.text.trim()),
             'longitude': double.tryParse(_lngController.text.trim()),
             'gambar_url': _currentImageUrl, // ← ikut terupdate
+            'category': _selectedCategory,
+            'min_price': minPrice,
+            'max_price': maxPrice,
           })
           .eq('id', widget.umkm['id']);
 
@@ -183,6 +202,17 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                   ),
 
                   const SizedBox(height: 16),
+                  _label('Alamat Lengkap', theme),
+                  const SizedBox(height: 8),
+                  _field(
+                    controller: _alamatController,
+                    hint: 'Contoh: Jl. Merdeka No. 12, Bandung',
+                    icon: Icons.location_on_outlined,
+                    maxLines: 2,
+                    theme: theme,
+                  ),
+
+                  const SizedBox(height: 16),
                   _label('Deskripsi', theme),
                   const SizedBox(height: 8),
                   _field(
@@ -191,6 +221,77 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                     icon: Icons.description_outlined,
                     maxLines: 3,
                     theme: theme,
+                  ),
+
+                  const SizedBox(height: 16),
+                  Divider(color: theme.border),
+                  const SizedBox(height: 16),
+
+                  _label('Kategori & Harga', theme),
+                  const SizedBox(height: 8),
+
+                  // ── Dropdown Kategori ──
+                  DropdownButtonFormField<String>(
+                    value: _selectedCategory,
+                    dropdownColor: theme.bgSurface,
+                    style: TextStyle(color: theme.textPrimary, fontSize: 14),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: theme.bgBase,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      prefixIcon: Icon(Icons.category_outlined, color: theme.iconColor, size: 20),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: theme.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: theme.borderFocus, width: 2),
+                      ),
+                    ),
+                    items: UmkmCategory.allCategories.map((category) {
+                      return DropdownMenuItem(
+                        value: category,
+                        child: Row(
+                          children: [
+                            Text(UmkmCategory.getCategoryEmoji(category)),
+                            const SizedBox(width: 8),
+                            Text(category),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        if (value != null) _selectedCategory = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Rentang Harga ──
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _field(
+                          controller: _minPriceController,
+                          hint: 'Harga Min',
+                          icon: Icons.payments_outlined,
+                          keyboardType: TextInputType.number,
+                          theme: theme,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _field(
+                          controller: _maxPriceController,
+                          hint: 'Harga Max',
+                          icon: Icons.payments_outlined,
+                          keyboardType: TextInputType.number,
+                          theme: theme,
+                        ),
+                      ),
+                    ],
                   ),
 
                   const SizedBox(height: 16),

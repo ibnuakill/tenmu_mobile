@@ -3,8 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
 import '../../core/theme_toggle_button.dart';
+import '../../core/umkm_category.dart';
 import '../auth/login_screen.dart';
 import 'umkm_detail_screen.dart';
+import 'route_map_screen.dart';
+import 'widgets/category_filter_widget.dart';
+import 'widgets/price_range_filter_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +24,14 @@ class _HomeScreenState extends State<HomeScreen> {
       .order('created_at', ascending: false);
 
   String _searchQuery = '';
+  Set<String> _selectedCategories = {}; // ← State untuk filter kategori
+  late RangeValues _priceRange; // ← State untuk filter harga
+
+  @override
+  void initState() {
+    super.initState();
+    _priceRange = const RangeValues(0, 1000000);
+  }
 
   Future<void> _signOut(BuildContext context) async {
     await Supabase.instance.client.auth.signOut();
@@ -29,6 +41,100 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+  }
+
+  void _showFilterBottomSheet(BuildContext context, ThemeProvider theme) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.65,
+          decoration: BoxDecoration(
+            color: theme.bgBase,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              // ── Handle Drag ──
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 20),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.borderFocus,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              // ── Header Title ──
+              Text(
+                'Filter Pencarian',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: theme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      CategoryFilterWidget(
+                        selectedCategories: _selectedCategories,
+                        onCategoriesChanged: (selected) {
+                          setState(() => _selectedCategories = selected);
+                        },
+                      ),
+                      const SizedBox(height: 30),
+                      PriceRangeFilterWidget(
+                        initialRange: _priceRange,
+                        minPrice: 0,
+                        maxPrice: 1000000,
+                        onRangeChanged: (range) {
+                          setState(() => _priceRange = range);
+                        },
+                      ),
+                      const SizedBox(height: 30),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── Apply Button ──
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.btnPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      'Terapkan Filter',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: theme.btnLabel,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -137,110 +243,184 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 20),
 
-            // ── SEARCH BAR ─────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: theme.bgSurface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: theme.border),
-                ),
-                child: TextField(
-                  onChanged: (v) =>
-                      setState(() => _searchQuery = v.toLowerCase()),
-                  style: TextStyle(color: theme.textPrimary),
-                  cursorColor: theme.borderFocus,
-                  decoration: InputDecoration(
-                    hintText: 'Cari nama tempat atau alamat...',
-                    hintStyle: TextStyle(
-                      color: theme.textHint,
-                      fontSize: 14,
-                    ),
-                    prefixIcon: Icon(
-                      Icons.search,
-                      color: theme.iconColor,
-                      size: 20,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // ── LIST ───────────────────────────────────────────────────────
+            // ── LIST & FILTER (Wrapped in StreamBuilder) ─────────────────
             Expanded(
               child: StreamBuilder<List<Map<String, dynamic>>>(
                 stream: _umkmStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(
-                      child: CircularProgressIndicator(
-                        color: theme.iconColor,
-                      ),
+                      child: CircularProgressIndicator(color: theme.iconColor),
                     );
                   }
 
                   if (snapshot.hasError) {
                     return Center(
-                      child: Text(
-                        'Terjadi kesalahan.',
-                        style: TextStyle(color: theme.textSecondary),
-                      ),
+                      child: Text('Terjadi kesalahan.', style: TextStyle(color: theme.textSecondary)),
                     );
                   }
 
                   final raw = snapshot.data ?? [];
-                  final umkmList = _searchQuery.isEmpty
-                      ? raw
-                      : raw.where((u) {
-                          final nama = (u['nama_tempat'] ?? '').toLowerCase();
-                          final alamat = (u['alamat'] ?? '').toLowerCase();
-                          return nama.contains(_searchQuery) ||
-                              alamat.contains(_searchQuery);
-                        }).toList();
+                  final umkmList = raw.where((u) {
+                    // Filter by search query
+                    bool matchesSearch = true;
+                    if (_searchQuery.isNotEmpty) {
+                      final nama = (u['nama_tempat'] ?? '').toLowerCase();
+                      final alamat = (u['alamat'] ?? '').toLowerCase();
+                      matchesSearch = nama.contains(_searchQuery) ||
+                          alamat.contains(_searchQuery);
+                    }
 
-                  if (umkmList.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.storefront_outlined,
-                            size: 56,
-                            color: theme.textHint,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Belum ada tempat ditemukan.',
-                            style: TextStyle(color: theme.textSecondary),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
+                    // Filter by category
+                    bool matchesCategory = true;
+                    if (_selectedCategories.isNotEmpty) {
+                      final umkmCategory = u['category'] ?? 'Lainnya';
+                      matchesCategory = _selectedCategories.contains(umkmCategory);
+                    }
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                    itemCount: umkmList.length,
-                    itemBuilder: (context, index) {
-                      final umkm = umkmList[index];
-                      return _UmkmCard(
-                        umkm: umkm,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => UmkmDetailScreen(umkm: umkm),
-                          ),
+                    // Filter by price range
+                    bool matchesPrice = true;
+                    final minPrice = (u['min_price'] ?? 0).toDouble();
+                    final maxPrice = (u['max_price'] ?? 1000000).toDouble();
+                    matchesPrice = !(maxPrice < _priceRange.start || minPrice > _priceRange.end);
+
+                    return matchesSearch && matchesCategory && matchesPrice;
+                  }).toList();
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── SEARCH BAR & MAP & FILTER BUTTON ────────────────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: theme.bgSurface,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: theme.border),
+                                ),
+                                child: TextField(
+                                  onChanged: (v) =>
+                                      setState(() => _searchQuery = v.toLowerCase()),
+                                  style: TextStyle(color: theme.textPrimary),
+                                  cursorColor: theme.borderFocus,
+                                  decoration: InputDecoration(
+                                    hintText: 'Cari nama tempat atau alamat...',
+                                    hintStyle: TextStyle(
+                                      color: theme.textHint,
+                                      fontSize: 14,
+                                    ),
+                                    prefixIcon: Icon(
+                                      Icons.search,
+                                      color: theme.iconColor,
+                                      size: 20,
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 14,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () {
+                                _showFilterBottomSheet(context, theme);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: (_selectedCategories.isNotEmpty || _priceRange.start > 0 || _priceRange.end < 1000000)
+                                      ? theme.btnPrimary
+                                      : theme.bgSurface,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: (_selectedCategories.isNotEmpty || _priceRange.start > 0 || _priceRange.end < 1000000)
+                                        ? theme.btnPrimary
+                                        : theme.border,
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.tune_rounded,
+                                  color: (_selectedCategories.isNotEmpty || _priceRange.start > 0 || _priceRange.end < 1000000)
+                                      ? theme.btnLabel
+                                      : theme.iconColor,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => RouteMapScreen(umkmList: umkmList),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: theme.btnPrimary,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Icon(
+                                  Icons.map_rounded,
+                                  color: theme.btnLabel,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      );
-                    },
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // ── LIST UMKM ──────────────────────────────────────────────────
+                      Expanded(
+                        child: umkmList.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.storefront_outlined,
+                                      size: 56,
+                                      color: theme.textHint,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Belum ada tempat ditemukan.',
+                                      style: TextStyle(color: theme.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                                itemCount: umkmList.length,
+                                itemBuilder: (context, index) {
+                                  final umkm = umkmList[index];
+                                  return _UmkmCard(
+                                    umkm: umkm,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => UmkmDetailScreen(umkm: umkm),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
                   );
                 },
               ),

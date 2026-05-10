@@ -4,12 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
 import '../auth/login_screen.dart';
 
-/// Widget lengkap Rating & Komentar untuk halaman detail UMKM.
-///
-/// Cara pakai:
-/// ```dart
-/// ReviewSection(umkmId: umkm['id'])
-/// ```
 class ReviewSection extends StatefulWidget {
   final int umkmId;
 
@@ -59,10 +53,7 @@ class _ReviewSectionState extends State<ReviewSection> {
   // ── Rata-rata bintang ──────────────────────────────────────
   double get _averageRating {
     if (_reviews.isEmpty) return 0;
-    final total = _reviews.fold<int>(
-      0,
-      (sum, r) => sum + (r['rating'] as int),
-    );
+    final total = _reviews.fold<int>(0, (sum, r) => sum + (r['rating'] as int));
     return total / _reviews.length;
   }
 
@@ -88,10 +79,7 @@ class _ReviewSectionState extends State<ReviewSection> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Nanti',
-              style: TextStyle(color: theme.textSecondary),
-            ),
+            child: Text('Nanti', style: TextStyle(color: theme.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -159,10 +147,7 @@ class _ReviewSectionState extends State<ReviewSection> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'Batal',
-              style: TextStyle(color: theme.textSecondary),
-            ),
+            child: Text('Batal', style: TextStyle(color: theme.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -180,10 +165,7 @@ class _ReviewSectionState extends State<ReviewSection> {
     );
 
     if (confirm == true && mounted) {
-      await _client
-          .from('reviews')
-          .delete()
-          .eq('id', _myReview!['id']);
+      await _client.from('reviews').delete().eq('id', _myReview!['id']);
       await _loadReviews();
     }
   }
@@ -214,7 +196,9 @@ class _ReviewSectionState extends State<ReviewSection> {
             const Spacer(),
             // Tombol beri ulasan — adapts berdasarkan login status
             GestureDetector(
-              onTap: isLoggedIn ? _openReviewSheet : () => _promptLogin(context),
+              onTap: isLoggedIn
+                  ? _openReviewSheet
+                  : () => _promptLogin(context),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -230,8 +214,8 @@ class _ReviewSectionState extends State<ReviewSection> {
                     Icon(
                       isLoggedIn
                           ? (_myReview != null
-                              ? Icons.edit_outlined
-                              : Icons.rate_review_outlined)
+                                ? Icons.edit_outlined
+                                : Icons.rate_review_outlined)
                           : Icons.lock_outline,
                       size: 14,
                       color: theme.iconColor,
@@ -258,10 +242,7 @@ class _ReviewSectionState extends State<ReviewSection> {
 
         // ── Ringkasan rata-rata bintang ──────────────────────
         if (!_isLoading && _reviews.isNotEmpty) ...[
-          _AverageBadge(
-            average: _averageRating,
-            totalReviews: _reviews.length,
-          ),
+          _AverageBadge(average: _averageRating, totalReviews: _reviews.length),
           const SizedBox(height: 20),
         ],
 
@@ -287,10 +268,7 @@ class _ReviewSectionState extends State<ReviewSection> {
                   const SizedBox(height: 10),
                   Text(
                     'Belum ada ulasan. Jadilah yang pertama!',
-                    style: TextStyle(
-                      color: theme.textSecondary,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: theme.textSecondary, fontSize: 13),
                   ),
                 ],
               ),
@@ -301,8 +279,7 @@ class _ReviewSectionState extends State<ReviewSection> {
             physics: const NeverScrollableScrollPhysics(),
             shrinkWrap: true,
             itemCount: _reviews.length,
-            separatorBuilder: (_, _) =>
-                Divider(color: theme.border, height: 1),
+            separatorBuilder: (_, _) => Divider(color: theme.border, height: 1),
             itemBuilder: (context, index) {
               final review = _reviews[index];
               final isOwn = review['user_id'] == userId;
@@ -355,10 +332,7 @@ class _AverageBadge extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 '$totalReviews ulasan',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.textSecondary,
-                ),
+                style: TextStyle(fontSize: 12, color: theme.textSecondary),
               ),
             ],
           ),
@@ -461,10 +435,7 @@ class _ReviewTile extends StatelessWidget {
                     ),
                     Text(
                       dateStr,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: theme.textHint,
-                      ),
+                      style: TextStyle(fontSize: 11, color: theme.textHint),
                     ),
                   ],
                 ),
@@ -477,11 +448,7 @@ class _ReviewTile extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     side: BorderSide(color: theme.border),
                   ),
-                  icon: Icon(
-                    Icons.more_vert,
-                    color: theme.iconColor,
-                    size: 18,
-                  ),
+                  icon: Icon(Icons.more_vert, color: theme.iconColor, size: 18),
                   onSelected: (value) {
                     if (value == 'edit') onEdit?.call();
                     if (value == 'delete') onDelete?.call();
@@ -491,8 +458,11 @@ class _ReviewTile extends StatelessWidget {
                       value: 'edit',
                       child: Row(
                         children: [
-                          Icon(Icons.edit_outlined,
-                              size: 16, color: theme.iconColor),
+                          Icon(
+                            Icons.edit_outlined,
+                            size: 16,
+                            color: theme.iconColor,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Edit',
@@ -505,8 +475,11 @@ class _ReviewTile extends StatelessWidget {
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete_outline,
-                              size: 16, color: Color(0xFF8B2020)),
+                          Icon(
+                            Icons.delete_outline,
+                            size: 16,
+                            color: Color(0xFF8B2020),
+                          ),
                           SizedBox(width: 8),
                           Text(
                             'Hapus',
@@ -619,12 +592,15 @@ class _ReviewInputSheetState extends State<_ReviewInputSheet> {
     try {
       if (widget.isEdit && widget.existingReview != null) {
         // UPDATE
-        await _client.from('reviews').update({
-          'rating': _selectedRating,
-          'komentar': _controller.text.trim().isEmpty
-              ? null
-              : _controller.text.trim(),
-        }).eq('id', widget.existingReview!['id']);
+        await _client
+            .from('reviews')
+            .update({
+              'rating': _selectedRating,
+              'komentar': _controller.text.trim().isEmpty
+                  ? null
+                  : _controller.text.trim(),
+            })
+            .eq('id', widget.existingReview!['id']);
       } else {
         // INSERT (UPSERT agar tidak duplikat)
         await _client.from('reviews').upsert({
@@ -773,8 +749,7 @@ class _ReviewInputSheetState extends State<_ReviewInputSheet> {
               style: TextStyle(color: theme.textPrimary, fontSize: 14),
               cursorColor: theme.borderFocus,
               decoration: InputDecoration(
-                hintText:
-                    'Tulis komentarmu (opsional)...',
+                hintText: 'Tulis komentarmu (opsional)...',
                 hintStyle: TextStyle(color: theme.textHint, fontSize: 14),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.all(14),

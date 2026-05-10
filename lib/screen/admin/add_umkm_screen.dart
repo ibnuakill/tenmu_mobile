@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:io';
 import '../../core/theme_provider.dart';
 import '../../core/location_permission_helper.dart';
+import '../../core/umkm_category.dart';
 
 class AddUmkmScreen extends StatefulWidget {
   const AddUmkmScreen({super.key});
@@ -27,6 +28,10 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
   final _searchController = TextEditingController();
   final _latController = TextEditingController();
   final _lngController = TextEditingController();
+
+  final _minPriceController = TextEditingController();
+  final _maxPriceController = TextEditingController();
+  String _selectedCategory = UmkmCategory.lainnya; // Default category
 
   bool _isLoading = false;
   File? _selectedImage;
@@ -527,6 +532,9 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final minPrice = int.tryParse(_minPriceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      final maxPrice = int.tryParse(_maxPriceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
+
       await Supabase.instance.client.from('umkm').insert({
         'nama_tempat': _namaController.text.trim(),
         'alamat': _alamatController.text.trim().isNotEmpty
@@ -538,6 +546,9 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
             : null,
         'latitude': double.tryParse(_latController.text),
         'longitude': double.tryParse(_lngController.text),
+        'category': _selectedCategory,
+        'min_price': minPrice,
+        'max_price': maxPrice,
         'is_featured': false,
       });
 
@@ -645,6 +656,14 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
               ),
               const SizedBox(height: 12),
               _darkField(
+                controller: _alamatController,
+                label: 'Alamat Lengkap',
+                hint: 'Contoh: Jl. Merdeka No. 12, Bandung',
+                icon: Icons.location_on_outlined,
+                maxLines: 2,
+              ),
+              const SizedBox(height: 12),
+              _darkField(
                 controller: _deskripsiController,
                 label: 'Deskripsi Singkat',
                 hint: 'Ceritakan keunikan tempat ini...',
@@ -727,6 +746,84 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                     ),
                   ),
                 ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                child: Divider(color: theme.border),
+              ),
+
+              Text(
+                'Kategori & Harga',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: theme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── Dropdown Kategori ──
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
+                dropdownColor: theme.bgSurface,
+                style: TextStyle(color: theme.textPrimary, fontSize: 15),
+                decoration: InputDecoration(
+                  labelText: 'Kategori Tempat',
+                  labelStyle: TextStyle(color: theme.textSecondary, fontSize: 13),
+                  prefixIcon: Icon(Icons.category_outlined, color: theme.iconColor, size: 20),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: theme.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: theme.borderFocus, width: 2),
+                  ),
+                ),
+                items: UmkmCategory.allCategories.map((category) {
+                  return DropdownMenuItem(
+                    value: category,
+                    child: Row(
+                      children: [
+                        Text(UmkmCategory.getCategoryEmoji(category)),
+                        const SizedBox(width: 8),
+                        Text(category),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    if (value != null) _selectedCategory = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // ── Rentang Harga ──
+              Row(
+                children: [
+                  Expanded(
+                    child: _darkField(
+                      controller: _minPriceController,
+                      label: 'Harga Termurah',
+                      hint: '10000',
+                      icon: Icons.payments_outlined,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _darkField(
+                      controller: _maxPriceController,
+                      label: 'Harga Termahal',
+                      hint: '100000',
+                      icon: Icons.payments_outlined,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
               ),
 
               Padding(
