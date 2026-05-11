@@ -223,64 +223,70 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: theme.bgBase,
       // ── DRAWER NAVIGATION ──
-      drawer: Drawer(
-        backgroundColor: theme.bgSurface,
-        child: Column(
-          children: [
-            UserAccountsDrawerHeader(
-              decoration: BoxDecoration(color: theme.btnPrimary),
-              accountName: Text(user?.userMetadata?['full_name'] ?? 'Guest'),
-              accountEmail: Text(user?.email ?? 'Belum login'),
-              currentAccountPicture: CircleAvatar(
-                backgroundColor: theme.bgBase,
-                child: Icon(Icons.person, color: theme.iconColor, size: 40),
-              ),
+      drawer: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: _umkmStream,
+        builder: (context, snapshot) {
+          final umkmList = snapshot.data ?? [];
+          return Drawer(
+            backgroundColor: theme.bgSurface,
+            child: Column(
+              children: [
+                UserAccountsDrawerHeader(
+                  decoration: BoxDecoration(color: theme.btnPrimary),
+                  accountName: Text(user?.userMetadata?['full_name'] ?? 'Guest'),
+                  accountEmail: Text(user?.email ?? 'Belum login'),
+                  currentAccountPicture: CircleAvatar(
+                    backgroundColor: theme.bgBase,
+                    child: Icon(Icons.person, color: theme.iconColor, size: 40),
+                  ),
+                ),
+                ListTile(
+                  leading: Icon(Icons.bookmark, color: theme.iconColor),
+                  title: Text('Favorit Saya', style: TextStyle(color: theme.textPrimary)),
+                  onTap: () {
+                    Navigator.pop(context); // Tutup drawer
+                    if (user != null) {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoriteScreen()));
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Silakan login terlebih dahulu')),
+                      );
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.map, color: theme.iconColor),
+                  title: Text('Peta Rute', style: TextStyle(color: theme.textPrimary)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => RouteMapScreen(umkmList: umkmList)));
+                  },
+                ),
+                const Spacer(),
+                Divider(color: theme.border),
+                if (user != null)
+                  ListTile(
+                    leading: Icon(Icons.logout, color: Colors.red),
+                    title: Text('Keluar', style: TextStyle(color: Colors.red)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _signOut(context);
+                    },
+                  )
+                else
+                  ListTile(
+                    leading: Icon(Icons.login, color: theme.btnPrimary),
+                    title: Text('Masuk', style: TextStyle(color: theme.btnPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _goToLogin(context);
+                    },
+                  ),
+                const SizedBox(height: 20),
+              ],
             ),
-            ListTile(
-              leading: Icon(Icons.bookmark, color: theme.iconColor),
-              title: Text('Favorit Saya', style: TextStyle(color: theme.textPrimary)),
-              onTap: () {
-                Navigator.pop(context); // Tutup drawer
-                if (user != null) {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoriteScreen()));
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Silakan login terlebih dahulu')),
-                  );
-                }
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.map, color: theme.iconColor),
-              title: Text('Peta Rute', style: TextStyle(color: theme.textPrimary)),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const RouteMapScreen(umkmList: []))); // Akan load dari stream di HomeScreen kl butuh list
-              },
-            ),
-            const Spacer(),
-            Divider(color: theme.border),
-            if (user != null)
-              ListTile(
-                leading: Icon(Icons.logout, color: Colors.red),
-                title: Text('Keluar', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _signOut(context);
-                },
-              )
-            else
-              ListTile(
-                leading: Icon(Icons.login, color: theme.btnPrimary),
-                title: Text('Masuk', style: TextStyle(color: theme.btnPrimary)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _goToLogin(context);
-                },
-              ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          );
+        }
       ),
       body: SafeArea(
         child: Column(
