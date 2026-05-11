@@ -20,6 +20,8 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
   final _alamatController = TextEditingController();
   final _deskripsiController = TextEditingController();
   final _nomorTeleponController = TextEditingController();
+  final _jamBukaController = TextEditingController();
+  final _jamTutupController = TextEditingController();
   final _latController = TextEditingController();
   final _lngController = TextEditingController();
   final _minPriceController = TextEditingController();
@@ -41,6 +43,8 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
     _alamatController.text = widget.umkm['alamat'] ?? '';
     _deskripsiController.text = widget.umkm['deskripsi'] ?? '';
     _nomorTeleponController.text = widget.umkm['nomor_telepon'] ?? '';
+    _jamBukaController.text = widget.umkm['jam_buka'] ?? '';
+    _jamTutupController.text = widget.umkm['jam_tutup'] ?? '';
     _latController.text = widget.umkm['latitude']?.toString() ?? '';
     _lngController.text = widget.umkm['longitude']?.toString() ?? '';
     _currentImageUrl = widget.umkm['gambar_url'];
@@ -122,6 +126,8 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
             'nomor_telepon': _nomorTeleponController.text.trim().isNotEmpty
                 ? _nomorTeleponController.text.trim()
                 : null,
+            'jam_buka': _jamBukaController.text.trim().isNotEmpty ? _jamBukaController.text.trim() : null,
+            'jam_tutup': _jamTutupController.text.trim().isNotEmpty ? _jamTutupController.text.trim() : null,
             'latitude': double.tryParse(_latController.text.trim()),
             'longitude': double.tryParse(_lngController.text.trim()),
             'gambar_url': _currentImageUrl, // ← ikut terupdate
@@ -238,6 +244,43 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                     icon: Icons.phone_outlined,
                     keyboardType: TextInputType.phone,
                     theme: theme,
+                  ),
+
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _label('Jam Buka', theme),
+                            const SizedBox(height: 8),
+                            _field(
+                              controller: _jamBukaController,
+                              hint: '08:00',
+                              icon: Icons.access_time,
+                              theme: theme,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _label('Jam Tutup', theme),
+                            const SizedBox(height: 8),
+                            _field(
+                              controller: _jamTutupController,
+                              hint: '22:00',
+                              icon: Icons.access_time_filled,
+                              theme: theme,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
 
                   const SizedBox(height: 16),

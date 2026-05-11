@@ -103,6 +103,29 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
         : null;
     final bool hasLocation = lat != null && lng != null;
     final String? nomorTelepon = widget.umkm['nomor_telepon'];
+    final String? jamBuka = widget.umkm['jam_buka'];
+    final String? jamTutup = widget.umkm['jam_tutup'];
+
+    bool isOpen = false;
+    if (jamBuka != null && jamTutup != null) {
+      try {
+        final now = TimeOfDay.now();
+        final currentMinutes = now.hour * 60 + now.minute;
+
+        final openParts = jamBuka.split(':');
+        final closeParts = jamTutup.split(':');
+
+        final openMinutes = int.parse(openParts[0]) * 60 + int.parse(openParts[1]);
+        final closeMinutes = int.parse(closeParts[0]) * 60 + int.parse(closeParts[1]);
+
+        if (closeMinutes < openMinutes) {
+          // Buka melewati tengah malam
+          isOpen = currentMinutes >= openMinutes || currentMinutes <= closeMinutes;
+        } else {
+          isOpen = currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
+        }
+      } catch (_) {}
+    }
 
     return Scaffold(
       backgroundColor: theme.bgBase,
@@ -263,6 +286,48 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+
+                  // Jam Operasional
+                  if (jamBuka != null && jamTutup != null)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.access_time_outlined,
+                          size: 16,
+                          color: theme.iconColor,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$jamBuka - $jamTutup',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: theme.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isOpen ? Colors.green.withValues(alpha: 0.2) : Colors.red.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isOpen ? Colors.green : Colors.red,
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Text(
+                            isOpen ? 'Buka' : 'Tutup',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isOpen ? Colors.green : Colors.red,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
 
                   const SizedBox(height: 28),
                   Divider(color: theme.border),

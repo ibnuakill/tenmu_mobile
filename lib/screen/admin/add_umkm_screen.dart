@@ -30,6 +30,9 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
   final _latController = TextEditingController();
   final _lngController = TextEditingController();
 
+  final _jamBukaController = TextEditingController();
+  final _jamTutupController = TextEditingController();
+
   final _minPriceController = TextEditingController();
   final _maxPriceController = TextEditingController();
   String _selectedCategory = UmkmCategory.lainnya; // Default category
@@ -550,6 +553,8 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
         'nomor_telepon': _nomorTeleponController.text.trim().isNotEmpty
             ? _nomorTeleponController.text.trim()
             : null,
+        'jam_buka': _jamBukaController.text.trim().isNotEmpty ? _jamBukaController.text.trim() : null,
+        'jam_tutup': _jamTutupController.text.trim().isNotEmpty ? _jamTutupController.text.trim() : null,
         'category': _selectedCategory,
         'min_price': minPrice,
         'max_price': maxPrice,
@@ -681,6 +686,57 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                 hint: 'Contoh: 081234567890',
                 icon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 12),
+              // ── Jam Operasional ──
+              Row(
+                children: [
+                  Expanded(
+                    child: _darkField(
+                      controller: _jamBukaController,
+                      label: 'Jam Buka',
+                      hint: '08:00',
+                      icon: Icons.access_time,
+                      suffixIcon: IconButton(
+                        icon: Icon(Icons.schedule, color: theme.iconColor, size: 20),
+                        onPressed: () async {
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.now(),
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              _jamBukaController.text = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _darkField(
+                      controller: _jamTutupController,
+                      label: 'Jam Tutup',
+                      hint: '22:00',
+                      icon: Icons.access_time_filled,
+                      suffixIcon: IconButton(
+                        icon: Icon(Icons.schedule, color: theme.iconColor, size: 20),
+                        onPressed: () async {
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.now(),
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              _jamTutupController.text = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               const Text(
