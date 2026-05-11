@@ -13,6 +13,7 @@ import 'widgets/category_filter_widget.dart';
 import 'widgets/price_range_filter_widget.dart';
 import 'widgets/sort_filter_widget.dart';
 import 'favorite_screen.dart';
+import 'profile_settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -258,6 +259,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     Navigator.pop(context); // Tutup drawer
                     if (user != null) {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoriteScreen()));
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Silakan login terlebih dahulu')),
+                      );
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.settings, color: theme.iconColor),
+                  title: Text('Pengaturan Profil', style: TextStyle(color: theme.textPrimary)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (user != null) {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileSettingsScreen()));
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Silakan login terlebih dahulu')),
