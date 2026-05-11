@@ -24,6 +24,7 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
   final _alamatController = TextEditingController();
   final _deskripsiController = TextEditingController();
   final _gambarUrlController = TextEditingController();
+  final _nomorTeleponController = TextEditingController();
 
   final _searchController = TextEditingController();
   final _latController = TextEditingController();
@@ -546,6 +547,9 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
             : null,
         'latitude': double.tryParse(_latController.text),
         'longitude': double.tryParse(_lngController.text),
+        'nomor_telepon': _nomorTeleponController.text.trim().isNotEmpty
+            ? _nomorTeleponController.text.trim()
+            : null,
         'category': _selectedCategory,
         'min_price': minPrice,
         'max_price': maxPrice,
@@ -669,6 +673,14 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                 hint: 'Ceritakan keunikan tempat ini...',
                 icon: Icons.description_outlined,
                 maxLines: 3,
+              ),
+              const SizedBox(height: 12),
+              _darkField(
+                controller: _nomorTeleponController,
+                label: 'Nomor Telepon / WhatsApp',
+                hint: 'Contoh: 081234567890',
+                icon: Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 12),
               const Text(
