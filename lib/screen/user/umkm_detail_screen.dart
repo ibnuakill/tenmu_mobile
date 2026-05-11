@@ -1,30 +1,108 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme_provider.dart';
 import 'route_map_screen.dart';
 import 'review_section.dart';
 
-class UmkmDetailScreen extends StatelessWidget {
+class UmkmDetailScreen extends StatefulWidget {
   final Map<String, dynamic> umkm;
 
   const UmkmDetailScreen({super.key, required this.umkm});
 
   @override
+  State<UmkmDetailScreen> createState() => _UmkmDetailScreenState();
+}
+
+class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
+  bool _isFavorite = false;
+  bool _isLoadingFavorite = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFavoriteStatus();
+  }
+
+  Future<void> _checkFavoriteStatus() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      setState(() => _isLoadingFavorite = false);
+      return;
+    }
+
+    try {
+      final response = await Supabase.instance.client
+          .from('favorites')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('umkm_id', widget.umkm['id'])
+          .maybeSingle();
+
+      if (mounted) {
+        setState(() {
+          _isFavorite = response != null;
+          _isLoadingFavorite = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking favorite: $e');
+      if (mounted) setState(() => _isLoadingFavorite = false);
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Silakan login untuk menyimpan favorit.')),
+      );
+      return;
+    }
+
+    // Optimistic UI update
+    setState(() => _isFavorite = !_isFavorite);
+
+    try {
+      if (_isFavorite) {
+        await Supabase.instance.client.from('favorites').insert({
+          'user_id': user.id,
+          'umkm_id': widget.umkm['id'],
+        });
+      } else {
+        await Supabase.instance.client
+            .from('favorites')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('umkm_id', widget.umkm['id']);
+      }
+    } catch (e) {
+      // Rollback on failure
+      setState(() => _isFavorite = !_isFavorite);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal memperbarui favorit: $e')),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
-    final double? lat = umkm['latitude'] != null
-        ? (umkm['latitude'] is int
-              ? (umkm['latitude'] as int).toDouble()
-              : umkm['latitude'])
+    final double? lat = widget.umkm['latitude'] != null
+        ? (widget.umkm['latitude'] is int
+              ? (widget.umkm['latitude'] as int).toDouble()
+              : widget.umkm['latitude'])
         : null;
-    final double? lng = umkm['longitude'] != null
-        ? (umkm['longitude'] is int
-              ? (umkm['longitude'] as int).toDouble()
-              : umkm['longitude'])
+    final double? lng = widget.umkm['longitude'] != null
+        ? (widget.umkm['longitude'] is int
+              ? (widget.umkm['longitude'] as int).toDouble()
+              : widget.umkm['longitude'])
         : null;
     final bool hasLocation = lat != null && lng != null;
-    final String? nomorTelepon = umkm['nomor_telepon'];
+    final String? nomorTelepon = widget.umkm['nomor_telepon'];
 
     return Scaffold(
       backgroundColor: theme.bgBase,
@@ -52,11 +130,11 @@ class UmkmDetailScreen extends StatelessWidget {
               ),
             ),
             flexibleSpace: FlexibleSpaceBar(
-              background: umkm['gambar_url'] != null
+              background: widget.umkm['gambar_url'] != null
                   ? Stack(
                       fit: StackFit.expand,
                       children: [
-                        Image.network(umkm['gambar_url'], fit: BoxFit.cover),
+                        Image.network(widget.umkm['gambar_url'], fit: BoxFit.cover),
                         // Gradient overlay agar teks terbaca
                         Container(
                           decoration: BoxDecoration(
@@ -83,6 +161,26 @@ class UmkmDetailScreen extends StatelessWidget {
                       ),
                     ),
             ),
+            actions: [
+              if (!_isLoadingFavorite)
+                GestureDetector(
+                  onTap: _toggleFavorite,
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.bgBase.withValues(alpha: 0.7),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: theme.border),
+                    ),
+                    child: Icon(
+                      _isFavorite ? Icons.bookmark : Icons.bookmark_border,
+                      color: _isFavorite ? Colors.amber : theme.textPrimary,
+                      size: 20,
+                    ),
+                  ),
+                ),
+            ],
           ),
 
           // ── KONTEN ───────────────────────────────────────────────────────
@@ -98,7 +196,7 @@ class UmkmDetailScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          umkm['nama_tempat'] ?? 'Tanpa Nama',
+                          widget.umkm['nama_tempat'] ?? 'Tanpa Nama',
                           style: TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w800,
@@ -106,7 +204,7 @@ class UmkmDetailScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (umkm['is_featured'] == true) ...[
+                      if (widget.umkm['is_featured'] == true) ...[
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -155,7 +253,7 @@ class UmkmDetailScreen extends StatelessWidget {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          umkm['alamat'] ?? '-',
+                          widget.umkm['alamat'] ?? '-',
                           style: TextStyle(
                             fontSize: 14,
                             color: theme.textSecondary,
@@ -181,7 +279,7 @@ class UmkmDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    umkm['deskripsi'] ?? 'Tidak ada deskripsi yang tersedia.',
+                    widget.umkm['deskripsi'] ?? 'Tidak ada deskripsi yang tersedia.',
                     style: TextStyle(
                       fontSize: 15,
                       height: 1.7,
@@ -270,7 +368,7 @@ class UmkmDetailScreen extends StatelessWidget {
                               builder: (_) => RouteMapScreen(
                                 destinationLat: lat,
                                 destinationLng: lng,
-                                destinationName: umkm['nama_tempat'] ?? '',
+                                destinationName: widget.umkm['nama_tempat'] ?? '',
                               ),
                             ),
                           );
@@ -325,8 +423,8 @@ class UmkmDetailScreen extends StatelessWidget {
 
                   // ── Rating & Komentar ────────────────────
                   const SizedBox(height: 28),
-                  if (umkm['id'] != null)
-                    ReviewSection(umkmId: umkm['id'] as int),
+                  if (widget.umkm['id'] != null)
+                    ReviewSection(umkmId: widget.umkm['id'] as int),
                 ],
               ),
             ),
