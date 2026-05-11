@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme_provider.dart';
 import 'route_map_screen.dart';
 import 'review_section.dart';
@@ -23,6 +24,7 @@ class UmkmDetailScreen extends StatelessWidget {
               : umkm['longitude'])
         : null;
     final bool hasLocation = lat != null && lng != null;
+    final String? nomorTelepon = umkm['nomor_telepon'];
 
     return Scaffold(
       backgroundColor: theme.bgBase,
@@ -189,7 +191,73 @@ class UmkmDetailScreen extends StatelessWidget {
 
                   const SizedBox(height: 36),
 
-                  // Tombol Rute
+                  // Tombol Kontak & Rute
+                  if (nomorTelepon != null && nomorTelepon.isNotEmpty) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          // Format nomor untuk WA (ganti 0 di awal dengan 62)
+                          String formattedNumber = nomorTelepon;
+                          if (formattedNumber.startsWith('0')) {
+                            formattedNumber = '62${formattedNumber.substring(1)}';
+                          }
+
+                          final Uri waUri = Uri.parse('https://wa.me/$formattedNumber');
+                          final Uri telUri = Uri.parse('tel:$nomorTelepon');
+
+                          // Coba WA dulu, kalau gagal coba Telepon biasa
+                          try {
+                            if (await canLaunchUrl(waUri)) {
+                              await launchUrl(waUri, mode: LaunchMode.externalApplication);
+                            } else if (await canLaunchUrl(telUri)) {
+                              await launchUrl(telUri);
+                            } else {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Tidak dapat membuka WhatsApp atau Telepon untuk nomor $nomorTelepon'),
+                                    backgroundColor: theme.snackError,
+                                  ),
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error: $e'),
+                                  backgroundColor: theme.snackError,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(
+                          Icons.chat_outlined,
+                          color: Colors.green,
+                          size: 20,
+                        ),
+                        label: Text(
+                          'Hubungi (WhatsApp / Telepon)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: theme.textPrimary,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: theme.border),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
                   if (hasLocation)
                     SizedBox(
                       width: double.infinity,
