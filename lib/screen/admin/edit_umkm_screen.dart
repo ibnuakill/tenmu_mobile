@@ -19,6 +19,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
   final _namaController = TextEditingController();
   final _alamatController = TextEditingController();
   final _deskripsiController = TextEditingController();
+  final _nomorTeleponController = TextEditingController();
   final _latController = TextEditingController();
   final _lngController = TextEditingController();
   final _minPriceController = TextEditingController();
@@ -39,6 +40,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
     _namaController.text = widget.umkm['nama_tempat'] ?? '';
     _alamatController.text = widget.umkm['alamat'] ?? '';
     _deskripsiController.text = widget.umkm['deskripsi'] ?? '';
+    _nomorTeleponController.text = widget.umkm['nomor_telepon'] ?? '';
     _latController.text = widget.umkm['latitude']?.toString() ?? '';
     _lngController.text = widget.umkm['longitude']?.toString() ?? '';
     _currentImageUrl = widget.umkm['gambar_url'];
@@ -58,6 +60,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
     _namaController.dispose();
     _alamatController.dispose();
     _deskripsiController.dispose();
+    _nomorTeleponController.dispose();
     _latController.dispose();
     _lngController.dispose();
     super.dispose();
@@ -116,6 +119,9 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
             'nama_tempat': _namaController.text.trim(),
             'alamat': _alamatController.text.trim(),
             'deskripsi': _deskripsiController.text.trim(),
+            'nomor_telepon': _nomorTeleponController.text.trim().isNotEmpty
+                ? _nomorTeleponController.text.trim()
+                : null,
             'latitude': double.tryParse(_latController.text.trim()),
             'longitude': double.tryParse(_lngController.text.trim()),
             'gambar_url': _currentImageUrl, // ← ikut terupdate
@@ -220,6 +226,17 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                     hint: 'Deskripsikan tempat ini...',
                     icon: Icons.description_outlined,
                     maxLines: 3,
+                    theme: theme,
+                  ),
+
+                  const SizedBox(height: 16),
+                  _label('Nomor Telepon / WhatsApp', theme),
+                  const SizedBox(height: 8),
+                  _field(
+                    controller: _nomorTeleponController,
+                    hint: 'Contoh: 081234567890',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
                     theme: theme,
                   ),
 
