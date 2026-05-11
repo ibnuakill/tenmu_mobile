@@ -36,7 +36,12 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
   Future<void> _pickAndUploadAvatar() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
 
     if (pickedFile == null) return;
 

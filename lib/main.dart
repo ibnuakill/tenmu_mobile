@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tenmu/core/theme_provider.dart';
+import 'package:tenmu/core/umkm_provider.dart';
 import 'package:tenmu/screen/auth/auth_gate.dart';
 import 'package:tenmu/screen/splash/animated_splash_screen.dart';
 
@@ -18,8 +19,11 @@ Future<void> main() async {
 
   // Menjalankan aplikasi
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => UMKMProvider()),
+      ],
       child: const TenMuApp(),
     ),
   );

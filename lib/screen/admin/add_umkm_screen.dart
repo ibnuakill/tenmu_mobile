@@ -45,7 +45,9 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 70,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
     );
 
     if (pickedFile == null) return;

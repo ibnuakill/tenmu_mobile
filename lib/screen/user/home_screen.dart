@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/theme_provider.dart';
+import '../../core/umkm_provider.dart';
 import '../../core/theme_toggle_button.dart';
 import '../../core/umkm_category.dart';
 import '../../core/location_permission_helper.dart';
@@ -23,55 +24,25 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _umkmStream = Supabase.instance.client
-      .from('umkm')
-      .stream(primaryKey: ['id'])
-      .order('created_at', ascending: false);
-
   String _searchQuery = '';
-  Set<String> _selectedCategories = {}; // ← State untuk filter kategori
-  late RangeValues _priceRange; // ← State untuk filter harga
-  SortOption _selectedSort = SortOption.terbaru; // ← State untuk sortir
+  Set<String> _selectedCategories = {};
+  late RangeValues _priceRange;
+  SortOption _selectedSort = SortOption.terbaru;
   Position? _currentPosition;
-  Map<int, double> _umkmRatings = {}; // Cache rating per UMKM id
 
   @override
   void initState() {
     super.initState();
     _priceRange = const RangeValues(0, 1000000);
-    _fetchRatings();
+    // optimization: fetch via provider with caching logic
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<UMKMProvider>(context, listen: false).fetchUMKM();
+    });
   }
 
-  Future<void> _fetchRatings() async {
-    try {
-      final response = await Supabase.instance.client
-          .from('reviews')
-          .select('umkm_id, rating');
-
-      final Map<int, List<int>> ratingsMap = {};
-      for (var row in response) {
-        final umkmId = row['umkm_id'] as int;
-        final rating = row['rating'] as int;
-        if (!ratingsMap.containsKey(umkmId)) {
-          ratingsMap[umkmId] = [];
-        }
-        ratingsMap[umkmId]!.add(rating);
-      }
-
-      final Map<int, double> avgRatings = {};
-      ratingsMap.forEach((id, ratings) {
-        final avg = ratings.reduce((a, b) => a + b) / ratings.length;
-        avgRatings[id] = avg;
-      });
-
-      if (mounted) {
-        setState(() {
-          _umkmRatings = avgRatings;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error fetching ratings: $e');
-    }
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   Future<void> _getCurrentLocationForSort() async {
@@ -219,100 +190,95 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
+    final umkmProvider = Provider.of<UMKMProvider>(context);
     final user = Supabase.instance.client.auth.currentUser;
 
     return Scaffold(
       backgroundColor: theme.bgBase,
       // ── DRAWER NAVIGATION ──
-      drawer: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: _umkmStream,
-        builder: (context, snapshot) {
-          final umkmList = snapshot.data ?? [];
-          return Drawer(
-            backgroundColor: theme.bgSurface,
-            child: Column(
-              children: [
-                UserAccountsDrawerHeader(
-                  decoration: BoxDecoration(color: theme.btnPrimary),
-                  accountName: Text(
-                    user?.userMetadata?['full_name'] ?? user?.userMetadata?['nama'] ?? 'Guest',
-                    style: TextStyle(color: theme.btnLabel, fontWeight: FontWeight.bold),
-                  ),
-                  accountEmail: Text(
-                    user?.email ?? 'Belum login',
-                    style: TextStyle(color: theme.btnLabel),
-                  ),
-                  currentAccountPicture: CircleAvatar(
-                    backgroundColor: theme.bgBase,
-                    backgroundImage: user?.userMetadata?['avatar_url'] != null
-                        ? NetworkImage(user!.userMetadata!['avatar_url'])
-                        : null,
-                    child: user?.userMetadata?['avatar_url'] == null
-                        ? Icon(Icons.person, color: theme.iconColor, size: 40)
-                        : null,
-                  ),
-                ),
-                ListTile(
-                  leading: Icon(Icons.bookmark, color: theme.iconColor),
-                  title: Text('Favorit Saya', style: TextStyle(color: theme.textPrimary)),
-                  onTap: () {
-                    Navigator.pop(context); // Tutup drawer
-                    if (user != null) {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoriteScreen()));
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Silakan login terlebih dahulu')),
-                      );
-                    }
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.settings, color: theme.iconColor),
-                  title: Text('Pengaturan Profil', style: TextStyle(color: theme.textPrimary)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (user != null) {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileSettingsScreen()));
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Silakan login terlebih dahulu')),
-                      );
-                    }
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.map, color: theme.iconColor),
-                  title: Text('Peta Rute', style: TextStyle(color: theme.textPrimary)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => RouteMapScreen(umkmList: umkmList)));
-                  },
-                ),
-                const Spacer(),
-                Divider(color: theme.border),
-                if (user != null)
-                  ListTile(
-                    leading: Icon(Icons.logout, color: Colors.red),
-                    title: Text('Keluar', style: TextStyle(color: Colors.red)),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _signOut(context);
-                    },
-                  )
-                else
-                  ListTile(
-                    leading: Icon(Icons.login, color: theme.btnPrimary),
-                    title: Text('Masuk', style: TextStyle(color: theme.btnPrimary)),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _goToLogin(context);
-                    },
-                  ),
-                const SizedBox(height: 20),
-              ],
+      drawer: Drawer(
+        backgroundColor: theme.bgSurface,
+        child: Column(
+          children: [
+            UserAccountsDrawerHeader(
+              decoration: BoxDecoration(color: theme.btnPrimary),
+              accountName: Text(
+                user?.userMetadata?['full_name'] ?? user?.userMetadata?['nama'] ?? 'Guest',
+                style: TextStyle(color: theme.btnLabel, fontWeight: FontWeight.bold),
+              ),
+              accountEmail: Text(
+                user?.email ?? 'Belum login',
+                style: TextStyle(color: theme.btnLabel),
+              ),
+              currentAccountPicture: CircleAvatar(
+                backgroundColor: theme.bgBase,
+                backgroundImage: user?.userMetadata?['avatar_url'] != null
+                    ? NetworkImage(user!.userMetadata!['avatar_url'])
+                    : null,
+                child: user?.userMetadata?['avatar_url'] == null
+                    ? Icon(Icons.person, color: theme.iconColor, size: 40)
+                    : null,
+              ),
             ),
-          );
-        }
+            ListTile(
+              leading: Icon(Icons.bookmark, color: theme.iconColor),
+              title: Text('Favorit Saya', style: TextStyle(color: theme.textPrimary)),
+              onTap: () {
+                Navigator.pop(context); // Tutup drawer
+                if (user != null) {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoriteScreen()));
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Silakan login terlebih dahulu')),
+                  );
+                }
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.settings, color: theme.iconColor),
+              title: Text('Pengaturan Profil', style: TextStyle(color: theme.textPrimary)),
+              onTap: () {
+                Navigator.pop(context);
+                if (user != null) {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileSettingsScreen()));
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Silakan login terlebih dahulu')),
+                  );
+                }
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.map, color: theme.iconColor),
+              title: Text('Peta Rute', style: TextStyle(color: theme.textPrimary)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => RouteMapScreen(umkmList: umkmProvider.umkmList)));
+              },
+            ),
+            const Spacer(),
+            Divider(color: theme.border),
+            if (user != null)
+              ListTile(
+                leading: Icon(Icons.logout, color: Colors.red),
+                title: Text('Keluar', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _signOut(context);
+                },
+              )
+            else
+              ListTile(
+                leading: Icon(Icons.login, color: theme.btnPrimary),
+                title: Text('Masuk', style: TextStyle(color: theme.btnPrimary)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _goToLogin(context);
+                },
+              ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
       body: SafeArea(
         child: Column(
@@ -367,24 +333,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 20),
 
-            // ── LIST & FILTER (Wrapped in StreamBuilder) ─────────────────
+            // ── LIST & FILTER (Using Provider for caching and performance) ─────────
             Expanded(
-              child: StreamBuilder<List<Map<String, dynamic>>>(
-                stream: _umkmStream,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+              child: Builder(
+                builder: (context) {
+                  if (umkmProvider.isLoading) {
                     return Center(
                       child: CircularProgressIndicator(color: theme.iconColor),
                     );
                   }
 
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Text('Terjadi kesalahan.', style: TextStyle(color: theme.textSecondary)),
-                    );
-                  }
-
-                  final raw = snapshot.data ?? [];
+                  final raw = umkmProvider.umkmList;
                   List<Map<String, dynamic>> umkmList = raw.where((u) {
                     // Filter by search query
                     bool matchesSearch = true;
@@ -429,11 +388,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     });
                   } else if (_selectedSort == SortOption.rating) {
                     umkmList.sort((a, b) {
-                      final ratingA = _umkmRatings[a['id']] ?? 0.0;
-                      final ratingB = _umkmRatings[b['id']] ?? 0.0;
+                      final ratingA = umkmProvider.ratings[a['id']] ?? 0.0;
+                      final ratingB = umkmProvider.ratings[b['id']] ?? 0.0;
                       return ratingB.compareTo(ratingA); // Descending (highest rating first)
                     });
-                  } // Default: terbaru (already sorted by stream)
+                  } // Default: terbaru (already sorted in provider)
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -612,6 +571,7 @@ class _UmkmCard extends StatelessWidget {
                     height: 180,
                     width: double.infinity,
                     fit: BoxFit.cover,
+                    cacheWidth: 600, // optimization: limit image cache size
                     errorBuilder: (_, _, _) => Container(
                       height: 180,
                       color: theme.bgElevated,
