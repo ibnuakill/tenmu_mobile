@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../core/theme_provider.dart';
 import '../../core/theme_toggle_button.dart';
 import '../../core/umkm_category.dart';
+import '../../core/location_permission_helper.dart';
 import '../auth/login_screen.dart';
 import 'umkm_detail_screen.dart';
 import 'route_map_screen.dart';
 import 'widgets/category_filter_widget.dart';
 import 'widgets/price_range_filter_widget.dart';
+import 'widgets/sort_filter_widget.dart';
 import 'favorite_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -27,11 +30,74 @@ class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
   Set<String> _selectedCategories = {}; // ← State untuk filter kategori
   late RangeValues _priceRange; // ← State untuk filter harga
+  SortOption _selectedSort = SortOption.terbaru; // ← State untuk sortir
+  Position? _currentPosition;
+  Map<int, double> _umkmRatings = {}; // Cache rating per UMKM id
 
   @override
   void initState() {
     super.initState();
     _priceRange = const RangeValues(0, 1000000);
+    _fetchRatings();
+  }
+
+  Future<void> _fetchRatings() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('reviews')
+          .select('umkm_id, rating');
+
+      final Map<int, List<int>> ratingsMap = {};
+      for (var row in response) {
+        final umkmId = row['umkm_id'] as int;
+        final rating = row['rating'] as int;
+        if (!ratingsMap.containsKey(umkmId)) {
+          ratingsMap[umkmId] = [];
+        }
+        ratingsMap[umkmId]!.add(rating);
+      }
+
+      final Map<int, double> avgRatings = {};
+      ratingsMap.forEach((id, ratings) {
+        final avg = ratings.reduce((a, b) => a + b) / ratings.length;
+        avgRatings[id] = avg;
+      });
+
+      if (mounted) {
+        setState(() {
+          _umkmRatings = avgRatings;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching ratings: $e');
+    }
+  }
+
+  Future<void> _getCurrentLocationForSort() async {
+    try {
+      final accessStatus = await LocationPermissionHelper.ensureAccess(
+        context,
+        featureLabel: 'mengurutkan berdasarkan jarak terdekat',
+      );
+
+      if (accessStatus == LocationAccessStatus.granted) {
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        );
+        setState(() {
+          _currentPosition = position;
+        });
+      } else {
+        setState(() {
+          _selectedSort = SortOption.terbaru; // Fallback jika ditolak
+        });
+      }
+    } catch (e) {
+      debugPrint('Error getting location: $e');
+      setState(() {
+        _selectedSort = SortOption.terbaru;
+      });
+    }
   }
 
   Future<void> _signOut(BuildContext context) async {
@@ -92,13 +158,23 @@ class _HomeScreenState extends State<HomeScreen> {
                           setState(() => _selectedCategories = selected);
                         },
                       ),
-                      const SizedBox(height: 30),
+                      const SizedBox(height: 24),
                       PriceRangeFilterWidget(
                         initialRange: _priceRange,
                         minPrice: 0,
                         maxPrice: 1000000,
                         onRangeChanged: (range) {
                           setState(() => _priceRange = range);
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      SortFilterWidget(
+                        selectedSort: _selectedSort,
+                        onSortChanged: (sort) {
+                          setState(() => _selectedSort = sort);
+                          if (sort == SortOption.terdekat && _currentPosition == null) {
+                            _getCurrentLocationForSort();
+                          }
                         },
                       ),
                       const SizedBox(height: 30),
@@ -277,7 +353,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
 
                   final raw = snapshot.data ?? [];
-                  final umkmList = raw.where((u) {
+                  List<Map<String, dynamic>> umkmList = raw.where((u) {
                     // Filter by search query
                     bool matchesSearch = true;
                     if (_searchQuery.isNotEmpty) {
@@ -302,6 +378,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     return matchesSearch && matchesCategory && matchesPrice;
                   }).toList();
+
+                  // Sort logic
+                  if (_selectedSort == SortOption.terdekat && _currentPosition != null) {
+                    umkmList.sort((a, b) {
+                      final latA = (a['latitude'] as num?)?.toDouble() ?? 0.0;
+                      final lngA = (a['longitude'] as num?)?.toDouble() ?? 0.0;
+                      final latB = (b['latitude'] as num?)?.toDouble() ?? 0.0;
+                      final lngB = (b['longitude'] as num?)?.toDouble() ?? 0.0;
+
+                      if (latA == 0.0 && latB != 0.0) return 1;
+                      if (latB == 0.0 && latA != 0.0) return -1;
+
+                      final distA = Geolocator.distanceBetween(_currentPosition!.latitude, _currentPosition!.longitude, latA, lngA);
+                      final distB = Geolocator.distanceBetween(_currentPosition!.latitude, _currentPosition!.longitude, latB, lngB);
+
+                      return distA.compareTo(distB);
+                    });
+                  } else if (_selectedSort == SortOption.rating) {
+                    umkmList.sort((a, b) {
+                      final ratingA = _umkmRatings[a['id']] ?? 0.0;
+                      final ratingB = _umkmRatings[b['id']] ?? 0.0;
+                      return ratingB.compareTo(ratingA); // Descending (highest rating first)
+                    });
+                  } // Default: terbaru (already sorted by stream)
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
