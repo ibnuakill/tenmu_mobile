@@ -233,11 +233,16 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 UserAccountsDrawerHeader(
                   decoration: BoxDecoration(color: theme.btnPrimary),
-                  accountName: Text(user?.userMetadata?['full_name'] ?? 'Guest'),
+                  accountName: Text(user?.userMetadata?['full_name'] ?? user?.userMetadata?['nama'] ?? 'Guest'),
                   accountEmail: Text(user?.email ?? 'Belum login'),
                   currentAccountPicture: CircleAvatar(
                     backgroundColor: theme.bgBase,
-                    child: Icon(Icons.person, color: theme.iconColor, size: 40),
+                    backgroundImage: user?.userMetadata?['avatar_url'] != null
+                        ? NetworkImage(user!.userMetadata!['avatar_url'])
+                        : null,
+                    child: user?.userMetadata?['avatar_url'] == null
+                        ? Icon(Icons.person, color: theme.iconColor, size: 40)
+                        : null,
                   ),
                 ),
                 ListTile(

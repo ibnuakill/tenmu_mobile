@@ -77,7 +77,10 @@ class _RegisterScreenState extends State<RegisterScreen>
       await Supabase.instance.client.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
-        data: {'nama': _namaController.text.trim()},
+        data: {
+          'full_name': _namaController.text.trim(),
+          'nama': _namaController.text.trim(), // Keep for backward compatibility
+        },
         emailRedirectTo: 'tenmu://login-callback',
       );
       if (mounted) {
