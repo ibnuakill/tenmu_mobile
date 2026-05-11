@@ -9,6 +9,7 @@ import 'umkm_detail_screen.dart';
 import 'route_map_screen.dart';
 import 'widgets/category_filter_widget.dart';
 import 'widgets/price_range_filter_widget.dart';
+import 'favorite_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -141,9 +142,70 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
+    final user = Supabase.instance.client.auth.currentUser;
 
     return Scaffold(
       backgroundColor: theme.bgBase,
+      // ── DRAWER NAVIGATION ──
+      drawer: Drawer(
+        backgroundColor: theme.bgSurface,
+        child: Column(
+          children: [
+            UserAccountsDrawerHeader(
+              decoration: BoxDecoration(color: theme.btnPrimary),
+              accountName: Text(user?.userMetadata?['full_name'] ?? 'Guest'),
+              accountEmail: Text(user?.email ?? 'Belum login'),
+              currentAccountPicture: CircleAvatar(
+                backgroundColor: theme.bgBase,
+                child: Icon(Icons.person, color: theme.iconColor, size: 40),
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.bookmark, color: theme.iconColor),
+              title: Text('Favorit Saya', style: TextStyle(color: theme.textPrimary)),
+              onTap: () {
+                Navigator.pop(context); // Tutup drawer
+                if (user != null) {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoriteScreen()));
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Silakan login terlebih dahulu')),
+                  );
+                }
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.map, color: theme.iconColor),
+              title: Text('Peta Rute', style: TextStyle(color: theme.textPrimary)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const RouteMapScreen(umkmList: []))); // Akan load dari stream di HomeScreen kl butuh list
+              },
+            ),
+            const Spacer(),
+            Divider(color: theme.border),
+            if (user != null)
+              ListTile(
+                leading: Icon(Icons.logout, color: Colors.red),
+                title: Text('Keluar', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _signOut(context);
+                },
+              )
+            else
+              ListTile(
+                leading: Icon(Icons.login, color: theme.btnPrimary),
+                title: Text('Masuk', style: TextStyle(color: theme.btnPrimary)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _goToLogin(context);
+                },
+              ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,6 +215,21 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
               child: Row(
                 children: [
+                  Builder(
+                    builder: (context) => GestureDetector(
+                      onTap: () => Scaffold.of(context).openDrawer(),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        margin: const EdgeInsets.only(right: 16),
+                        decoration: BoxDecoration(
+                          color: theme.bgElevated,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: theme.border),
+                        ),
+                        child: Icon(Icons.menu, color: theme.textPrimary, size: 24),
+                      ),
+                    ),
+                  ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -176,67 +253,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const Spacer(),
                   const ThemeToggleButton(),
-                  const SizedBox(width: 8),
-                  StreamBuilder<AuthState>(
-                    stream: Supabase.instance.client.auth.onAuthStateChange,
-                    builder: (ctx, snapshot) {
-                      final isLoggedIn =
-                          Supabase.instance.client.auth.currentUser != null;
-                      if (isLoggedIn) {
-                        // ── Tombol Logout (user sudah login) ────────────
-                        return GestureDetector(
-                          onTap: () => _signOut(ctx),
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: theme.bgElevated,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: theme.border),
-                            ),
-                            child: Icon(
-                              Icons.logout_rounded,
-                              color: theme.iconColor,
-                              size: 20,
-                            ),
-                          ),
-                        );
-                      } else {
-                        // ── Tombol Login (guest) ─────────────────────────
-                        return GestureDetector(
-                          onTap: () => _goToLogin(ctx),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 9,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.btnPrimary,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.login_rounded,
-                                  color: theme.btnLabel,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Masuk',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: theme.btnLabel,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                  ),
                 ],
               ),
             ),
