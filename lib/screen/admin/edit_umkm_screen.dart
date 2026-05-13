@@ -116,8 +116,16 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final minPrice = int.tryParse(_minPriceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-      final maxPrice = int.tryParse(_maxPriceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
+      final minPrice =
+          int.tryParse(
+            _minPriceController.text.replaceAll(RegExp(r'[^0-9]'), ''),
+          ) ??
+          0;
+      final maxPrice =
+          int.tryParse(
+            _maxPriceController.text.replaceAll(RegExp(r'[^0-9]'), ''),
+          ) ??
+          100000;
 
       await Supabase.instance.client
           .from('umkm')
@@ -128,8 +136,12 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
             'nomor_telepon': _nomorTeleponController.text.trim().isNotEmpty
                 ? _nomorTeleponController.text.trim()
                 : null,
-            'jam_buka': _jamBukaController.text.trim().isNotEmpty ? _jamBukaController.text.trim() : null,
-            'jam_tutup': _jamTutupController.text.trim().isNotEmpty ? _jamTutupController.text.trim() : null,
+            'jam_buka': _jamBukaController.text.trim().isNotEmpty
+                ? _jamBukaController.text.trim()
+                : null,
+            'jam_tutup': _jamTutupController.text.trim().isNotEmpty
+                ? _jamTutupController.text.trim()
+                : null,
             'latitude': double.tryParse(_latController.text.trim()),
             'longitude': double.tryParse(_lngController.text.trim()),
             'gambar_url': _currentImageUrl, // ← ikut terupdate
@@ -294,21 +306,31 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
 
                   // ── Dropdown Kategori ──
                   DropdownButtonFormField<String>(
-                    value: _selectedCategory,
+                    initialValue: _selectedCategory,
                     dropdownColor: theme.bgSurface,
                     style: TextStyle(color: theme.textPrimary, fontSize: 14),
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: theme.bgBase,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      prefixIcon: Icon(Icons.category_outlined, color: theme.iconColor, size: 20),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.category_outlined,
+                        color: theme.iconColor,
+                        size: 20,
+                      ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(color: theme.border),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: theme.borderFocus, width: 2),
+                        borderSide: BorderSide(
+                          color: theme.borderFocus,
+                          width: 2,
+                        ),
                       ),
                     ),
                     items: UmkmCategory.allCategories.map((category) {

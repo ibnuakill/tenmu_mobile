@@ -6,10 +6,12 @@ class UMKMProvider extends ChangeNotifier {
   Map<int, double> _ratings = {};
   bool _isLoading = false;
   DateTime? _lastFetch;
+  String? _error;
 
   List<Map<String, dynamic>> get umkmList => _umkmList;
   Map<int, double> get ratings => _ratings;
   bool get isLoading => _isLoading;
+  String? get error => _error;
 
   // Cache duration: 5 minutes
   bool get _shouldRefresh =>
@@ -20,6 +22,7 @@ class UMKMProvider extends ChangeNotifier {
     if (!force && !_shouldRefresh && _umkmList.isNotEmpty) return;
 
     _isLoading = true;
+    _error = null;
     notifyListeners();
 
     try {
@@ -31,13 +34,20 @@ class UMKMProvider extends ChangeNotifier {
 
       _umkmList = List<Map<String, dynamic>>.from(data);
       _lastFetch = DateTime.now();
+      _error = null;
       await fetchRatings();
     } catch (e) {
       debugPrint('Error fetching UMKM: $e');
+      _error = e.toString();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
   }
 
   Future<void> fetchRatings() async {

@@ -37,7 +37,30 @@ class _HomeScreenState extends State<HomeScreen> {
     // optimization: fetch via provider with caching logic
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<UMKMProvider>(context, listen: false).fetchUMKM();
+      _requestUserLocation();
     });
+  }
+
+  Future<void> _requestUserLocation() async {
+    try {
+      final accessStatus = await LocationPermissionHelper.ensureAccess(
+        context,
+        featureLabel: 'menampilkan jarak ke lokasi usaha',
+      );
+
+      if (accessStatus == LocationAccessStatus.granted) {
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        );
+        if (mounted) {
+          setState(() {
+            _currentPosition = position;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error getting user location: $e');
+    }
   }
 
   @override
@@ -337,9 +360,58 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: Builder(
                 builder: (context) {
-                  if (umkmProvider.isLoading) {
+                  if (umkmProvider.isLoading && umkmProvider.umkmList.isEmpty) {
                     return Center(
                       child: CircularProgressIndicator(color: theme.iconColor),
+                    );
+                  }
+
+                  // Error state - show retry option
+                  if (umkmProvider.error != null && umkmProvider.umkmList.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.wifi_off_rounded,
+                              size: 56,
+                              color: theme.textHint,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Gagal memuat data',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: theme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Pastikan koneksi internet aktif',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: theme.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                umkmProvider.clearError();
+                                umkmProvider.fetchUMKM(force: true);
+                              },
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Coba Lagi'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: theme.btnPrimary,
+                                foregroundColor: theme.btnLabel,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     );
                   }
 
@@ -492,40 +564,77 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       // ── LIST UMKM ──────────────────────────────────────────────────
                       Expanded(
-                        child: umkmList.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
+                        child: RefreshIndicator(
+                          onRefresh: () async {
+                            umkmProvider.clearError();
+                            await umkmProvider.fetchUMKM(force: true);
+                            // Refresh user location on pull-to-refresh
+                            await _requestUserLocation();
+                            // Show snackbar if refresh failed but we have cached data
+                            if (umkmProvider.error != null && umkmProvider.umkmList.isNotEmpty) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Gagal memperbarui data'),
+                                    backgroundColor: Colors.red.shade700,
+                                    behavior: SnackBarBehavior.floating,
+                                    action: SnackBarAction(
+                                      label: 'Retry',
+                                      textColor: Colors.white,
+                                      onPressed: () => umkmProvider.fetchUMKM(force: true),
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          color: theme.btnPrimary,
+                          backgroundColor: theme.bgElevated,
+                          child: umkmList.isEmpty
+                              ? ListView(
+                                  physics: const AlwaysScrollableScrollPhysics(),
                                   children: [
-                                    Icon(
-                                      Icons.storefront_outlined,
-                                      size: 56,
-                                      color: theme.textHint,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'Belum ada tempat ditemukan.',
-                                      style: TextStyle(color: theme.textSecondary),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : ListView.builder(
-                                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                                itemCount: umkmList.length,
-                                itemBuilder: (context, index) {
-                                  final umkm = umkmList[index];
-                                  return _UmkmCard(
-                                    umkm: umkm,
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => UmkmDetailScreen(umkm: umkm),
+                                    SizedBox(
+                                      height: MediaQuery.of(context).size.height * 0.5,
+                                      child: Center(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.storefront_outlined,
+                                              size: 56,
+                                              color: theme.textHint,
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Text(
+                                              'Belum ada tempat ditemukan.',
+                                              style: TextStyle(color: theme.textSecondary),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                  );
-                                },
-                              ),
+                                  ],
+                                )
+                              : ListView.builder(
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                                  itemCount: umkmList.length,
+                                  itemBuilder: (context, index) {
+                                    final umkm = umkmList[index];
+                                    return _UmkmCard(
+                                      umkm: umkm,
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => UmkmDetailScreen(umkm: umkm),
+                                        ),
+                                      ),
+                                      userPosition: _currentPosition,
+                                    );
+                                  },
+                                ),
+                        ),
                       ),
                     ],
                   );
@@ -542,12 +651,39 @@ class _HomeScreenState extends State<HomeScreen> {
 class _UmkmCard extends StatelessWidget {
   final Map<String, dynamic> umkm;
   final VoidCallback onTap;
+  final Position? userPosition;
 
-  const _UmkmCard({required this.umkm, required this.onTap});
+  const _UmkmCard({
+    required this.umkm,
+    required this.onTap,
+    this.userPosition,
+  });
+
+  String? _getDistanceText() {
+    if (userPosition == null) return null;
+
+    final lat = (umkm['latitude'] as num?)?.toDouble();
+    final lng = (umkm['longitude'] as num?)?.toDouble();
+    if (lat == null || lng == null || lat == 0 || lng == 0) return null;
+
+    final distance = Geolocator.distanceBetween(
+      userPosition!.latitude,
+      userPosition!.longitude,
+      lat,
+      lng,
+    );
+
+    if (distance < 1000) {
+      return '${distance.round()} m';
+    } else {
+      return '${(distance / 1000).toStringAsFixed(1)} km';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
+    final distanceText = _getDistanceText();
 
     return GestureDetector(
       onTap: onTap,
@@ -662,6 +798,23 @@ class _UmkmCard extends StatelessWidget {
                   const SizedBox(height: 10),
                   Row(
                     children: [
+                      if (distanceText != null) ...[
+                        Icon(
+                          Icons.near_me_rounded,
+                          size: 14,
+                          color: theme.btnPrimary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          distanceText,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: theme.btnPrimary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
                       Icon(
                         Icons.location_on_outlined,
                         size: 14,

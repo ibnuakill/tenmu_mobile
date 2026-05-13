@@ -538,8 +538,16 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final minPrice = int.tryParse(_minPriceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-      final maxPrice = int.tryParse(_maxPriceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
+      final minPrice =
+          int.tryParse(
+            _minPriceController.text.replaceAll(RegExp(r'[^0-9]'), ''),
+          ) ??
+          0;
+      final maxPrice =
+          int.tryParse(
+            _maxPriceController.text.replaceAll(RegExp(r'[^0-9]'), ''),
+          ) ??
+          100000;
 
       await Supabase.instance.client.from('umkm').insert({
         'nama_tempat': _namaController.text.trim(),
@@ -555,8 +563,12 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
         'nomor_telepon': _nomorTeleponController.text.trim().isNotEmpty
             ? _nomorTeleponController.text.trim()
             : null,
-        'jam_buka': _jamBukaController.text.trim().isNotEmpty ? _jamBukaController.text.trim() : null,
-        'jam_tutup': _jamTutupController.text.trim().isNotEmpty ? _jamTutupController.text.trim() : null,
+        'jam_buka': _jamBukaController.text.trim().isNotEmpty
+            ? _jamBukaController.text.trim()
+            : null,
+        'jam_tutup': _jamTutupController.text.trim().isNotEmpty
+            ? _jamTutupController.text.trim()
+            : null,
         'category': _selectedCategory,
         'min_price': minPrice,
         'max_price': maxPrice,
@@ -700,7 +712,11 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                       hint: '08:00',
                       icon: Icons.access_time,
                       suffixIcon: IconButton(
-                        icon: Icon(Icons.schedule, color: theme.iconColor, size: 20),
+                        icon: Icon(
+                          Icons.schedule,
+                          color: theme.iconColor,
+                          size: 20,
+                        ),
                         onPressed: () async {
                           final picked = await showTimePicker(
                             context: context,
@@ -708,7 +724,8 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                           );
                           if (picked != null) {
                             setState(() {
-                              _jamBukaController.text = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                              _jamBukaController.text =
+                                  '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
                             });
                           }
                         },
@@ -723,7 +740,11 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                       hint: '22:00',
                       icon: Icons.access_time_filled,
                       suffixIcon: IconButton(
-                        icon: Icon(Icons.schedule, color: theme.iconColor, size: 20),
+                        icon: Icon(
+                          Icons.schedule,
+                          color: theme.iconColor,
+                          size: 20,
+                        ),
                         onPressed: () async {
                           final picked = await showTimePicker(
                             context: context,
@@ -731,7 +752,8 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                           );
                           if (picked != null) {
                             setState(() {
-                              _jamTutupController.text = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                              _jamTutupController.text =
+                                  '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
                             });
                           }
                         },
@@ -835,13 +857,20 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
 
               // ── Dropdown Kategori ──
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 dropdownColor: theme.bgSurface,
                 style: TextStyle(color: theme.textPrimary, fontSize: 15),
                 decoration: InputDecoration(
                   labelText: 'Kategori Tempat',
-                  labelStyle: TextStyle(color: theme.textSecondary, fontSize: 13),
-                  prefixIcon: Icon(Icons.category_outlined, color: theme.iconColor, size: 20),
+                  labelStyle: TextStyle(
+                    color: theme.textSecondary,
+                    fontSize: 13,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.category_outlined,
+                    color: theme.iconColor,
+                    size: 20,
+                  ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(color: theme.border),

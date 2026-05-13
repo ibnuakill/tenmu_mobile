@@ -117,11 +117,7 @@ class _PriceRangeFilterWidgetState extends State<PriceRangeFilterWidget> {
                     ),
                   ],
                 ),
-                Container(
-                  width: 1,
-                  height: 40,
-                  color: theme.divider,
-                ),
+                Container(width: 1, height: 40, color: theme.divider),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -179,17 +175,11 @@ class _PriceRangeFilterWidgetState extends State<PriceRangeFilterWidget> {
               children: [
                 Text(
                   _formatPrice(widget.minPrice),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: theme.textSecondary,
-                  ),
+                  style: TextStyle(fontSize: 11, color: theme.textSecondary),
                 ),
                 Text(
                   _formatPrice(widget.maxPrice),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: theme.textSecondary,
-                  ),
+                  style: TextStyle(fontSize: 11, color: theme.textSecondary),
                 ),
               ],
             ),

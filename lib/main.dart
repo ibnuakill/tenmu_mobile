@@ -11,7 +11,6 @@ Future<void> main() async {
   // Memastikan bahwa framework Flutter sudah siap sebelum menjalankan kode lain
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Menginisialisasi koneksi ke Supabase
   await Supabase.initialize(
     url: 'https://axtkquxgojewinwdndtt.supabase.co',
     anonKey: 'sb_publishable_ZREX99FnrmwrdqSn4x7Afw_qFLnjP9F',
