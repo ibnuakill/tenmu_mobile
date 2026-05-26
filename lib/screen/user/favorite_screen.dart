@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
+import '../../core/umkm_image_helper.dart';
 import 'umkm_detail_screen.dart';
 
 class FavoriteScreen extends StatefulWidget {
@@ -97,6 +98,7 @@ class _FavoriteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
+    final imageUrl = UmkmImageHelper.primaryImageUrl(umkm);
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -109,9 +111,9 @@ class _FavoriteCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Row(
           children: [
-            if (umkm['gambar_url'] != null)
+            if (imageUrl != null)
               Image.network(
-                umkm['gambar_url'],
+                imageUrl,
                 width: 100,
                 height: 100,
                 fit: BoxFit.cover,

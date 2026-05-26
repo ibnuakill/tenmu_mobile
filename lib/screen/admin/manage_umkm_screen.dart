@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme_provider.dart';
+import '../../core/umkm_image_helper.dart';
 import 'edit_umkm_screen.dart';
 
 class ManageUmkmScreen extends StatefulWidget {
@@ -174,6 +175,7 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
             itemCount: umkmList.length,
             itemBuilder: (context, index) {
               final umkm = umkmList[index];
+              final imageUrl = UmkmImageHelper.primaryImageUrl(umkm);
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
@@ -185,9 +187,9 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
                   contentPadding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
                   leading: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: umkm['gambar_url'] != null
+                    child: imageUrl != null
                         ? Image.network(
-                            umkm['gambar_url'],
+                            imageUrl,
                             width: 58,
                             height: 58,
                             fit: BoxFit.cover,

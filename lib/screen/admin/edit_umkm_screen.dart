@@ -1,10 +1,12 @@
-import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
 import '../../core/umkm_category.dart';
+import '../../core/umkm_image_helper.dart';
 
 class EditUmkmScreen extends StatefulWidget {
   final Map<String, dynamic> umkm;
@@ -29,16 +31,13 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
 
   bool _isLoading = false;
   bool _isUploadingImage = false;
-
-  // Gambar: bisa dari URL lama atau file baru
-  File? _newImageFile;
-  String? _currentImageUrl;
+  final List<String> _imageUrls = [];
+  int _selectedImageIndex = 0;
   String _selectedCategory = UmkmCategory.lainnya;
 
   @override
   void initState() {
     super.initState();
-    // Isi semua field dengan data lama
     _namaController.text = widget.umkm['nama_tempat'] ?? '';
     _alamatController.text = widget.umkm['alamat'] ?? '';
     _deskripsiController.text = widget.umkm['deskripsi'] ?? '';
@@ -47,16 +46,14 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
     _jamTutupController.text = widget.umkm['jam_tutup'] ?? '';
     _latController.text = widget.umkm['latitude']?.toString() ?? '';
     _lngController.text = widget.umkm['longitude']?.toString() ?? '';
-    _currentImageUrl = widget.umkm['gambar_url'];
     _minPriceController.text = (widget.umkm['min_price'] ?? 0).toString();
     _maxPriceController.text = (widget.umkm['max_price'] ?? 100000).toString();
+    _imageUrls.addAll(UmkmImageHelper.extractImageUrls(widget.umkm));
 
-    String cat = widget.umkm['category'] ?? UmkmCategory.lainnya;
-    if (UmkmCategory.isValidCategory(cat)) {
-      _selectedCategory = cat;
-    } else {
-      _selectedCategory = UmkmCategory.lainnya;
-    }
+    final cat = widget.umkm['category'] ?? UmkmCategory.lainnya;
+    _selectedCategory = UmkmCategory.isValidCategory(cat)
+        ? cat
+        : UmkmCategory.lainnya;
   }
 
   @override
@@ -65,41 +62,53 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
     _alamatController.dispose();
     _deskripsiController.dispose();
     _nomorTeleponController.dispose();
+    _jamBukaController.dispose();
+    _jamTutupController.dispose();
     _latController.dispose();
     _lngController.dispose();
+    _minPriceController.dispose();
+    _maxPriceController.dispose();
     super.dispose();
   }
 
-  // ── Ganti Gambar ────────────────────────────────────────────────────────
-  Future<void> _pickAndUploadImage() async {
+  Future<void> _pickAndUploadImages() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
+    final pickedFiles = await picker.pickMultiImage(
       maxWidth: 1024,
       maxHeight: 1024,
       imageQuality: 80,
     );
-    if (picked == null) return;
+    if (pickedFiles.isEmpty) return;
 
-    setState(() {
-      _newImageFile = File(picked.path);
-      _isUploadingImage = true;
-    });
-
+    setState(() => _isUploadingImage = true);
     try {
-      final fileName =
-          '${DateTime.now().millisecondsSinceEpoch}_${picked.name}';
-      await Supabase.instance.client.storage
-          .from('umkm_images')
-          .upload(fileName, _newImageFile!);
+      final uploadedUrls = <String>[];
+      for (final picked in pickedFiles) {
+        final fileName =
+            '${DateTime.now().millisecondsSinceEpoch}_${picked.name}';
+        await Supabase.instance.client.storage
+            .from('umkm_images')
+            .upload(fileName, File(picked.path));
 
-      final url = Supabase.instance.client.storage
-          .from('umkm_images')
-          .getPublicUrl(fileName);
+        uploadedUrls.add(
+          Supabase.instance.client.storage
+              .from('umkm_images')
+              .getPublicUrl(fileName),
+        );
+      }
 
-      setState(() => _currentImageUrl = url);
+      setState(() {
+        _imageUrls.addAll(
+          uploadedUrls.where((url) => !_imageUrls.contains(url)),
+        );
+        if (_selectedImageIndex >= _imageUrls.length) {
+          _selectedImageIndex = _imageUrls.isEmpty ? 0 : _imageUrls.length - 1;
+        }
+      });
 
-      if (mounted) _toast('Gambar berhasil diganti! ✅');
+      if (mounted) {
+        _toast('${uploadedUrls.length} gambar berhasil ditambahkan.');
+      }
     } catch (e) {
       if (mounted) _toast('Gagal mengunggah gambar: $e', isError: true);
     } finally {
@@ -107,10 +116,29 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
     }
   }
 
-  // ── Simpan Perubahan ─────────────────────────────────────────────────────
+  void _removeImage(int index) {
+    setState(() {
+      _imageUrls.removeAt(index);
+      if (_imageUrls.isEmpty) {
+        _selectedImageIndex = 0;
+      } else if (_selectedImageIndex >= _imageUrls.length) {
+        _selectedImageIndex = _imageUrls.length - 1;
+      }
+    });
+  }
+
+  void _setPrimaryImage(int index) {
+    if (index <= 0 || index >= _imageUrls.length) return;
+    setState(() {
+      final selected = _imageUrls.removeAt(index);
+      _imageUrls.insert(0, selected);
+      _selectedImageIndex = 0;
+    });
+  }
+
   Future<void> _updateData() async {
     if (_namaController.text.trim().isEmpty) {
-      _toast('Nama tempat tidak boleh kosong!', isError: true);
+      _toast('Nama tempat tidak boleh kosong.', isError: true);
       return;
     }
 
@@ -144,7 +172,8 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                 : null,
             'latitude': double.tryParse(_latController.text.trim()),
             'longitude': double.tryParse(_lngController.text.trim()),
-            'gambar_url': _currentImageUrl, // ← ikut terupdate
+            'gambar_url': _imageUrls.isNotEmpty ? _imageUrls.first : null,
+            'image_urls': _imageUrls,
             'category': _selectedCategory,
             'min_price': minPrice,
             'max_price': maxPrice,
@@ -152,7 +181,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
           .eq('id', widget.umkm['id']);
 
       if (mounted) {
-        _toast('Data berhasil diperbarui!');
+        _toast('Data berhasil diperbarui.');
         Navigator.pop(context);
       }
     } catch (e) {
@@ -162,11 +191,11 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
     }
   }
 
-  void _toast(String msg, {bool isError = false}) {
+  void _toast(String message, {bool isError = false}) {
     final theme = Provider.of<ThemeProvider>(context, listen: false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg, style: TextStyle(color: theme.textPrimary)),
+        content: Text(message, style: TextStyle(color: theme.textPrimary)),
         backgroundColor: isError ? theme.snackError : theme.snackSuccess,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
@@ -202,12 +231,8 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── PRATINJAU GAMBAR ──────────────────────────────────────────
             _buildImageSection(theme),
-
             const SizedBox(height: 24),
-
-            // ── FORM CARD ─────────────────────────────────────────────────
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -226,7 +251,6 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                     icon: Icons.storefront_outlined,
                     theme: theme,
                   ),
-
                   const SizedBox(height: 16),
                   _label('Alamat Lengkap', theme),
                   const SizedBox(height: 8),
@@ -237,7 +261,6 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                     maxLines: 2,
                     theme: theme,
                   ),
-
                   const SizedBox(height: 16),
                   _label('Deskripsi', theme),
                   const SizedBox(height: 8),
@@ -248,7 +271,6 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                     maxLines: 3,
                     theme: theme,
                   ),
-
                   const SizedBox(height: 16),
                   _label('Nomor Telepon / WhatsApp', theme),
                   const SizedBox(height: 8),
@@ -259,130 +281,84 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                     keyboardType: TextInputType.phone,
                     theme: theme,
                   ),
-
                   const SizedBox(height: 16),
+                  _label('Jam Operasional', theme),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('Jam Buka', theme),
-                            const SizedBox(height: 8),
-                            _field(
-                              controller: _jamBukaController,
-                              hint: '08:00',
-                              icon: Icons.access_time,
-                              theme: theme,
-                            ),
-                          ],
+                        child: _field(
+                          controller: _jamBukaController,
+                          hint: '08:00',
+                          icon: Icons.schedule_outlined,
+                          theme: theme,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('Jam Tutup', theme),
-                            const SizedBox(height: 8),
-                            _field(
-                              controller: _jamTutupController,
-                              hint: '22:00',
-                              icon: Icons.access_time_filled,
-                              theme: theme,
-                            ),
-                          ],
+                        child: _field(
+                          controller: _jamTutupController,
+                          hint: '22:00',
+                          icon: Icons.schedule,
+                          theme: theme,
                         ),
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 16),
-                  Divider(color: theme.border),
-                  const SizedBox(height: 16),
-
-                  _label('Kategori & Harga', theme),
+                  _label('Kategori', theme),
                   const SizedBox(height: 8),
-
-                  // ── Dropdown Kategori ──
                   DropdownButtonFormField<String>(
                     initialValue: _selectedCategory,
                     dropdownColor: theme.bgSurface,
-                    style: TextStyle(color: theme.textPrimary, fontSize: 14),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: theme.bgBase,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      prefixIcon: Icon(
-                        Icons.category_outlined,
-                        color: theme.iconColor,
-                        size: 20,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: theme.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: theme.borderFocus,
-                          width: 2,
-                        ),
-                      ),
+                    style: TextStyle(color: theme.textPrimary, fontSize: 15),
+                    decoration: _inputDecoration(
+                      hint: 'Pilih kategori',
+                      icon: Icons.category_outlined,
+                      theme: theme,
                     ),
                     items: UmkmCategory.allCategories.map((category) {
                       return DropdownMenuItem(
                         value: category,
-                        child: Row(
-                          children: [
-                            Text(UmkmCategory.getCategoryEmoji(category)),
-                            const SizedBox(width: 8),
-                            Text(category),
-                          ],
+                        child: Text(
+                          '${UmkmCategory.getCategoryEmoji(category)} $category',
                         ),
                       );
                     }).toList(),
                     onChanged: (value) {
-                      setState(() {
-                        if (value != null) _selectedCategory = value;
-                      });
+                      if (value != null) {
+                        setState(() => _selectedCategory = value);
+                      }
                     },
                   ),
-                  const SizedBox(height: 12),
-
-                  // ── Rentang Harga ──
+                  const SizedBox(height: 16),
+                  _label('Rentang Harga', theme),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
                         child: _field(
                           controller: _minPriceController,
-                          hint: 'Harga Min',
+                          hint: 'Harga minimum',
                           icon: Icons.payments_outlined,
                           keyboardType: TextInputType.number,
                           theme: theme,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: _field(
                           controller: _maxPriceController,
-                          hint: 'Harga Max',
-                          icon: Icons.payments_outlined,
+                          hint: 'Harga maksimum',
+                          icon: Icons.payments,
                           keyboardType: TextInputType.number,
                           theme: theme,
                         ),
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 16),
-                  Divider(color: theme.border),
-                  const SizedBox(height: 16),
-
-                  _label('Koordinat Lokasi', theme),
+                  _label('Koordinat', theme),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -390,7 +366,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                         child: _field(
                           controller: _latController,
                           hint: 'Latitude',
-                          icon: Icons.my_location,
+                          icon: Icons.my_location_outlined,
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                             signed: true,
@@ -398,12 +374,12 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                           theme: theme,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: _field(
                           controller: _lngController,
                           hint: 'Longitude',
-                          icon: Icons.my_location,
+                          icon: Icons.place_outlined,
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                             signed: true,
@@ -416,22 +392,15 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                 ],
               ),
             ),
-
-            const SizedBox(height: 28),
-
-            // ── TOMBOL SIMPAN ─────────────────────────────────────────────
+            const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
-              height: 52,
+              height: 50,
               child: _isLoading
                   ? Center(
-                      child: SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          color: theme.textSecondary,
-                          strokeWidth: 2,
-                        ),
+                      child: CircularProgressIndicator(
+                        color: theme.textSecondary,
+                        strokeWidth: 2,
                       ),
                     )
                   : ElevatedButton.icon(
@@ -464,8 +433,11 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
     );
   }
 
-  // ── Seksi Gambar ────────────────────────────────────────────────────────
   Widget _buildImageSection(ThemeProvider theme) {
+    final previewUrl = _imageUrls.isNotEmpty
+        ? _imageUrls[_selectedImageIndex]
+        : null;
+
     return Container(
       decoration: BoxDecoration(
         color: theme.bgSurface,
@@ -476,27 +448,16 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Pratinjau gambar
-          if (_newImageFile != null)
-            // Gambar baru dari galeri
-            Image.file(
-              _newImageFile!,
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            )
-          else if (_currentImageUrl != null && _currentImageUrl!.isNotEmpty)
-            // Gambar lama dari URL
+          if (previewUrl != null)
             Stack(
               children: [
                 Image.network(
-                  _currentImageUrl!,
+                  previewUrl,
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => _imagePlaceholder(theme),
                 ),
-                // Label "Gambar Saat Ini"
                 Positioned(
                   top: 10,
                   left: 10,
@@ -511,7 +472,9 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                       border: Border.all(color: theme.border),
                     ),
                     child: Text(
-                      'Gambar Saat Ini',
+                      _selectedImageIndex == 0
+                          ? 'Cover utama'
+                          : 'Foto ${_selectedImageIndex + 1}',
                       style: TextStyle(
                         fontSize: 11,
                         color: theme.textSecondary,
@@ -525,12 +488,97 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
           else
             _imagePlaceholder(theme),
           Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+            child: Text(
+              'Galeri UMKM',
+              style: TextStyle(
+                color: theme.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
+            child: Text(
+              'Foto pertama akan dipakai sebagai cover. Admin bisa menambah foto tempat, menu, dan pricelist.',
+              style: TextStyle(
+                color: theme.textSecondary,
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+          ),
+          if (_imageUrls.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+              child: SizedBox(
+                height: 88,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _imageUrls.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 10),
+                  itemBuilder: (context, index) {
+                    final isSelected = index == _selectedImageIndex;
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedImageIndex = index),
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: 88,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isSelected
+                                    ? theme.borderFocus
+                                    : theme.border,
+                                width: isSelected ? 2 : 1,
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Image.network(
+                              _imageUrls[index],
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: Row(
+                              children: [
+                                if (index != 0)
+                                  GestureDetector(
+                                    onTap: () => _setPrimaryImage(index),
+                                    child: _thumbAction(
+                                      theme,
+                                      icon: Icons.star_outline_rounded,
+                                    ),
+                                  ),
+                                const SizedBox(width: 4),
+                                GestureDetector(
+                                  onTap: () => _removeImage(index),
+                                  child: _thumbAction(
+                                    theme,
+                                    icon: Icons.close_rounded,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          Padding(
             padding: const EdgeInsets.all(14),
             child: SizedBox(
               width: double.infinity,
               height: 44,
               child: OutlinedButton.icon(
-                onPressed: _isUploadingImage ? null : _pickAndUploadImage,
+                onPressed: _isUploadingImage ? null : _pickAndUploadImages,
                 icon: _isUploadingImage
                     ? SizedBox(
                         width: 16,
@@ -548,9 +596,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                 label: Text(
                   _isUploadingImage
                       ? 'Mengunggah...'
-                      : (_currentImageUrl != null
-                            ? 'Ganti Gambar'
-                            : 'Pilih Gambar dari Galeri'),
+                      : 'Tambah Foto Tempat / Menu / Pricelist',
                   style: TextStyle(
                     color: theme.textSecondary,
                     fontSize: 13,
@@ -568,6 +614,17 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _thumbAction(ThemeProvider theme, {required IconData icon}) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: theme.bgBase.withValues(alpha: 0.85),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, size: 14, color: theme.textPrimary),
     );
   }
 
@@ -589,7 +646,6 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
     ),
   );
 
-  // ── Helper Widgets ─────────────────────────────────────────────────────────
   Widget _label(String text, ThemeProvider theme) => Text(
     text,
     style: TextStyle(
@@ -599,6 +655,33 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
       letterSpacing: 0.5,
     ),
   );
+
+  InputDecoration _inputDecoration({
+    required String hint,
+    required IconData icon,
+    required ThemeProvider theme,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: theme.textHint, fontSize: 14),
+      prefixIcon: Icon(icon, color: theme.iconColor, size: 20),
+      filled: true,
+      fillColor: theme.bgElevated,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: theme.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: theme.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: theme.borderFocus, width: 1.5),
+      ),
+    );
+  }
 
   Widget _field({
     required TextEditingController controller,
@@ -614,31 +697,16 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
       maxLines: maxLines,
       style: TextStyle(color: theme.textPrimary, fontSize: 15),
       cursorColor: theme.borderFocus,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: theme.textHint, fontSize: 14),
-        prefixIcon: maxLines == 1
-            ? Icon(icon, color: theme.iconColor, size: 20)
-            : null,
-        filled: true,
-        fillColor: theme.bgElevated,
-        contentPadding: EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: maxLines > 1 ? 14 : 0,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: theme.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: theme.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: theme.borderFocus, width: 1.5),
-        ),
-      ),
+      decoration: _inputDecoration(hint: hint, icon: icon, theme: theme)
+          .copyWith(
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: maxLines > 1 ? 14 : 0,
+            ),
+            prefixIcon: maxLines == 1
+                ? Icon(icon, color: theme.iconColor, size: 20)
+                : null,
+          ),
     );
   }
 }

@@ -10,6 +10,7 @@ import 'package:flutter_compass/flutter_compass.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme_provider.dart';
 import '../../core/location_permission_helper.dart';
+import '../../core/umkm_image_helper.dart';
 
 class RouteMapScreen extends StatefulWidget {
   // Opsional: Jika dikasih list UMKM, ini mode "Browse Map"
@@ -524,6 +525,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   // --- WIDGET INFO PANELS ---
 
   Widget _buildUmkmPreview(ThemeProvider theme) {
+    final imageUrl = UmkmImageHelper.primaryImageUrl(_selectedUmkm!);
     return Container(
       decoration: BoxDecoration(
         color: theme.bgSurface,
@@ -549,9 +551,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                 // Gambar
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: _selectedUmkm!['gambar_url'] != null
+                  child: imageUrl != null
                       ? Image.network(
-                          _selectedUmkm!['gambar_url'],
+                          imageUrl,
                           width: 60,
                           height: 60,
                           fit: BoxFit.cover,

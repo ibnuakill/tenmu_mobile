@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/theme_provider.dart';
+import '../../core/umkm_image_helper.dart';
 import '../../core/umkm_provider.dart';
 import '../../core/theme_toggle_button.dart';
 import '../../core/umkm_category.dart';
@@ -684,6 +685,7 @@ class _UmkmCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
     final distanceText = _getDistanceText();
+    final imageUrl = UmkmImageHelper.primaryImageUrl(umkm);
 
     return GestureDetector(
       onTap: onTap,
@@ -699,11 +701,11 @@ class _UmkmCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Gambar
-            if (umkm['gambar_url'] != null)
+            if (imageUrl != null)
               Stack(
                 children: [
                   Image.network(
-                    umkm['gambar_url'],
+                    imageUrl,
                     height: 180,
                     width: double.infinity,
                     fit: BoxFit.cover,
@@ -730,16 +732,15 @@ class _UmkmCard extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: theme.bgBase.withValues(alpha: 0.85),
+                          color: Colors.black.withValues(alpha: 0.22),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: theme.border),
                         ),
                         child: Row(
                           children: [
                             Icon(
                               Icons.star_rounded,
                               size: 14,
-                              color: theme.textPrimary,
+                              color: Colors.white,
                             ),
                             const SizedBox(width: 4),
                             Text(
@@ -747,7 +748,7 @@ class _UmkmCard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: theme.textPrimary,
+                                color: Colors.white,
                               ),
                             ),
                           ],

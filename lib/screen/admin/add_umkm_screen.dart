@@ -11,6 +11,7 @@ import 'dart:io';
 import '../../core/theme_provider.dart';
 import '../../core/location_permission_helper.dart';
 import '../../core/umkm_category.dart';
+import '../../core/umkm_image_helper.dart';
 
 class AddUmkmScreen extends StatefulWidget {
   const AddUmkmScreen({super.key});
@@ -23,7 +24,6 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
   final _namaController = TextEditingController();
   final _alamatController = TextEditingController();
   final _deskripsiController = TextEditingController();
-  final _gambarUrlController = TextEditingController();
   final _nomorTeleponController = TextEditingController();
 
   final _searchController = TextEditingController();
@@ -38,40 +38,45 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
   String _selectedCategory = UmkmCategory.lainnya; // Default category
 
   bool _isLoading = false;
-  File? _selectedImage;
   bool _isUploadingImage = false;
+  final List<String> _imageUrls = [];
+  int _selectedImageIndex = 0;
 
   Future<void> _pickAndUploadImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-      source: ImageSource.gallery,
+    final pickedFiles = await picker.pickMultiImage(
       maxWidth: 1024,
       maxHeight: 1024,
       imageQuality: 80,
     );
 
-    if (pickedFile == null) return;
+    if (pickedFiles.isEmpty) return;
 
-    setState(() {
-      _selectedImage = File(pickedFile.path);
-      _isUploadingImage = true;
-    });
+    setState(() => _isUploadingImage = true);
 
     try {
-      final fileName =
-          '${DateTime.now().millisecondsSinceEpoch}_${pickedFile.name}';
+      final uploadedUrls = <String>[];
 
-      // Menggunakan bucket 'umkm_images' di Supabase
-      await Supabase.instance.client.storage
-          .from('umkm_images')
-          .upload(fileName, _selectedImage!);
+      for (final pickedFile in pickedFiles) {
+        final fileName =
+            '${DateTime.now().millisecondsSinceEpoch}_${pickedFile.name}';
+        final file = File(pickedFile.path);
 
-      final imageUrl = Supabase.instance.client.storage
-          .from('umkm_images')
-          .getPublicUrl(fileName);
+        await Supabase.instance.client.storage
+            .from('umkm_images')
+            .upload(fileName, file);
+
+        final imageUrl = Supabase.instance.client.storage
+            .from('umkm_images')
+            .getPublicUrl(fileName);
+        uploadedUrls.add(imageUrl);
+      }
 
       setState(() {
-        _gambarUrlController.text = imageUrl;
+        _imageUrls.addAll(uploadedUrls.where((url) => !_imageUrls.contains(url)));
+        if (_imageUrls.isNotEmpty && _selectedImageIndex >= _imageUrls.length) {
+          _selectedImageIndex = 0;
+        }
       });
 
       if (mounted) {
@@ -94,6 +99,27 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
     } finally {
       setState(() => _isUploadingImage = false);
     }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _imageUrls.removeAt(index);
+      if (_imageUrls.isEmpty) {
+        _selectedImageIndex = 0;
+      } else if (_selectedImageIndex >= _imageUrls.length) {
+        _selectedImageIndex = _imageUrls.length - 1;
+      }
+    });
+  }
+
+  void _setPrimaryImage(int index) {
+    if (index <= 0 || index >= _imageUrls.length) return;
+
+    setState(() {
+      final selected = _imageUrls.removeAt(index);
+      _imageUrls.insert(0, selected);
+      _selectedImageIndex = 0;
+    });
   }
 
   Future<void> _searchLocationOSM() async {
@@ -555,9 +581,8 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
             ? _alamatController.text.trim()
             : 'Lokasi: ${_latController.text}, ${_lngController.text}',
         'deskripsi': _deskripsiController.text.trim(),
-        'gambar_url': _gambarUrlController.text.isNotEmpty
-            ? _gambarUrlController.text
-            : null,
+        'gambar_url': _imageUrls.isNotEmpty ? _imageUrls.first : null,
+        'image_urls': _imageUrls,
         'latitude': double.tryParse(_latController.text),
         'longitude': double.tryParse(_lngController.text),
         'nomor_telepon': _nomorTeleponController.text.trim().isNotEmpty
@@ -645,6 +670,167 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
           borderSide: BorderSide(color: theme.borderFocus, width: 1.5),
         ),
       ),
+    );
+  }
+
+  Widget _buildImageSection(ThemeProvider theme) {
+    final previewUrl = _imageUrls.isNotEmpty
+        ? _imageUrls[_selectedImageIndex]
+        : UmkmImageHelper.primaryImageUrl({'image_urls': _imageUrls});
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Galeri UMKM',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: theme.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Foto pertama jadi cover utama. Tambahkan foto tempat, menu, dan pricelist.',
+          style: TextStyle(
+            fontSize: 12,
+            color: theme.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (previewUrl != null)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Stack(
+              children: [
+                Image.network(
+                  previewUrl,
+                  height: 180,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+                Positioned(
+                  top: 10,
+                  left: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.bgBase.withValues(alpha: 0.82),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      _selectedImageIndex == 0
+                          ? 'Cover utama'
+                          : 'Foto ${_selectedImageIndex + 1}',
+                      style: TextStyle(
+                        color: theme.textPrimary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Container(
+            height: 180,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: theme.bgElevated,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: theme.border),
+            ),
+            child: Center(
+              child: Icon(
+                Icons.image_outlined,
+                size: 50,
+                color: theme.textHint,
+              ),
+            ),
+          ),
+        if (_imageUrls.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 88,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _imageUrls.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final isSelected = index == _selectedImageIndex;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedImageIndex = index),
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 88,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isSelected ? theme.borderFocus : theme.border,
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Image.network(
+                          _imageUrls[index],
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Row(
+                          children: [
+                            if (index != 0)
+                              GestureDetector(
+                                onTap: () => _setPrimaryImage(index),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: theme.bgBase.withValues(alpha: 0.85),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.star_outline_rounded,
+                                    size: 14,
+                                    color: theme.textPrimary,
+                                  ),
+                                ),
+                              ),
+                            const SizedBox(width: 4),
+                            GestureDetector(
+                              onTap: () => _removeImage(index),
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: theme.bgBase.withValues(alpha: 0.85),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  size: 14,
+                                  color: theme.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -763,48 +949,7 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Gambar Tempat',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const SizedBox(height: 8),
-              if (_selectedImage != null)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    _selectedImage!,
-                    height: 180,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-                )
-              else if (_gambarUrlController.text.isNotEmpty)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    _gambarUrlController.text,
-                    height: 180,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-                )
-              else
-                Container(
-                  height: 180,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: theme.bgElevated,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: theme.border),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.image_outlined,
-                      size: 50,
-                      color: theme.textHint,
-                    ),
-                  ),
-                ),
+              _buildImageSection(theme),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
@@ -827,7 +972,7 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                   label: Text(
                     _isUploadingImage
                         ? 'Mengunggah Gambar...'
-                        : 'Upload Gambar dari Galeri HP',
+                        : 'Upload Foto Tempat / Menu / Pricelist',
                     style: TextStyle(color: theme.textSecondary, fontSize: 14),
                   ),
                   style: OutlinedButton.styleFrom(

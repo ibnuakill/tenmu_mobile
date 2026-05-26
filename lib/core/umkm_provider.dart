@@ -29,7 +29,7 @@ class UMKMProvider extends ChangeNotifier {
       // optimization: fetch only necessary fields for listing
       final data = await Supabase.instance.client
           .from('umkm')
-          .select('id, nama_tempat, alamat, gambar_url, category, min_price, max_price, latitude, longitude, is_featured')
+          .select('id, nama_tempat, alamat, deskripsi, gambar_url, image_urls, category, min_price, max_price, latitude, longitude, is_featured')
           .order('created_at', ascending: false);
 
       _umkmList = List<Map<String, dynamic>>.from(data);

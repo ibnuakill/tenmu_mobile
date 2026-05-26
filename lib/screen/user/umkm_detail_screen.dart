@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme_provider.dart';
+import '../../core/umkm_image_helper.dart';
 import 'route_map_screen.dart';
 import 'review_section.dart';
 
@@ -18,11 +19,19 @@ class UmkmDetailScreen extends StatefulWidget {
 class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
   bool _isFavorite = false;
   bool _isLoadingFavorite = true;
+  final PageController _imagePageController = PageController();
+  int _currentImageIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _checkFavoriteStatus();
+  }
+
+  @override
+  void dispose() {
+    _imagePageController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkFavoriteStatus() async {
@@ -105,6 +114,7 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
     final String? nomorTelepon = widget.umkm['nomor_telepon'];
     final String? jamBuka = widget.umkm['jam_buka'];
     final String? jamTutup = widget.umkm['jam_tutup'];
+    final imageUrls = UmkmImageHelper.extractImageUrls(widget.umkm);
 
     bool isOpen = false;
     if (jamBuka != null && jamTutup != null) {
@@ -141,23 +151,46 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
               child: Container(
                 margin: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: theme.bgBase.withValues(alpha: 0.7),
+                  color: Colors.black.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
-                  border: Border.all(color: theme.border),
                 ),
                 child: Icon(
                   Icons.arrow_back_ios_new,
-                  color: theme.textPrimary,
+                  color: Colors.white,
                   size: 16,
                 ),
               ),
             ),
             flexibleSpace: FlexibleSpaceBar(
-              background: widget.umkm['gambar_url'] != null
+              background: imageUrls.isNotEmpty
                   ? Stack(
                       fit: StackFit.expand,
                       children: [
-                        Image.network(widget.umkm['gambar_url'], fit: BoxFit.cover),
+                        PageView.builder(
+                          controller: _imagePageController,
+                          itemCount: imageUrls.length,
+                          onPageChanged: (index) {
+                            if (mounted) {
+                              setState(() => _currentImageIndex = index);
+                            }
+                          },
+                          itemBuilder: (context, index) {
+                            return Image.network(
+                              imageUrls[index],
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Container(
+                                color: theme.bgSurface,
+                                child: Center(
+                                  child: Icon(
+                                    Icons.broken_image_outlined,
+                                    color: theme.textHint,
+                                    size: 42,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                         // Gradient overlay agar teks terbaca
                         Container(
                           decoration: BoxDecoration(
@@ -166,11 +199,35 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
                               end: Alignment.bottomCenter,
                               colors: [
                                 Colors.transparent,
-                                theme.bgBase.withValues(alpha: 0.9),
+                                Colors.black.withValues(alpha: 0.22),
                               ],
+                              stops: const [0.72, 1],
                             ),
                           ),
                         ),
+                        if (imageUrls.length > 1)
+                          Positioned(
+                            right: 16,
+                            bottom: 16,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.24),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '${_currentImageIndex + 1}/${imageUrls.length}',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     )
                   : Container(
@@ -192,13 +249,12 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
                     margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: theme.bgBase.withValues(alpha: 0.7),
+                      color: Colors.black.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
-                      border: Border.all(color: theme.border),
                     ),
                     child: Icon(
                       _isFavorite ? Icons.bookmark : Icons.bookmark_border,
-                      color: _isFavorite ? Colors.amber : theme.textPrimary,
+                      color: _isFavorite ? Colors.amber : Colors.white,
                       size: 20,
                     ),
                   ),
@@ -261,6 +317,46 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
                       ],
                     ],
                   ),
+
+                  if (imageUrls.length > 1) ...[
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 76,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: imageUrls.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 10),
+                        itemBuilder: (context, index) {
+                          final isActive = index == _currentImageIndex;
+                          return GestureDetector(
+                            onTap: () {
+                              _imagePageController.animateToPage(
+                                index,
+                                duration: const Duration(milliseconds: 240),
+                                curve: Curves.easeOut,
+                              );
+                              setState(() => _currentImageIndex = index);
+                            },
+                            child: Container(
+                              width: 76,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isActive ? theme.borderFocus : theme.border,
+                                  width: isActive ? 2 : 1,
+                                ),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Image.network(
+                                imageUrls[index],
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 10),
 
