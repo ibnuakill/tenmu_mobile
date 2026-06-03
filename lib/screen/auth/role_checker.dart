@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../admin/admin_home_screen.dart'; // Nanti kita buat
+import '../../core/user_role.dart';
+import '../admin/admin_home_screen.dart';
+import '../owner/owner_home_screen.dart';
 import '../user/home_screen.dart';
 
 class RoleChecker extends StatefulWidget {
@@ -12,7 +14,7 @@ class RoleChecker extends StatefulWidget {
 }
 
 class _RoleCheckerState extends State<RoleChecker> {
-  late Future<String> _userRole;
+  late Future<UserRole> _userRole;
 
   @override
   void initState() {
@@ -21,43 +23,86 @@ class _RoleCheckerState extends State<RoleChecker> {
   }
 
   // Fungsi untuk mengambil role dari tabel profiles
-  Future<String> _fetchUserRole() async {
-    final userId = Supabase.instance.client.auth.currentUser!.id;
+  Future<UserRole> _fetchUserRole() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      throw Exception('Sesi login tidak ditemukan.');
+    }
 
-    // Melakukan query (SELECT role FROM profiles WHERE id = userId)
     final response = await Supabase.instance.client
         .from('profiles')
         .select('role')
-        .eq('id', userId)
-        .single();
+        .eq('id', user.id)
+        .maybeSingle();
 
-    return response['role'] as String;
+    if (response == null) {
+      throw Exception('Profil user tidak ditemukan di tabel profiles.');
+    }
+
+    return parseUserRole(response['role']);
+  }
+
+  void _reloadRole() {
+    setState(() {
+      _userRole = _fetchUserRole();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<String>(
+    return FutureBuilder<UserRole>(
       future: _userRole,
       builder: (context, snapshot) {
-        // Tampilkan loading saat sedang mengambil data role
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        // Jika terjadi error, kembalikan ke layar user biasa sebagai default keamanan
         if (snapshot.hasError || !snapshot.hasData) {
-          return const HomeScreen();
+          final message = snapshot.error?.toString().replaceFirst(
+            'Exception: ',
+            '',
+          );
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.red, size: 32),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Gagal memuat role akun.',
+                      style: Theme.of(context).textTheme.titleMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      message ?? 'Terjadi kesalahan tidak diketahui.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _reloadRole,
+                      child: const Text('Coba Lagi'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
         }
 
         final role = snapshot.data!;
-
-        // Penyeleksian jalan:
-        if (role == 'admin') {
-          return const AdminHomeScreen(); // Arahkan ke Dashboard Admin
-        } else {
-          return const HomeScreen(); // Arahkan ke Beranda User
+        switch (role) {
+          case UserRole.superadmin:
+            return const AdminHomeScreen();
+          case UserRole.owner:
+            return const OwnerHomeScreen();
+          case UserRole.user:
+            return const HomeScreen();
         }
       },
     );

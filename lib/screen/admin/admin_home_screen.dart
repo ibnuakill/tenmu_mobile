@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
-import '../../core/theme_toggle_button.dart';
+import '../user/settings_screen.dart';
 import 'add_umkm_screen.dart';
+import 'admin_analytics_screen.dart';
 import 'manage_umkm_screen.dart';
 import 'manage_users_screen.dart';
 import 'admin_profile_screen.dart';
+import 'manage_kategori_screen.dart';
+import 'verify_umkm_screen.dart';
+import 'manage_role_requests_screen.dart';
 
 class AdminHomeScreen extends StatelessWidget {
   const AdminHomeScreen({super.key});
@@ -15,12 +19,25 @@ class AdminHomeScreen extends StatelessWidget {
     await Supabase.instance.client.auth.signOut();
   }
 
+  Stream<int> _pendingCountStream({
+    required String table,
+    required String column,
+    required String value,
+  }) {
+    return Supabase.instance.client
+        .from(table)
+        .stream(primaryKey: ['id'])
+        .eq(column, value)
+        .map((rows) => rows.length);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
       backgroundColor: theme.bgBase,
+      drawer: _buildDrawer(context, theme),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -32,45 +49,54 @@ class AdminHomeScreen extends StatelessWidget {
               // ── HEADER ───────────────────────────────────────────────────
               Row(
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: theme.bgElevated,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: theme.border),
-                    ),
-                    child: Icon(
-                      Icons.admin_panel_settings_outlined,
-                      color: theme.textPrimary,
-                      size: 24,
+                  Builder(
+                    builder: (context) => GestureDetector(
+                      onTap: () => Scaffold.of(context).openDrawer(),
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: theme.bgElevated,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: theme.border),
+                        ),
+                        child: Icon(
+                          Icons.menu_rounded,
+                          color: theme.textPrimary,
+                          size: 24,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Dashboard Admin',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: theme.textPrimary,
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Dashboard Superadmin',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: theme.textPrimary,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'TenMu Management',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.textSecondary,
-                          letterSpacing: 1,
+                        Text(
+                          'TenMu Management',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.textSecondary,
+                            letterSpacing: 1,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const Spacer(),
-                  const ThemeToggleButton(),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 12),
                   GestureDetector(
                     onTap: () => _signOut(context),
                     child: Container(
@@ -119,7 +145,7 @@ class AdminHomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Selamat Datang, Admin! 👋',
+                      'Selamat Datang, Superadmin',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
@@ -128,7 +154,7 @@ class AdminHomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Kamu punya kendali penuh untuk mengelola data tempat nongkrong.',
+                      'Kamu punya akses penuh untuk mengelola user, UMKM, dan melihat analisis aplikasi.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
@@ -188,13 +214,13 @@ class AdminHomeScreen extends StatelessWidget {
               _menuButton(
                 context: context,
                 theme: theme,
-                icon: Icons.rate_review_outlined,
-                title: 'Kelola User & Ulasan',
-                subtitle: 'Hapus komentar tidak pantas atau akun bermasalah',
+                icon: Icons.analytics_outlined,
+                title: 'Analisis Aplikasi',
+                subtitle: 'Lihat statistik UMKM, user, kategori, dan ulasan',
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const ManageUsersScreen(),
+                    builder: (_) => const AdminAnalyticsScreen(),
                   ),
                 ),
                 isPrimary: false,
@@ -202,17 +228,58 @@ class AdminHomeScreen extends StatelessWidget {
 
               const SizedBox(height: 12),
 
-              _menuButton(
-                context: context,
-                theme: theme,
-                icon: Icons.manage_accounts_outlined,
-                title: 'Pengaturan Akun',
-                subtitle: 'Ganti email atau password admin',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AdminProfileScreen()),
+              StreamBuilder<int>(
+                stream: _pendingCountStream(
+                  table: 'umkm',
+                  column: 'verification_status',
+                  value: 'pending',
                 ),
-                isPrimary: false,
+                builder: (context, snapshot) {
+                  final pendingCount = snapshot.data ?? 0;
+                  return _menuButton(
+                    context: context,
+                    theme: theme,
+                    icon: Icons.verified_user_outlined,
+                    title: 'Verifikasi UMKM',
+                    subtitle: 'Setujui atau tolak UMKM yang baru didaftar',
+                    pendingCount: pendingCount,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const VerifyUmkmScreen(),
+                      ),
+                    ),
+                    isPrimary: false,
+                  );
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              StreamBuilder<int>(
+                stream: _pendingCountStream(
+                  table: 'profiles',
+                  column: 'request_status',
+                  value: 'pending',
+                ),
+                builder: (context, snapshot) {
+                  final pendingCount = snapshot.data ?? 0;
+                  return _menuButton(
+                    context: context,
+                    theme: theme,
+                    icon: Icons.request_page_outlined,
+                    title: 'Permintaan Owner',
+                    subtitle: 'Lihat dan approve permintaan role owner',
+                    pendingCount: pendingCount,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ManageRoleRequestsScreen(),
+                      ),
+                    ),
+                    isPrimary: false,
+                  );
+                },
               ),
 
               const SizedBox(height: 40),
@@ -231,6 +298,7 @@ class AdminHomeScreen extends StatelessWidget {
     required String subtitle,
     required VoidCallback onTap,
     required bool isPrimary,
+    int pendingCount = 0,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -265,15 +333,44 @@ class AdminHomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: isPrimary
-                          ? theme.btnLabel
-                          : theme.textPrimary,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: isPrimary
+                                ? theme.btnLabel
+                                : theme.textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (pendingCount > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE53935),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            pendingCount > 99 ? '99+' : '$pendingCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 3),
                   Text(
@@ -297,6 +394,102 @@ class AdminHomeScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDrawer(BuildContext context, ThemeProvider theme) {
+    return Drawer(
+      backgroundColor: theme.bgBase,
+      child: SafeArea(
+        child: Column(
+          children: [
+            ListTile(
+              title: Text(
+                'Menu Admin',
+                style: TextStyle(
+                  color: theme.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                ),
+              ),
+              trailing: IconButton(
+                icon: Icon(Icons.close, color: theme.iconColor),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            Divider(color: theme.border),
+            _drawerItem(
+              context: context,
+              theme: theme,
+              icon: Icons.rate_review_outlined,
+              title: 'Kelola User & Ulasan',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ManageUsersScreen()),
+              ),
+            ),
+            _drawerItem(
+              context: context,
+              theme: theme,
+              icon: Icons.category_outlined,
+              title: 'Kelola Kategori',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ManageKategoriScreen()),
+              ),
+            ),
+            _drawerItem(
+              context: context,
+              theme: theme,
+              icon: Icons.settings_outlined,
+              title: 'Pengaturan',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              ),
+            ),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _signOut(context),
+                  icon: Icon(Icons.logout_rounded, color: theme.iconColor),
+                  label: Text(
+                    'Logout',
+                    style: TextStyle(color: theme.textPrimary),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: theme.border),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _drawerItem({
+    required BuildContext context,
+    required ThemeProvider theme,
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: theme.iconColor),
+      title: Text(
+        title,
+        style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.w600),
+      ),
+      onTap: () {
+        Navigator.pop(context);
+        onTap();
+      },
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// UMKM Category Constants
 /// File ini mendefinisikan semua kategori UMKM yang tersedia
 class UmkmCategory {
@@ -54,6 +56,32 @@ class UmkmCategory {
         return '💄';
       default:
         return '📍';
+    }
+  }
+
+  /// Ikon Material untuk marker dan elemen UI berdasarkan kategori
+  static IconData getCategoryIcon(String category) {
+    switch (category) {
+      case cafe:
+        return Icons.local_cafe_outlined;
+      case warung:
+        return Icons.ramen_dining_outlined;
+      case toko:
+        return Icons.storefront_outlined;
+      case restoran:
+        return Icons.restaurant_outlined;
+      case bakery:
+        return Icons.bakery_dining_outlined;
+      case fashion:
+        return Icons.checkroom_outlined;
+      case elektronik:
+        return Icons.devices_outlined;
+      case farmasi:
+        return Icons.local_pharmacy_outlined;
+      case kecantikan:
+        return Icons.content_cut_outlined;
+      default:
+        return Icons.place_outlined;
     }
   }
 }

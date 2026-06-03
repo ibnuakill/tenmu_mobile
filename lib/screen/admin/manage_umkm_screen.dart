@@ -6,17 +6,33 @@ import '../../core/umkm_image_helper.dart';
 import 'edit_umkm_screen.dart';
 
 class ManageUmkmScreen extends StatefulWidget {
-  const ManageUmkmScreen({super.key});
+  final bool isOwnerView;
+
+  const ManageUmkmScreen({super.key, this.isOwnerView = false});
 
   @override
   State<ManageUmkmScreen> createState() => _ManageUmkmScreenState();
 }
 
 class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
-  final _umkmStream = Supabase.instance.client
-      .from('umkm')
-      .stream(primaryKey: ['id'])
-      .order('created_at', ascending: false);
+  late final Stream<List<Map<String, dynamic>>> _umkmStream;
+
+  @override
+  void initState() {
+    super.initState();
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    final baseQuery = Supabase.instance.client
+        .from('umkm')
+        .stream(primaryKey: ['id']);
+
+    if (widget.isOwnerView && userId != null) {
+      _umkmStream = baseQuery
+          .eq('owner_id', userId)
+          .order('created_at', ascending: false);
+    } else {
+      _umkmStream = baseQuery.order('created_at', ascending: false);
+    }
+  }
 
   Future<void> _hapusData(int id, String nama) async {
     final theme = Provider.of<ThemeProvider>(context, listen: false);
@@ -126,7 +142,7 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
           ),
         ),
         title: Text(
-          'Kelola Data UMKM',
+          widget.isOwnerView ? 'UMKM Milik Saya' : 'Kelola Data UMKM',
           style: TextStyle(
             color: theme.textPrimary,
             fontWeight: FontWeight.w700,
@@ -215,13 +231,24 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
                             ),
                           ),
                   ),
-                  title: Text(
-                    umkm['nama_tempat'] ?? 'Tanpa Nama',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: theme.textPrimary,
-                      fontSize: 15,
-                    ),
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          umkm['nama_tempat'] ?? 'Tanpa Nama',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: theme.textPrimary,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _statusBadge(
+                        theme,
+                        umkm['verification_status'] ?? 'pending',
+                      ),
+                    ],
                   ),
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -249,12 +276,13 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      _iconBtn(
-                        icon: Icons.delete_outline,
-                        color: const Color(0xFF8B2020),
-                        onTap: () =>
-                            _hapusData(umkm['id'], umkm['nama_tempat']),
-                      ),
+                      if (!widget.isOwnerView)
+                        _iconBtn(
+                          icon: Icons.delete_outline,
+                          color: const Color(0xFF8B2020),
+                          onTap: () =>
+                              _hapusData(umkm['id'], umkm['nama_tempat']),
+                        ),
                     ],
                   ),
                 ),
@@ -282,6 +310,58 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
           border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Icon(icon, color: color, size: 18),
+      ),
+    );
+  }
+
+  Widget _statusBadge(ThemeProvider theme, String status) {
+    Color bgColor;
+    Color textColor;
+    String label;
+    IconData icon;
+
+    switch (status) {
+      case 'verified':
+        bgColor = const Color(0xFF28A745).withValues(alpha: 0.2);
+        textColor = const Color(0xFF28A745);
+        label = 'Verified';
+        icon = Icons.check_circle;
+        break;
+      case 'rejected':
+        bgColor = const Color(0xFF8B2020).withValues(alpha: 0.2);
+        textColor = const Color(0xFF8B2020);
+        label = 'Rejected';
+        icon = Icons.cancel;
+        break;
+      case 'pending':
+      default:
+        bgColor = const Color(0xFFFFB800).withValues(alpha: 0.2);
+        textColor = const Color(0xFFFFB800);
+        label = 'Pending';
+        icon = Icons.schedule;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: textColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: textColor),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

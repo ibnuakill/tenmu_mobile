@@ -20,6 +20,9 @@ class _RegisterScreenState extends State<RegisterScreen>
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _isVerifying = false; // Track if user is in verification step
+  bool _isCheckingVerification = false;
+  String? _registeredEmail; // Store email for verification
 
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
@@ -74,18 +77,26 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     setState(() => _isLoading = true);
     try {
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
+
       await Supabase.instance.client.auth.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        email: email,
+        password: password,
         data: {
           'full_name': _namaController.text.trim(),
-          'nama': _namaController.text.trim(), // Keep for backward compatibility
+          'nama': _namaController.text.trim(),
         },
         emailRedirectTo: 'tenmu://login-callback',
       );
+
       if (mounted) {
-        _toast('Pendaftaran berhasil! Silakan login.');
-        Navigator.pop(context);
+        setState(() {
+          _isVerifying = true;
+          _registeredEmail = email;
+        });
+        _toast('Email verifikasi telah dikirim! Silakan periksa inbox Anda.');
+        _checkVerification(email, password);
       }
     } on AuthException catch (e) {
       _toast(e.message, isError: true);
@@ -93,6 +104,39 @@ class _RegisterScreenState extends State<RegisterScreen>
       _toast('Terjadi kesalahan yang tidak terduga.', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _checkVerification(String email, String password) async {
+    while (mounted && _isVerifying) {
+      setState(() => _isCheckingVerification = true);
+
+      try {
+        await Supabase.instance.client.auth.signInWithPassword(
+          email: email,
+          password: password,
+        );
+
+        final user = Supabase.instance.client.auth.currentUser;
+        if (user != null && user.emailConfirmedAt != null) {
+          if (mounted) {
+            _toast('Email berhasil diverifikasi! Silakan login.');
+            await Supabase.instance.client.auth.signOut();
+            if (mounted) Navigator.pop(context);
+          }
+          return;
+        }
+
+        await Supabase.instance.client.auth.signOut();
+      } catch (_) {
+        // Login gagal, coba lagi nanti
+      }
+
+      if (mounted) {
+        setState(() => _isCheckingVerification = false);
+      }
+
+      await Future.delayed(const Duration(seconds: 5));
     }
   }
 
@@ -121,6 +165,12 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Jika sedang verifikasi, tampilkan verification screen
+    if (_isVerifying && _registeredEmail != null) {
+      return _buildVerificationScreen();
+    }
+
+    // Otherwise, show registration form
     return Scaffold(
       backgroundColor: AppColors.bgBase,
       body: SafeArea(
@@ -334,6 +384,217 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
+  Widget _buildVerificationScreen() {
+    return PopScope(
+      canPop: false, // Prevent back navigation
+      child: Scaffold(
+        backgroundColor: AppColors.bgBase,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 40),
+
+                // Illustration / Icon
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: AppColors.bgElevated,
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(color: AppColors.btnPrimary, width: 2),
+                  ),
+                  child: const Icon(
+                    Icons.mark_email_unread_outlined,
+                    size: 60,
+                    color: AppColors.btnPrimary,
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // Title
+                const Text(
+                  'Verifikasi Email',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Subtitle
+                const Text(
+                  'Kami telah mengirimkan email verifikasi ke:',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Email address
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgElevated,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border, width: 1),
+                  ),
+                  child: Text(
+                    _registeredEmail ?? '',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.btnPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // Instructions
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgElevated,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border, width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Langkah-langkah:',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      _InstructionItem(number: '1', text: 'Buka email Anda'),
+                      SizedBox(height: 8),
+                      _InstructionItem(
+                        number: '2',
+                        text: 'Klik tombol "Verifikasi Email" dalam email',
+                      ),
+                      SizedBox(height: 8),
+                      _InstructionItem(
+                        number: '3',
+                        text: 'Verifikasi akan selesai secara otomatis',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // Checking status
+                if (_isCheckingVerification)
+                  Column(
+                    children: const [
+                      SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation(AppColors.btnPrimary),
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Memeriksa verifikasi email...',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  const Text(
+                    'Menunggu verifikasi email...',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                const SizedBox(height: 32),
+
+                // Sudah Verifikasi button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    icon: const Icon(Icons.login, color: AppColors.btnLabel),
+                    label: const Text(
+                      'Sudah Verifikasi? Login',
+                      style: TextStyle(color: AppColors.btnLabel, fontWeight: FontWeight.w600),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.btnPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Cancel button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _isVerifying = false;
+                        _registeredEmail = null;
+                      });
+                    },
+                    icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+                    label: const Text(
+                      'Kembali ke Pendaftaran',
+                      style: TextStyle(color: AppColors.textPrimary),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.border, width: 1),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // Help text
+                const Text(
+                  'Email tidak masuk? Periksa folder spam atau kembali dan coba daftar dengan email berbeda.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textHint,
+                    fontSize: 12,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Helper Widgets ────────────────────────────────────────────────────────
 
   Widget _stepDot({required bool active, required String label}) {
@@ -473,8 +734,58 @@ class _RegisterScreenState extends State<RegisterScreen>
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.5,
                 ),
-              ),
-            ),
-    );
-  }
-}
+               ),
+             ),
+     );
+   }
+ }
+
+ class _InstructionItem extends StatelessWidget {
+   final String number;
+   final String text;
+
+   const _InstructionItem({
+     required this.number,
+     required this.text,
+   });
+
+   @override
+   Widget build(BuildContext context) {
+     return Row(
+       crossAxisAlignment: CrossAxisAlignment.start,
+       children: [
+         Container(
+           width: 28,
+           height: 28,
+           decoration: BoxDecoration(
+             color: AppColors.btnPrimary,
+             borderRadius: BorderRadius.circular(8),
+           ),
+           child: Center(
+             child: Text(
+               number,
+               style: const TextStyle(
+                 color: AppColors.btnLabel,
+                 fontWeight: FontWeight.bold,
+                 fontSize: 12,
+               ),
+             ),
+           ),
+         ),
+         const SizedBox(width: 12),
+         Expanded(
+           child: Padding(
+             padding: const EdgeInsets.only(top: 4),
+             child: Text(
+               text,
+               style: const TextStyle(
+                 color: AppColors.textSecondary,
+                 fontSize: 13,
+               ),
+             ),
+           ),
+         ),
+       ],
+     );
+   }
+ }

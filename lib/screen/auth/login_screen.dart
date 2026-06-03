@@ -69,8 +69,18 @@ class _LoginScreenState extends State<LoginScreen>
         password: _passwordController.text.trim(),
       );
 
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop(true);
+      // Check if email is verified
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null && user.emailConfirmedAt == null) {
+        // Email not verified - AuthGate will handle redirecting to verification screen
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(true);
+        }
+      } else {
+        // Email is verified, proceed as normal
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(true);
+        }
       }
     } on AuthException catch (e) {
       _toast(e.message, isError: true);

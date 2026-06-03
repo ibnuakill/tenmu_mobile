@@ -10,6 +10,7 @@ import 'package:flutter_compass/flutter_compass.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme_provider.dart';
 import '../../core/location_permission_helper.dart';
+import '../../core/umkm_category.dart';
 import '../../core/umkm_image_helper.dart';
 
 class RouteMapScreen extends StatefulWidget {
@@ -79,6 +80,55 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
   // True jika OSRM gagal, tampilkan garis lurus sebagai fallback
   bool _useFallback = false;
+
+  String _resolveCategory(Map<String, dynamic> umkm) {
+    final category = umkm['category']?.toString().trim();
+    if (category == null || category.isEmpty) {
+      return UmkmCategory.lainnya;
+    }
+    return UmkmCategory.isValidCategory(category)
+        ? category
+        : UmkmCategory.lainnya;
+  }
+
+  Widget _buildCategoryMarker(
+    Map<String, dynamic> umkm,
+    ThemeProvider theme,
+  ) {
+    final isSelected = _selectedUmkm?['id'] == umkm['id'];
+    final category = _resolveCategory(umkm);
+    final pinColor = isSelected ? theme.btnPrimary : Colors.red;
+    final iconColor = isSelected ? theme.btnPrimary : theme.textPrimary;
+
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        Icon(
+          Icons.location_on,
+          color: pinColor,
+          size: isSelected ? 50 : 42,
+        ),
+        Positioned(
+          top: isSelected ? 9 : 8,
+          child: Container(
+            width: isSelected ? 24 : 20,
+            height: isSelected ? 24 : 20,
+            decoration: BoxDecoration(
+              color: theme.bgSurface,
+              shape: BoxShape.circle,
+              border: Border.all(color: theme.border, width: 1),
+            ),
+            child: Icon(
+              UmkmCategory.getCategoryIcon(category),
+              size: isSelected ? 14 : 12,
+              color: iconColor,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   Future<void> _initLocationAndRoute() async {
     try {
@@ -367,7 +417,10 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                   children: [
                     TileLayer(
                       urlTemplate:
-                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      subdomains: const ['a', 'b', 'c'],
+                      maxNativeZoom: 19,
+                      maxZoom: 22,
                       userAgentPackageName: 'com.example.tenmu',
                     ),
                     if (isNavigating)
@@ -417,11 +470,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                                         16.0,
                                       );
                                     },
-                                    child: Icon(
-                                      Icons.location_on,
-                                      color: _selectedUmkm?['id'] == umkm['id'] ? theme.btnPrimary : Colors.red,
-                                      size: _selectedUmkm?['id'] == umkm['id'] ? 50 : 40,
-                                    ),
+                                    child: _buildCategoryMarker(umkm, theme),
                                   ),
                                 );
                               }),

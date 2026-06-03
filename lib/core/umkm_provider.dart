@@ -15,8 +15,8 @@ class UMKMProvider extends ChangeNotifier {
 
   // Cache duration: 5 minutes
   bool get _shouldRefresh =>
-    _lastFetch == null ||
-    DateTime.now().difference(_lastFetch!) > const Duration(minutes: 5);
+      _lastFetch == null ||
+      DateTime.now().difference(_lastFetch!) > const Duration(minutes: 5);
 
   Future<void> fetchUMKM({bool force = false}) async {
     if (!force && !_shouldRefresh && _umkmList.isNotEmpty) return;
@@ -26,10 +26,13 @@ class UMKMProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // optimization: fetch only necessary fields for listing
+      // optimization: fetch only necessary fields for listing + only verified UMKM
       final data = await Supabase.instance.client
           .from('umkm')
-          .select('id, nama_tempat, alamat, deskripsi, gambar_url, image_urls, category, min_price, max_price, latitude, longitude, is_featured')
+          .select(
+            'id, nama_tempat, alamat, deskripsi, gambar_url, image_urls, category, min_price, max_price, latitude, longitude, is_featured',
+          )
+          .eq('verification_status', 'verified')
           .order('created_at', ascending: false);
 
       _umkmList = List<Map<String, dynamic>>.from(data);

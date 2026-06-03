@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Screen Admin: Kelola User & Hapus Review yang tidak pantas.
+import '../../core/theme_provider.dart';
+import '../../core/user_role.dart';
+
 class ManageUsersScreen extends StatefulWidget {
   const ManageUsersScreen({super.key});
 
@@ -16,7 +17,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
   final _client = Supabase.instance.client;
   late TabController _tabController;
 
-  // ── Data ──────────────────────────────────────────────────
   List<Map<String, dynamic>> _users = [];
   List<Map<String, dynamic>> _reviews = [];
   bool _loadingUsers = true;
@@ -37,29 +37,16 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
     super.dispose();
   }
 
-  // ── Load semua user dari auth.users (via service role function atau tabel publik) ──
   Future<void> _loadUsers() async {
     setState(() => _loadingUsers = true);
     try {
-      // Mengambil dari tabel profiles atau reviews untuk mendapatkan user_id unik
-      // Supabase auth.users tidak bisa diakses langsung dari client,
-      // jadi kita ambil user_id unik dari tabel reviews
       final data = await _client
-          .from('reviews')
-          .select('user_id, created_at')
+          .from('profiles')
+          .select('id, role, full_name, nama')
           .order('created_at', ascending: false);
 
-      // Kumpulkan unique user_id
-      final Map<String, Map<String, dynamic>> uniqueUsers = {};
-      for (final row in List<Map<String, dynamic>>.from(data)) {
-        final uid = row['user_id'] as String;
-        if (!uniqueUsers.containsKey(uid)) {
-          uniqueUsers[uid] = row;
-        }
-      }
-
       setState(() {
-        _users = uniqueUsers.values.toList();
+        _users = List<Map<String, dynamic>>.from(data);
         _loadingUsers = false;
       });
     } catch (_) {
@@ -67,7 +54,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
     }
   }
 
-  // ── Load semua review ──────────────────────────────────────
   Future<void> _loadReviews() async {
     setState(() => _loadingReviews = true);
     try {
@@ -84,7 +70,16 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
     }
   }
 
-  // ── Hapus satu review ──────────────────────────────────────
+  Future<void> _updateUserRole(String userId, UserRole role) async {
+    try {
+      await _client.from('profiles').update({'role': role.value}).eq('id', userId);
+      await _loadUsers();
+      _snack('Role berhasil diubah ke ${role.label}.', isError: false);
+    } catch (e) {
+      _snack('Gagal mengubah role: $e', isError: true);
+    }
+  }
+
   Future<void> _deleteReview(Map<String, dynamic> review) async {
     final confirm = await _showConfirmDialog(
       title: 'Hapus Ulasan?',
@@ -102,7 +97,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
     }
   }
 
-  // ── Hapus SEMUA review milik satu user ─────────────────────
   Future<void> _deleteAllReviewsByUser(String userId) async {
     final confirm = await _showConfirmDialog(
       title: 'Hapus Semua Ulasan User?',
@@ -113,7 +107,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
       try {
         await _client.from('reviews').delete().eq('user_id', userId);
         await _loadReviews();
-        await _loadUsers();
         _snack('Semua ulasan user berhasil dihapus.', isError: false);
       } catch (e) {
         _snack('Gagal: $e', isError: true);
@@ -217,10 +210,10 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
           indicatorColor: theme.textPrimary,
           labelColor: theme.textPrimary,
           unselectedLabelColor: theme.textHint,
-          labelStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           tabs: const [
             Tab(text: 'Semua Ulasan'),
-            Tab(text: 'Per User'),
+            Tab(text: 'Role User'),
           ],
         ),
       ),
@@ -240,6 +233,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
             reviews: _reviews,
             isLoading: _loadingUsers,
             onDeleteAll: _deleteAllReviewsByUser,
+            onRoleChanged: _updateUserRole,
             onRefresh: () async {
               await _loadUsers();
               await _loadReviews();
@@ -251,7 +245,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
   }
 }
 
-// ── Tab 1: Semua Ulasan ─────────────────────────────────────────────────────
 class _AllReviewsTab extends StatelessWidget {
   final List<Map<String, dynamic>> reviews;
   final bool isLoading;
@@ -287,7 +280,6 @@ class _AllReviewsTab extends StatelessWidget {
       backgroundColor: theme.bgSurface,
       child: Column(
         children: [
-          // Search bar
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Container(
@@ -309,7 +301,7 @@ class _AllReviewsTab extends StatelessWidget {
                     size: 18,
                   ),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
+                  contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 12,
                   ),
@@ -317,7 +309,6 @@ class _AllReviewsTab extends StatelessWidget {
               ),
             ),
           ),
-
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Row(
@@ -329,7 +320,6 @@ class _AllReviewsTab extends StatelessWidget {
               ],
             ),
           ),
-
           Expanded(
             child: isLoading
                 ? Center(
@@ -361,12 +351,12 @@ class _AllReviewsTab extends StatelessWidget {
   }
 }
 
-// ── Tab 2: Per User ─────────────────────────────────────────────────────────
 class _UserListTab extends StatelessWidget {
   final List<Map<String, dynamic>> users;
   final List<Map<String, dynamic>> reviews;
   final bool isLoading;
   final Future<void> Function(String userId) onDeleteAll;
+  final Future<void> Function(String userId, UserRole role) onRoleChanged;
   final Future<void> Function() onRefresh;
 
   const _UserListTab({
@@ -374,6 +364,7 @@ class _UserListTab extends StatelessWidget {
     required this.reviews,
     required this.isLoading,
     required this.onDeleteAll,
+    required this.onRoleChanged,
     required this.onRefresh,
   });
 
@@ -389,7 +380,7 @@ class _UserListTab extends StatelessWidget {
           : users.isEmpty
           ? Center(
               child: Text(
-                'Belum ada user yang memberikan ulasan.',
+                'Belum ada data user di tabel profiles.',
                 style: TextStyle(color: theme.textSecondary),
               ),
             )
@@ -399,16 +390,22 @@ class _UserListTab extends StatelessWidget {
               separatorBuilder: (_, _) => Divider(color: theme.border),
               itemBuilder: (context, i) {
                 final user = users[i];
-                final userId = user['user_id'] as String;
+                final userId = user['id'] as String;
                 final userReviews = reviews
                     .where((r) => r['user_id'] == userId)
                     .toList();
 
                 return _UserTile(
                   userId: userId,
+                  name:
+                      user['full_name']?.toString() ??
+                      user['nama']?.toString() ??
+                      'Tanpa nama',
+                  role: parseUserRole(user['role']),
                   reviewCount: userReviews.length,
                   reviews: userReviews,
                   onDeleteAll: () => onDeleteAll(userId),
+                  onRoleChanged: (role) => onRoleChanged(userId, role),
                 );
               },
             ),
@@ -416,7 +413,6 @@ class _UserListTab extends StatelessWidget {
   }
 }
 
-// ── Tile: Satu review di tab Admin ─────────────────────────────────────────
 class _AdminReviewTile extends StatelessWidget {
   final Map<String, dynamic> review;
   final VoidCallback onDelete;
@@ -442,7 +438,6 @@ class _AdminReviewTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Rating badge
           Container(
             width: 40,
             height: 40,
@@ -511,7 +506,6 @@ class _AdminReviewTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          // Tombol hapus
           GestureDetector(
             onTap: onDelete,
             child: Container(
@@ -523,7 +517,7 @@ class _AdminReviewTile extends StatelessWidget {
                   color: const Color(0xFF8B0000).withValues(alpha: 0.3),
                 ),
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.delete_outline,
                 size: 16,
                 color: Color(0xFF8B2020),
@@ -536,30 +530,33 @@ class _AdminReviewTile extends StatelessWidget {
   }
 }
 
-// ── Tile: Satu user di tab Per User ─────────────────────────────────────────
 class _UserTile extends StatelessWidget {
   final String userId;
+  final String name;
+  final UserRole role;
   final int reviewCount;
   final List<Map<String, dynamic>> reviews;
   final VoidCallback onDeleteAll;
+  final ValueChanged<UserRole> onRoleChanged;
 
   const _UserTile({
     required this.userId,
+    required this.name,
+    required this.role,
     required this.reviewCount,
     required this.reviews,
     required this.onDeleteAll,
+    required this.onRoleChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
-    final shortId = userId.length > 12
-        ? '${userId.substring(0, 12)}...'
-        : userId;
+    final shortId = userId.length > 12 ? '${userId.substring(0, 12)}...' : userId;
 
     return ExpansionTile(
       tilePadding: EdgeInsets.zero,
-      childrenPadding: const EdgeInsets.only(left: 8, bottom: 8),
+      childrenPadding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
       iconColor: theme.iconColor,
       collapsedIconColor: theme.iconColor,
       leading: Container(
@@ -575,82 +572,141 @@ class _UserTile extends StatelessWidget {
         ),
       ),
       title: Text(
-        shortId,
+        name,
         style: TextStyle(
           fontSize: 13,
           color: theme.textPrimary,
-          fontFamily: 'monospace',
+          fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: Text(
-        '$reviewCount ulasan',
+        '$reviewCount ulasan • $shortId',
         style: TextStyle(fontSize: 11, color: theme.textHint),
       ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GestureDetector(
-            onTap: onDeleteAll,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF8B0000).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: const Color(0xFF8B0000).withValues(alpha: 0.3),
-                ),
-              ),
-              child: Text(
-                'Hapus Semua',
+      trailing: const Icon(Icons.expand_more),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: theme.bgElevated,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: theme.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Role Akun',
                 style: TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF8B2020),
+                  color: theme.textSecondary,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      children: reviews
-          .map(
-            (r) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.bgElevated,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: theme.border),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<UserRole>(
+                initialValue: role,
+                dropdownColor: theme.bgSurface,
+                style: TextStyle(color: theme.textPrimary),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: theme.bgSurface,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: theme.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: theme.border),
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${r['rating']}★ — UMKM ID: ${r['umkm_id']}',
+                items: UserRole.values
+                    .map(
+                      (item) => DropdownMenuItem<UserRole>(
+                        value: item,
+                        child: Text(item.label),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null && value != role) {
+                    onRoleChanged(value);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: GestureDetector(
+                  onTap: onDeleteAll,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8B0000).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF8B0000).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: const Text(
+                      'Hapus Semua Ulasan User Ini',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: theme.textSecondary,
+                        fontSize: 11,
+                        color: Color(0xFF8B2020),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    if (r['komentar'] != null && r['komentar'] != '') ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        r['komentar'],
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: theme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        ...reviews.map(
+          (r) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.bgElevated,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: theme.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${r['rating']}★ - UMKM ID: ${r['umkm_id']}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (r['komentar'] != null && r['komentar'] != '') ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      r['komentar'],
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-          )
-          .toList(),
+          ),
+        ),
+      ],
     );
   }
 }

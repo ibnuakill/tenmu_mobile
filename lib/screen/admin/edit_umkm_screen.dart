@@ -158,6 +158,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
       await Supabase.instance.client
           .from('umkm')
           .update({
+            'owner_id': widget.umkm['owner_id'] ?? Supabase.instance.client.auth.currentUser?.id,
             'nama_tempat': _namaController.text.trim(),
             'alamat': _alamatController.text.trim(),
             'deskripsi': _deskripsiController.text.trim(),

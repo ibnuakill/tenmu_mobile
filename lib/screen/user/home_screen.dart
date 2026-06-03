@@ -5,17 +5,17 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/theme_provider.dart';
 import '../../core/umkm_image_helper.dart';
 import '../../core/umkm_provider.dart';
-import '../../core/theme_toggle_button.dart';
+import 'settings_screen.dart';
 import '../../core/umkm_category.dart';
 import '../../core/location_permission_helper.dart';
 import '../auth/login_screen.dart';
 import 'umkm_detail_screen.dart';
 import 'route_map_screen.dart';
+
 import 'widgets/category_filter_widget.dart';
 import 'widgets/price_range_filter_widget.dart';
 import 'widgets/sort_filter_widget.dart';
 import 'favorite_screen.dart';
-import 'profile_settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,6 +30,22 @@ class _HomeScreenState extends State<HomeScreen> {
   late RangeValues _priceRange;
   SortOption _selectedSort = SortOption.terbaru;
   Position? _currentPosition;
+
+  bool get _hasActiveFilters =>
+      _selectedCategories.isNotEmpty ||
+      _priceRange.start > 0 ||
+      _priceRange.end < 1000000;
+
+  String _sortLabel(SortOption option) {
+    switch (option) {
+      case SortOption.terbaru:
+        return 'Terbaru';
+      case SortOption.terdekat:
+        return 'Terdekat';
+      case SortOption.rating:
+        return 'Rating';
+    }
+  }
 
   @override
   void initState() {
@@ -51,7 +67,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (accessStatus == LocationAccessStatus.granted) {
         final position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
         );
         if (mounted) {
           setState(() {
@@ -78,7 +96,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (accessStatus == LocationAccessStatus.granted) {
         final position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
         );
         setState(() {
           _currentPosition = position;
@@ -168,7 +188,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         selectedSort: _selectedSort,
                         onSortChanged: (sort) {
                           setState(() => _selectedSort = sort);
-                          if (sort == SortOption.terdekat && _currentPosition == null) {
+                          if (sort == SortOption.terdekat &&
+                              _currentPosition == null) {
                             _getCurrentLocationForSort();
                           }
                         },
@@ -203,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-              )
+              ),
             ],
           ),
         );
@@ -211,99 +232,77 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  List<Map<String, dynamic>> _getFilteredUMKM(UMKMProvider umkmProvider) {
+    final raw = umkmProvider.umkmList;
+    List<Map<String, dynamic>> umkmList = raw.where((u) {
+      bool matchesSearch = true;
+      if (_searchQuery.isNotEmpty) {
+        final nama = (u['nama_tempat'] ?? '').toLowerCase();
+        final alamat = (u['alamat'] ?? '').toLowerCase();
+        matchesSearch =
+            nama.contains(_searchQuery) || alamat.contains(_searchQuery);
+      }
+      bool matchesCategory = true;
+      if (_selectedCategories.isNotEmpty) {
+        final umkmCategory = u['category'] ?? 'Lainnya';
+        matchesCategory = _selectedCategories.contains(umkmCategory);
+      }
+      bool matchesPrice = true;
+      final minPrice = (u['min_price'] ?? 0).toDouble();
+      final maxPrice = (u['max_price'] ?? 1000000).toDouble();
+      matchesPrice =
+          !(maxPrice < _priceRange.start || minPrice > _priceRange.end);
+      return matchesSearch && matchesCategory && matchesPrice;
+    }).toList();
+
+    if (_selectedSort == SortOption.terdekat && _currentPosition != null) {
+      umkmList.sort((a, b) {
+        final latA = (a['latitude'] as num?)?.toDouble() ?? 0.0;
+        final lngA = (a['longitude'] as num?)?.toDouble() ?? 0.0;
+        final latB = (b['latitude'] as num?)?.toDouble() ?? 0.0;
+        final lngB = (b['longitude'] as num?)?.toDouble() ?? 0.0;
+
+        if (latA == 0.0 && latB != 0.0) return 1;
+        if (latB == 0.0 && latA != 0.0) return -1;
+
+        final distA = Geolocator.distanceBetween(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          latA,
+          lngA,
+        );
+        final distB = Geolocator.distanceBetween(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          latB,
+          lngB,
+        );
+
+        return distA.compareTo(distB);
+      });
+    } else if (_selectedSort == SortOption.rating) {
+      umkmList.sort((a, b) {
+        final ratingA = umkmProvider.ratings[a['id']] ?? 0.0;
+        final ratingB = umkmProvider.ratings[b['id']] ?? 0.0;
+        return ratingB.compareTo(ratingA);
+      });
+    }
+    return umkmList;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
     final umkmProvider = Provider.of<UMKMProvider>(context);
     final user = Supabase.instance.client.auth.currentUser;
+    final umkmList = _getFilteredUMKM(umkmProvider);
 
     return Scaffold(
       backgroundColor: theme.bgBase,
       // ── DRAWER NAVIGATION ──
-      drawer: Drawer(
-        backgroundColor: theme.bgSurface,
-        child: Column(
-          children: [
-            UserAccountsDrawerHeader(
-              decoration: BoxDecoration(color: theme.btnPrimary),
-              accountName: Text(
-                user?.userMetadata?['full_name'] ?? user?.userMetadata?['nama'] ?? 'Guest',
-                style: TextStyle(color: theme.btnLabel, fontWeight: FontWeight.bold),
-              ),
-              accountEmail: Text(
-                user?.email ?? 'Belum login',
-                style: TextStyle(color: theme.btnLabel),
-              ),
-              currentAccountPicture: CircleAvatar(
-                backgroundColor: theme.bgBase,
-                backgroundImage: user?.userMetadata?['avatar_url'] != null
-                    ? NetworkImage(user!.userMetadata!['avatar_url'])
-                    : null,
-                child: user?.userMetadata?['avatar_url'] == null
-                    ? Icon(Icons.person, color: theme.iconColor, size: 40)
-                    : null,
-              ),
-            ),
-            ListTile(
-              leading: Icon(Icons.bookmark, color: theme.iconColor),
-              title: Text('Favorit Saya', style: TextStyle(color: theme.textPrimary)),
-              onTap: () {
-                Navigator.pop(context); // Tutup drawer
-                if (user != null) {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoriteScreen()));
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Silakan login terlebih dahulu')),
-                  );
-                }
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.settings, color: theme.iconColor),
-              title: Text('Pengaturan Profil', style: TextStyle(color: theme.textPrimary)),
-              onTap: () {
-                Navigator.pop(context);
-                if (user != null) {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileSettingsScreen()));
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Silakan login terlebih dahulu')),
-                  );
-                }
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.map, color: theme.iconColor),
-              title: Text('Peta Rute', style: TextStyle(color: theme.textPrimary)),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => RouteMapScreen(umkmList: umkmProvider.umkmList)));
-              },
-            ),
-            const Spacer(),
-            Divider(color: theme.border),
-            if (user != null)
-              ListTile(
-                leading: Icon(Icons.logout, color: Colors.red),
-                title: Text('Keluar', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _signOut(context);
-                },
-              )
-            else
-              ListTile(
-                leading: Icon(Icons.login, color: theme.btnPrimary),
-                title: Text('Masuk', style: TextStyle(color: theme.btnPrimary)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _goToLogin(context);
-                },
-              ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+      drawer: user != null
+          ? _buildLoggedInDrawer(context, theme, umkmProvider, user)
+          : _buildGuestDrawer(context, theme, umkmProvider),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,39 +317,112 @@ class _HomeScreenState extends State<HomeScreen> {
                       onTap: () => Scaffold.of(context).openDrawer(),
                       child: Container(
                         padding: const EdgeInsets.all(10),
-                        margin: const EdgeInsets.only(right: 16),
                         decoration: BoxDecoration(
                           color: theme.bgElevated,
-                          borderRadius: BorderRadius.circular(12),
+                          shape: BoxShape.circle,
                           border: Border.all(color: theme.border),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color.fromRGBO(0, 0, 0, 0.15),
+                              blurRadius: 8,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
                         ),
-                        child: Icon(Icons.menu, color: theme.textPrimary, size: 24),
+                        child: Icon(
+                          Icons.menu,
+                          color: theme.textPrimary,
+                          size: 22,
+                        ),
                       ),
                     ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'TenMu',
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: theme.bgElevated,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: theme.border),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color.fromRGBO(0, 0, 0, 0.15),
+                            blurRadius: 8,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        onChanged: (v) =>
+                            setState(() => _searchQuery = v.toLowerCase()),
                         style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
                           color: theme.textPrimary,
-                          letterSpacing: 2,
+                          fontSize: 14,
+                        ),
+                        cursorColor: theme.borderFocus,
+                        textAlignVertical: TextAlignVertical.center,
+                        decoration: InputDecoration(
+                          hintText: 'Cari tempat...',
+                          hintStyle: TextStyle(
+                            color: theme.textHint,
+                            fontSize: 13,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: theme.iconColor,
+                            size: 18,
+                          ),
+                          suffixIcon: GestureDetector(
+                            onTap: () => _showFilterBottomSheet(context, theme),
+                            child: Icon(
+                              Icons.tune_rounded,
+                              color: _hasActiveFilters
+                                  ? theme.btnPrimary
+                                  : theme.iconColor,
+                              size: 18,
+                            ),
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 0,
+                          ),
                         ),
                       ),
-                      Text(
-                        'Temukan tempat nongkrong favoritmu',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.textSecondary,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  const Spacer(),
-                  const ThemeToggleButton(),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => RouteMapScreen(umkmList: umkmList),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: theme.btnPrimary,
+                        shape: BoxShape.circle,
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color.fromRGBO(0, 0, 0, 0.15),
+                            blurRadius: 8,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.map_rounded,
+                        color: theme.btnLabel,
+                        size: 22,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -368,7 +440,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
 
                   // Error state - show retry option
-                  if (umkmProvider.error != null && umkmProvider.umkmList.isEmpty) {
+                  if (umkmProvider.error != null &&
+                      umkmProvider.umkmList.isEmpty) {
                     return Center(
                       child: Padding(
                         padding: const EdgeInsets.all(32),
@@ -416,153 +489,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                   }
 
-                  final raw = umkmProvider.umkmList;
-                  List<Map<String, dynamic>> umkmList = raw.where((u) {
-                    // Filter by search query
-                    bool matchesSearch = true;
-                    if (_searchQuery.isNotEmpty) {
-                      final nama = (u['nama_tempat'] ?? '').toLowerCase();
-                      final alamat = (u['alamat'] ?? '').toLowerCase();
-                      matchesSearch = nama.contains(_searchQuery) ||
-                          alamat.contains(_searchQuery);
-                    }
-
-                    // Filter by category
-                    bool matchesCategory = true;
-                    if (_selectedCategories.isNotEmpty) {
-                      final umkmCategory = u['category'] ?? 'Lainnya';
-                      matchesCategory = _selectedCategories.contains(umkmCategory);
-                    }
-
-                    // Filter by price range
-                    bool matchesPrice = true;
-                    final minPrice = (u['min_price'] ?? 0).toDouble();
-                    final maxPrice = (u['max_price'] ?? 1000000).toDouble();
-                    matchesPrice = !(maxPrice < _priceRange.start || minPrice > _priceRange.end);
-
-                    return matchesSearch && matchesCategory && matchesPrice;
-                  }).toList();
-
-                  // Sort logic
-                  if (_selectedSort == SortOption.terdekat && _currentPosition != null) {
-                    umkmList.sort((a, b) {
-                      final latA = (a['latitude'] as num?)?.toDouble() ?? 0.0;
-                      final lngA = (a['longitude'] as num?)?.toDouble() ?? 0.0;
-                      final latB = (b['latitude'] as num?)?.toDouble() ?? 0.0;
-                      final lngB = (b['longitude'] as num?)?.toDouble() ?? 0.0;
-
-                      if (latA == 0.0 && latB != 0.0) return 1;
-                      if (latB == 0.0 && latA != 0.0) return -1;
-
-                      final distA = Geolocator.distanceBetween(_currentPosition!.latitude, _currentPosition!.longitude, latA, lngA);
-                      final distB = Geolocator.distanceBetween(_currentPosition!.latitude, _currentPosition!.longitude, latB, lngB);
-
-                      return distA.compareTo(distB);
-                    });
-                  } else if (_selectedSort == SortOption.rating) {
-                    umkmList.sort((a, b) {
-                      final ratingA = umkmProvider.ratings[a['id']] ?? 0.0;
-                      final ratingB = umkmProvider.ratings[b['id']] ?? 0.0;
-                      return ratingB.compareTo(ratingA); // Descending (highest rating first)
-                    });
-                  } // Default: terbaru (already sorted in provider)
-
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── SEARCH BAR & MAP & FILTER BUTTON ────────────────────────────────────
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: theme.bgSurface,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: theme.border),
-                                ),
-                                child: TextField(
-                                  onChanged: (v) =>
-                                      setState(() => _searchQuery = v.toLowerCase()),
-                                  style: TextStyle(color: theme.textPrimary),
-                                  cursorColor: theme.borderFocus,
-                                  decoration: InputDecoration(
-                                    hintText: 'Cari nama tempat atau alamat...',
-                                    hintStyle: TextStyle(
-                                      color: theme.textHint,
-                                      fontSize: 14,
-                                    ),
-                                    prefixIcon: Icon(
-                                      Icons.search,
-                                      color: theme.iconColor,
-                                      size: 20,
-                                    ),
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 14,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () {
-                                _showFilterBottomSheet(context, theme);
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: (_selectedCategories.isNotEmpty || _priceRange.start > 0 || _priceRange.end < 1000000)
-                                      ? theme.btnPrimary
-                                      : theme.bgSurface,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: (_selectedCategories.isNotEmpty || _priceRange.start > 0 || _priceRange.end < 1000000)
-                                        ? theme.btnPrimary
-                                        : theme.border,
-                                  ),
-                                ),
-                                child: Icon(
-                                  Icons.tune_rounded,
-                                  color: (_selectedCategories.isNotEmpty || _priceRange.start > 0 || _priceRange.end < 1000000)
-                                      ? theme.btnLabel
-                                      : theme.iconColor,
-                                  size: 24,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => RouteMapScreen(umkmList: umkmList),
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: theme.btnPrimary,
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: Icon(
-                                  Icons.map_rounded,
-                                  color: theme.btnLabel,
-                                  size: 24,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
                       // ── LIST UMKM ──────────────────────────────────────────────────
                       Expanded(
                         child: RefreshIndicator(
@@ -572,17 +501,21 @@ class _HomeScreenState extends State<HomeScreen> {
                             // Refresh user location on pull-to-refresh
                             await _requestUserLocation();
                             // Show snackbar if refresh failed but we have cached data
-                            if (umkmProvider.error != null && umkmProvider.umkmList.isNotEmpty) {
+                            if (umkmProvider.error != null &&
+                                umkmProvider.umkmList.isNotEmpty) {
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: const Text('Gagal memperbarui data'),
+                                    content: const Text(
+                                      'Gagal memperbarui data',
+                                    ),
                                     backgroundColor: Colors.red.shade700,
                                     behavior: SnackBarBehavior.floating,
                                     action: SnackBarAction(
                                       label: 'Retry',
                                       textColor: Colors.white,
-                                      onPressed: () => umkmProvider.fetchUMKM(force: true),
+                                      onPressed: () =>
+                                          umkmProvider.fetchUMKM(force: true),
                                     ),
                                   ),
                                 );
@@ -593,10 +526,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           backgroundColor: theme.bgElevated,
                           child: umkmList.isEmpty
                               ? ListView(
-                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
                                   children: [
                                     SizedBox(
-                                      height: MediaQuery.of(context).size.height * 0.5,
+                                      height:
+                                          MediaQuery.of(context).size.height *
+                                          0.5,
                                       child: Center(
                                         child: Column(
                                           mainAxisSize: MainAxisSize.min,
@@ -609,7 +545,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                             const SizedBox(height: 12),
                                             Text(
                                               'Belum ada tempat ditemukan.',
-                                              style: TextStyle(color: theme.textSecondary),
+                                              style: TextStyle(
+                                                color: theme.textSecondary,
+                                              ),
                                             ),
                                           ],
                                         ),
@@ -618,8 +556,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ],
                                 )
                               : ListView.builder(
-                                  physics: const AlwaysScrollableScrollPhysics(),
-                                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    0,
+                                    20,
+                                    20,
+                                  ),
                                   itemCount: umkmList.length,
                                   itemBuilder: (context, index) {
                                     final umkm = umkmList[index];
@@ -628,7 +572,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                       onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => UmkmDetailScreen(umkm: umkm),
+                                          builder: (_) =>
+                                              UmkmDetailScreen(umkm: umkm),
                                         ),
                                       ),
                                       userPosition: _currentPosition,
@@ -654,11 +599,7 @@ class _UmkmCard extends StatelessWidget {
   final VoidCallback onTap;
   final Position? userPosition;
 
-  const _UmkmCard({
-    required this.umkm,
-    required this.onTap,
-    this.userPosition,
-  });
+  const _UmkmCard({required this.umkm, required this.onTap, this.userPosition});
 
   String? _getDistanceText() {
     if (userPosition == null) return null;
@@ -681,11 +622,22 @@ class _UmkmCard extends StatelessWidget {
     }
   }
 
+  String _resolveCategory() {
+    final category = umkm['category']?.toString().trim();
+    if (category == null || category.isEmpty) {
+      return UmkmCategory.lainnya;
+    }
+    return UmkmCategory.isValidCategory(category)
+        ? category
+        : UmkmCategory.lainnya;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
     final distanceText = _getDistanceText();
     final imageUrl = UmkmImageHelper.primaryImageUrl(umkm);
+    final category = _resolveCategory();
 
     return GestureDetector(
       onTap: onTap,
@@ -693,8 +645,14 @@ class _UmkmCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
           color: theme.bgSurface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.border),
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: const [
+            BoxShadow(
+              color: Color.fromRGBO(0, 0, 0, 0.28),
+              blurRadius: 18,
+              offset: Offset(0, 10),
+            ),
+          ],
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -755,6 +713,40 @@ class _UmkmCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                  Positioned(
+                    left: 12,
+                    bottom: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.48),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            UmkmCategory.getCategoryIcon(category),
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            category.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.2,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               )
             else
@@ -800,18 +792,32 @@ class _UmkmCard extends StatelessWidget {
                   Row(
                     children: [
                       if (distanceText != null) ...[
-                        Icon(
-                          Icons.near_me_rounded,
-                          size: 14,
-                          color: theme.btnPrimary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          distanceText,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: theme.btnPrimary,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: theme.bgElevated,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.near_me_rounded,
+                                size: 14,
+                                color: theme.btnPrimary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                distanceText,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: theme.btnPrimary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -835,6 +841,34 @@ class _UmkmCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Buka detail',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.1,
+                            color: theme.textSecondary,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: theme.btnPrimary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 18,
+                          color: theme.btnLabel,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -843,4 +877,271 @@ class _UmkmCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _InfoPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool highlighted;
+
+  const _InfoPill({
+    required this.icon,
+    required this.label,
+    this.highlighted = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeProvider>(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: highlighted ? theme.btnPrimary : theme.bgElevated,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 14,
+            color: highlighted ? theme.btnLabel : theme.iconColor,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: highlighted ? theme.btnLabel : theme.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Drawer builders (minimal, keep inside this file for locality) ──
+Widget _buildGuestDrawer(
+  BuildContext context,
+  ThemeProvider theme,
+  UMKMProvider umkmProvider,
+) {
+  return Drawer(
+    backgroundColor: theme.bgSurface,
+    child: Column(
+      children: [
+        DrawerHeader(
+          decoration: BoxDecoration(color: theme.btnPrimary),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'TenMu',
+                style: TextStyle(
+                  color: theme.btnLabel,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Temukan UMKM lokal',
+                style: TextStyle(color: theme.btnLabel.withValues(alpha: 0.9)),
+              ),
+            ],
+          ),
+        ),
+
+        ListTile(
+          leading: Icon(Icons.settings_outlined, color: theme.iconColor),
+          title: Text('Pengaturan', style: TextStyle(color: theme.textPrimary)),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            );
+          },
+        ),
+        const Spacer(),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+              },
+              icon: Icon(Icons.login, color: theme.btnLabel),
+              label: Text(
+                'Masuk / Daftar',
+                style: TextStyle(color: theme.btnLabel),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.btnPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+    ),
+  );
+}
+
+Widget _buildLoggedInDrawer(
+  BuildContext context,
+  ThemeProvider theme,
+  UMKMProvider umkmProvider,
+  User user,
+) {
+  return Drawer(
+    backgroundColor: theme.bgBase,
+    child: SafeArea(
+      child: Column(
+        children: [
+          ListTile(
+            title: Text(
+              'Menu',
+              style: TextStyle(
+                color: theme.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+              ),
+            ),
+            trailing: IconButton(
+              icon: Icon(Icons.close, color: theme.iconColor),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          Divider(color: theme.border),
+
+          // Account header (compact)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 26,
+                  backgroundColor: theme.bgElevated,
+                  backgroundImage: user.userMetadata?['avatar_url'] != null
+                      ? NetworkImage(user.userMetadata!['avatar_url'])
+                      : null,
+                  child: user.userMetadata?['avatar_url'] == null
+                      ? Icon(Icons.person, color: theme.iconColor)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.userMetadata?['full_name'] ??
+                            user.userMetadata?['nama'] ??
+                            'Pengguna',
+                        style: TextStyle(
+                          color: theme.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        user.email ?? '',
+                        style: TextStyle(
+                          color: theme.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Menu items (styled like admin)
+          ListTile(
+            leading: Icon(Icons.bookmark, color: theme.iconColor),
+            title: Text(
+              'Favorit Saya',
+              style: TextStyle(
+                color: theme.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FavoriteScreen()),
+              );
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.category_outlined, color: theme.iconColor),
+            title: Text(
+              'Kategori',
+              style: TextStyle(
+                color: theme.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              // Optionally navigate to kategori management/browse
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.settings_outlined, color: theme.iconColor),
+            title: Text(
+              'Pengaturan',
+              style: TextStyle(
+                color: theme.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
+
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await Supabase.instance.client.auth.signOut();
+                },
+                icon: Icon(Icons.logout_rounded, color: theme.iconColor),
+                label: Text(
+                  'Keluar',
+                  style: TextStyle(color: theme.textPrimary),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: theme.border),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }

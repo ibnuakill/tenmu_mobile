@@ -73,7 +73,9 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
       }
 
       setState(() {
-        _imageUrls.addAll(uploadedUrls.where((url) => !_imageUrls.contains(url)));
+        _imageUrls.addAll(
+          uploadedUrls.where((url) => !_imageUrls.contains(url)),
+        );
         if (_imageUrls.isNotEmpty && _selectedImageIndex >= _imageUrls.length) {
           _selectedImageIndex = 0;
         }
@@ -383,7 +385,10 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                         children: [
                           TileLayer(
                             urlTemplate:
-                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            subdomains: const ['a', 'b', 'c'],
+                            maxNativeZoom: 19,
+                            maxZoom: 22,
                             userAgentPackageName: 'com.example.tenmu',
                           ),
                           if (pickedLocation != null)
@@ -576,6 +581,7 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
           100000;
 
       await Supabase.instance.client.from('umkm').insert({
+        'owner_id': Supabase.instance.client.auth.currentUser?.id,
         'nama_tempat': _namaController.text.trim(),
         'alamat': _alamatController.text.trim().isNotEmpty
             ? _alamatController.text.trim()
@@ -598,6 +604,7 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
         'min_price': minPrice,
         'max_price': maxPrice,
         'is_featured': false,
+        'verification_status': 'pending',
       });
 
       if (mounted) {
@@ -773,7 +780,9 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: isSelected ? theme.borderFocus : theme.border,
+                            color: isSelected
+                                ? theme.borderFocus
+                                : theme.border,
                             width: isSelected ? 2 : 1,
                           ),
                         ),
