@@ -931,25 +931,37 @@ Widget _buildGuestDrawer(
 ) {
   return Drawer(
     backgroundColor: theme.bgSurface,
-    child: Column(
-      children: [
-        DrawerHeader(
-          decoration: BoxDecoration(color: theme.btnPrimary),
+    child: SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: theme.bgElevated,
+                ),
+                child: Icon(Icons.person, size: 32, color: theme.iconColor),
+              ),
+              const SizedBox(height: 12),
               Text(
-                'TenMu',
+                'Guest',
                 style: TextStyle(
-                  color: theme.btnLabel,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
+                  color: theme.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 'Temukan UMKM lokal',
-                style: TextStyle(color: theme.btnLabel.withValues(alpha: 0.9)),
+                style: TextStyle(color: theme.textSecondary),
               ),
             ],
           ),
@@ -992,7 +1004,8 @@ Widget _buildGuestDrawer(
           ),
         ),
         const SizedBox(height: 12),
-      ],
+        ],
+      ),
     ),
   );
 }
@@ -1029,12 +1042,19 @@ Widget _buildLoggedInDrawer(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 26,
-                  backgroundColor: theme.bgElevated,
-                  backgroundImage: user.userMetadata?['avatar_url'] != null
-                      ? NetworkImage(user.userMetadata!['avatar_url'])
-                      : null,
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: theme.bgElevated,
+                    image: user.userMetadata?['avatar_url'] != null
+                        ? DecorationImage(
+                            image: NetworkImage(user.userMetadata!['avatar_url']),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
+                  ),
                   child: user.userMetadata?['avatar_url'] == null
                       ? Icon(Icons.person, color: theme.iconColor)
                       : null,
@@ -1084,20 +1104,6 @@ Widget _buildLoggedInDrawer(
                 context,
                 MaterialPageRoute(builder: (_) => const FavoriteScreen()),
               );
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.category_outlined, color: theme.iconColor),
-            title: Text(
-              'Kategori',
-              style: TextStyle(
-                color: theme.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            onTap: () {
-              Navigator.pop(context);
-              // Optionally navigate to kategori management/browse
             },
           ),
           ListTile(
