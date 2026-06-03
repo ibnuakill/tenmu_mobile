@@ -3,9 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
 import '../user/settings_screen.dart';
-import 'add_umkm_screen.dart';
 import 'admin_analytics_screen.dart';
-import 'manage_umkm_screen.dart';
 import 'manage_users_screen.dart';
 import 'admin_profile_screen.dart';
 import 'manage_kategori_screen.dart';
@@ -96,23 +94,6 @@ class AdminHomeScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  GestureDetector(
-                    onTap: () => _signOut(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: theme.bgElevated,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: theme.border),
-                      ),
-                      child: Icon(
-                        Icons.logout_rounded,
-                        color: theme.iconColor,
-                        size: 20,
-                      ),
-                    ),
-                  ),
                 ],
               ),
 
@@ -178,38 +159,6 @@ class AdminHomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-
-              // ── MENU CARD: TAMBAH ─────────────────────────────────────────
-              _menuButton(
-                context: context,
-                theme: theme,
-                icon: Icons.add_location_alt_outlined,
-                title: 'Tambah Tempat Baru',
-                subtitle: 'Tambahkan UMKM atau spot nongkrong baru',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AddUmkmScreen()),
-                ),
-                isPrimary: true,
-              ),
-
-              const SizedBox(height: 12),
-
-              // ── MENU CARD: KELOLA ─────────────────────────────────────────
-              _menuButton(
-                context: context,
-                theme: theme,
-                icon: Icons.tune_rounded,
-                title: 'Kelola / Edit / Hapus Data',
-                subtitle: 'Lihat semua data dan lakukan perubahan',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ManageUmkmScreen()),
-                ),
-                isPrimary: false,
-              ),
-
-              const SizedBox(height: 12),
 
               _menuButton(
                 context: context,

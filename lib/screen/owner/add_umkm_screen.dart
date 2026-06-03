@@ -11,6 +11,7 @@ import 'dart:io';
 import '../../core/theme_provider.dart';
 import '../../core/location_permission_helper.dart';
 import '../../core/umkm_category.dart';
+import '../../core/umkm_facility.dart';
 import '../../core/umkm_image_helper.dart';
 
 class AddUmkmScreen extends StatefulWidget {
@@ -36,6 +37,7 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
   final _minPriceController = TextEditingController();
   final _maxPriceController = TextEditingController();
   String _selectedCategory = UmkmCategory.lainnya; // Default category
+  final Set<String> _selectedFacilities = {};
 
   bool _isLoading = false;
   bool _isUploadingImage = false;
@@ -605,6 +607,7 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
         'max_price': maxPrice,
         'is_featured': false,
         'verification_status': 'pending',
+        'fasilitas': _selectedFacilities.toList(),
       });
 
       if (mounted) {
@@ -1077,6 +1080,70 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                     ),
                   ),
                 ],
+              ),
+
+              // ── Fasilitas ──
+              const SizedBox(height: 16),
+              Text(
+                'Fasilitas',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: theme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: UmkmFacility.all.map((f) {
+                  final selected = _selectedFacilities.contains(f.id);
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        if (selected) {
+                          _selectedFacilities.remove(f.id);
+                        } else {
+                          _selectedFacilities.add(f.id);
+                        }
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: selected ? theme.btnPrimary : theme.bgElevated,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: selected ? theme.btnPrimary : theme.border,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            f.icon,
+                            size: 16,
+                            color: selected ? theme.btnLabel : theme.iconColor,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            f.label,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: selected
+                                  ? theme.btnLabel
+                                  : theme.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
 
               Padding(

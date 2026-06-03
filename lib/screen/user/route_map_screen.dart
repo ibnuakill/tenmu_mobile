@@ -413,6 +413,13 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                       _currentPosition!.longitude,
                     ),
                     initialZoom: 15.0,
+                    minZoom: 4.0,
+                    cameraConstraint: CameraConstraint.contain(
+                      bounds: LatLngBounds(
+                        const LatLng(-11.0, 94.0), // SW
+                        const LatLng(6.0, 142.0),  // NE
+                      ),
+                    ),
                   ),
                   children: [
                     TileLayer(

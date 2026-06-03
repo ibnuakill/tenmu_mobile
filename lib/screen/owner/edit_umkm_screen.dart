@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
 import '../../core/umkm_category.dart';
+import '../../core/umkm_facility.dart';
 import '../../core/umkm_image_helper.dart';
 
 class EditUmkmScreen extends StatefulWidget {
@@ -34,6 +35,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
   final List<String> _imageUrls = [];
   int _selectedImageIndex = 0;
   String _selectedCategory = UmkmCategory.lainnya;
+  final Set<String> _selectedFacilities = {};
 
   @override
   void initState() {
@@ -54,6 +56,11 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
     _selectedCategory = UmkmCategory.isValidCategory(cat)
         ? cat
         : UmkmCategory.lainnya;
+
+    final fas = widget.umkm['fasilitas'];
+    if (fas is List) {
+      _selectedFacilities.addAll(fas.cast<String>());
+    }
   }
 
   @override
@@ -178,6 +185,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
             'category': _selectedCategory,
             'min_price': minPrice,
             'max_price': maxPrice,
+            'fasilitas': _selectedFacilities.toList(),
           })
           .eq('id', widget.umkm['id']);
 
@@ -331,6 +339,59 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                         setState(() => _selectedCategory = value);
                       }
                     },
+                  ),
+                  const SizedBox(height: 16),
+                  _label('Fasilitas', theme),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: UmkmFacility.all.map((f) {
+                      final selected = _selectedFacilities.contains(f.id);
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            if (selected) {
+                              _selectedFacilities.remove(f.id);
+                            } else {
+                              _selectedFacilities.add(f.id);
+                            }
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selected ? theme.btnPrimary : theme.bgElevated,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: selected ? theme.btnPrimary : theme.border,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                f.icon,
+                                size: 16,
+                                color: selected ? theme.btnLabel : theme.iconColor,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                f.label,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: selected ? theme.btnLabel : theme.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ),
                   const SizedBox(height: 16),
                   _label('Rentang Harga', theme),

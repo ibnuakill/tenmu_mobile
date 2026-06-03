@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme_provider.dart';
 import '../../core/umkm_image_helper.dart';
+import '../../core/umkm_facility.dart';
 import 'route_map_screen.dart';
 import 'review_section.dart';
 
@@ -424,6 +425,41 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
                         ),
                       ],
                     ),
+
+                  // Fasilitas
+                  const SizedBox(height: 24),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: UmkmFacility.fromList(widget.umkm['fasilitas'])
+                        .map((f) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: theme.bgSurface,
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(color: theme.border),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(f.icon, size: 16, color: theme.btnPrimary),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    f.label,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: theme.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ))
+                        .toList(),
+                  ),
 
                   const SizedBox(height: 28),
                   Divider(color: theme.border),

@@ -229,7 +229,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: 'Ubah nama, foto profil, dan password',
                     theme: theme,
                     onTap: () {
-                      if (_userRole == UserRole.superadmin) {
+                      if (_userRole == UserRole.superadmin ||
+                          _userRole == UserRole.owner) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(

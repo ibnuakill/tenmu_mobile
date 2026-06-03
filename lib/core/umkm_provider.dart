@@ -30,7 +30,7 @@ class UMKMProvider extends ChangeNotifier {
       final data = await Supabase.instance.client
           .from('umkm')
           .select(
-            'id, nama_tempat, alamat, deskripsi, gambar_url, image_urls, category, min_price, max_price, latitude, longitude, is_featured',
+            'id, nama_tempat, alamat, deskripsi, gambar_url, image_urls, category, min_price, max_price, latitude, longitude, is_featured, fasilitas, jam_buka, jam_tutup, nomor_telepon',
           )
           .eq('verification_status', 'verified')
           .order('created_at', ascending: false);
