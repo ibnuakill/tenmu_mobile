@@ -3,21 +3,21 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme_provider.dart';
-import '../../core/umkm_image_helper.dart';
-import '../../core/umkm_facility.dart';
+import '../../core/poi_image_helper.dart';
+import '../../core/poi_facility.dart';
 import 'route_map_screen.dart';
 import 'review_section.dart';
 
-class UmkmDetailScreen extends StatefulWidget {
-  final Map<String, dynamic> umkm;
+class PoiDetailScreen extends StatefulWidget {
+  final Map<String, dynamic> place;
 
-  const UmkmDetailScreen({super.key, required this.umkm});
+  const PoiDetailScreen({super.key, required this.place});
 
   @override
-  State<UmkmDetailScreen> createState() => _UmkmDetailScreenState();
+  State<PoiDetailScreen> createState() => _PoiDetailScreenState();
 }
 
-class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
+class _PoiDetailScreenState extends State<PoiDetailScreen> {
   bool _isFavorite = false;
   bool _isLoadingFavorite = true;
   final PageController _imagePageController = PageController();
@@ -47,7 +47,7 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
           .from('favorites')
           .select('id')
           .eq('user_id', user.id)
-          .eq('umkm_id', widget.umkm['id'])
+          .eq('umkm_id', widget.place['id'])
           .maybeSingle();
 
       if (mounted) {
@@ -78,14 +78,14 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
       if (_isFavorite) {
         await Supabase.instance.client.from('favorites').insert({
           'user_id': user.id,
-          'umkm_id': widget.umkm['id'],
+          'umkm_id': widget.place['id'],
         });
       } else {
         await Supabase.instance.client
             .from('favorites')
             .delete()
             .eq('user_id', user.id)
-            .eq('umkm_id', widget.umkm['id']);
+            .eq('umkm_id', widget.place['id']);
       }
     } catch (e) {
       // Rollback on failure
@@ -101,21 +101,21 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
-    final double? lat = widget.umkm['latitude'] != null
-        ? (widget.umkm['latitude'] is int
-              ? (widget.umkm['latitude'] as int).toDouble()
-              : widget.umkm['latitude'])
+    final double? lat = widget.place['latitude'] != null
+        ? (widget.place['latitude'] is int
+              ? (widget.place['latitude'] as int).toDouble()
+              : widget.place['latitude'])
         : null;
-    final double? lng = widget.umkm['longitude'] != null
-        ? (widget.umkm['longitude'] is int
-              ? (widget.umkm['longitude'] as int).toDouble()
-              : widget.umkm['longitude'])
+    final double? lng = widget.place['longitude'] != null
+        ? (widget.place['longitude'] is int
+              ? (widget.place['longitude'] as int).toDouble()
+              : widget.place['longitude'])
         : null;
     final bool hasLocation = lat != null && lng != null;
-    final String? nomorTelepon = widget.umkm['nomor_telepon'];
-    final String? jamBuka = widget.umkm['jam_buka'];
-    final String? jamTutup = widget.umkm['jam_tutup'];
-    final imageUrls = UmkmImageHelper.extractImageUrls(widget.umkm);
+    final String? nomorTelepon = widget.place['nomor_telepon'];
+    final String? jamBuka = widget.place['jam_buka'];
+    final String? jamTutup = widget.place['jam_tutup'];
+    final imageUrls = PoiImageHelper.extractImageUrls(widget.place);
 
     bool isOpen = false;
     if (jamBuka != null && jamTutup != null) {
@@ -276,7 +276,7 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          widget.umkm['nama_tempat'] ?? 'Tanpa Nama',
+                          widget.place['nama_tempat'] ?? 'Tanpa Nama',
                           style: TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w800,
@@ -284,7 +284,7 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
                           ),
                         ),
                       ),
-                      if (widget.umkm['is_featured'] == true) ...[
+                      if (widget.place['is_featured'] == true) ...[
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -373,7 +373,7 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          widget.umkm['alamat'] ?? '-',
+                          widget.place['alamat'] ?? '-',
                           style: TextStyle(
                             fontSize: 14,
                             color: theme.textSecondary,
@@ -431,7 +431,7 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
-                    children: UmkmFacility.fromList(widget.umkm['fasilitas'])
+                    children: PoiFacility.fromList(widget.place['fasilitas'])
                         .map((f) => Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 14,
@@ -476,7 +476,7 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    widget.umkm['deskripsi'] ?? 'Tidak ada deskripsi yang tersedia.',
+                    widget.place['deskripsi'] ?? 'Tidak ada deskripsi yang tersedia.',
                     style: TextStyle(
                       fontSize: 15,
                       height: 1.7,
@@ -565,7 +565,7 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
                               builder: (_) => RouteMapScreen(
                                 destinationLat: lat,
                                 destinationLng: lng,
-                                destinationName: widget.umkm['nama_tempat'] ?? '',
+                                destinationName: widget.place['nama_tempat'] ?? '',
                               ),
                             ),
                           );
@@ -620,8 +620,8 @@ class _UmkmDetailScreenState extends State<UmkmDetailScreen> {
 
                   // ── Rating & Komentar ────────────────────
                   const SizedBox(height: 28),
-                  if (widget.umkm['id'] != null)
-                    ReviewSection(umkmId: widget.umkm['id'] as int),
+                  if (widget.place['id'] != null)
+                    ReviewSection(umkmId: widget.place['id'] as int),
                 ],
               ),
             ),

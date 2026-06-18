@@ -3,19 +3,19 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/theme_provider.dart';
-import '../../core/umkm_image_helper.dart';
-import '../../core/umkm_provider.dart';
+import '../../core/poi_image_helper.dart';
+import '../../core/places_provider.dart';
 import 'settings_screen.dart';
-import '../../core/umkm_category.dart';
+import '../../core/poi_category.dart';
 import '../../core/location_permission_helper.dart';
-import '../auth/login_screen.dart';
-import 'umkm_detail_screen.dart';
+import 'poi_detail_screen.dart';
 import 'route_map_screen.dart';
 
 import 'widgets/category_filter_widget.dart';
-import 'widgets/price_range_filter_widget.dart';
 import 'widgets/sort_filter_widget.dart';
 import 'favorite_screen.dart';
+import '../../core/haversine.dart';
+import 'widgets/chat_bot.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,14 +27,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
   Set<String> _selectedCategories = {};
-  late RangeValues _priceRange;
   SortOption _selectedSort = SortOption.terbaru;
   Position? _currentPosition;
 
   bool get _hasActiveFilters =>
       _selectedCategories.isNotEmpty ||
-      _priceRange.start > 0 ||
-      _priceRange.end < 1000000;
 
   String _sortLabel(SortOption option) {
     switch (option) {
@@ -50,10 +47,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _priceRange = const RangeValues(0, 1000000);
     // optimization: fetch via provider with caching logic
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<UMKMProvider>(context, listen: false).fetchUMKM();
+      Provider.of<PlacesProvider>(context, listen: false).fetchPlaces();
       _requestUserLocation();
     });
   }
@@ -116,17 +112,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _signOut(BuildContext context) async {
-    await Supabase.instance.client.auth.signOut();
-  }
-
-  void _goToLogin(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
-  }
-
   void _showFilterBottomSheet(BuildContext context, ThemeProvider theme) {
     showModalBottomSheet(
       context: context,
@@ -172,15 +157,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         selectedCategories: _selectedCategories,
                         onCategoriesChanged: (selected) {
                           setState(() => _selectedCategories = selected);
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      PriceRangeFilterWidget(
-                        initialRange: _priceRange,
-                        minPrice: 0,
-                        maxPrice: 1000000,
-                        onRangeChanged: (range) {
-                          setState(() => _priceRange = range);
                         },
                       ),
                       const SizedBox(height: 24),
@@ -232,9 +208,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  List<Map<String, dynamic>> _getFilteredUMKM(UMKMProvider umkmProvider) {
-    final raw = umkmProvider.umkmList;
-    List<Map<String, dynamic>> umkmList = raw.where((u) {
+  List<Map<String, dynamic>> _getFilteredPlaces(PlacesProvider placesProvider) {
+    final raw = placesProvider.placesList;
+    List<Map<String, dynamic>> placesList = raw.where((u) {
       bool matchesSearch = true;
       if (_searchQuery.isNotEmpty) {
         final nama = (u['nama_tempat'] ?? '').toLowerCase();
@@ -247,64 +223,38 @@ class _HomeScreenState extends State<HomeScreen> {
         final umkmCategory = u['category'] ?? 'Lainnya';
         matchesCategory = _selectedCategories.contains(umkmCategory);
       }
-      bool matchesPrice = true;
-      final minPrice = (u['min_price'] ?? 0).toDouble();
-      final maxPrice = (u['max_price'] ?? 1000000).toDouble();
-      matchesPrice =
-          !(maxPrice < _priceRange.start || minPrice > _priceRange.end);
-      return matchesSearch && matchesCategory && matchesPrice;
+      return matchesSearch && matchesCategory;
     }).toList();
 
     if (_selectedSort == SortOption.terdekat && _currentPosition != null) {
-      umkmList.sort((a, b) {
-        final latA = (a['latitude'] as num?)?.toDouble() ?? 0.0;
-        final lngA = (a['longitude'] as num?)?.toDouble() ?? 0.0;
-        final latB = (b['latitude'] as num?)?.toDouble() ?? 0.0;
-        final lngB = (b['longitude'] as num?)?.toDouble() ?? 0.0;
-
-        if (latA == 0.0 && latB != 0.0) return 1;
-        if (latB == 0.0 && latA != 0.0) return -1;
-
-        final distA = Geolocator.distanceBetween(
-          _currentPosition!.latitude,
-          _currentPosition!.longitude,
-          latA,
-          lngA,
-        );
-        final distB = Geolocator.distanceBetween(
-          _currentPosition!.latitude,
-          _currentPosition!.longitude,
-          latB,
-          lngB,
-        );
-
-        return distA.compareTo(distB);
-      });
+      Haversine.sortByDistance(
+        places: placesList,
+        userLat: _currentPosition!.latitude,
+        userLng: _currentPosition!.longitude,
+      );
     } else if (_selectedSort == SortOption.rating) {
-      umkmList.sort((a, b) {
-        final ratingA = umkmProvider.ratings[a['id']] ?? 0.0;
-        final ratingB = umkmProvider.ratings[b['id']] ?? 0.0;
+      placesList.sort((a, b) {
+        final ratingA = placesProvider.ratings[a['id']] ?? 0.0;
+        final ratingB = placesProvider.ratings[b['id']] ?? 0.0;
         return ratingB.compareTo(ratingA);
       });
     }
-    return umkmList;
+    return placesList;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
-    final umkmProvider = Provider.of<UMKMProvider>(context);
+    final placesProvider = Provider.of<PlacesProvider>(context);
     final user = Supabase.instance.client.auth.currentUser;
-    final umkmList = _getFilteredUMKM(umkmProvider);
+    final placesList = _getFilteredPlaces(placesProvider);
 
     return Scaffold(
       backgroundColor: theme.bgBase,
-      // ── DRAWER NAVIGATION ──
-      drawer: user != null
-          ? _buildLoggedInDrawer(context, theme, umkmProvider, user)
-          : _buildGuestDrawer(context, theme, umkmProvider),
       body: SafeArea(
-        child: Column(
+        child: Stack(
+          children: [
+            Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── HEADER ─────────────────────────────────────────────────────
@@ -312,29 +262,35 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
               child: Row(
                 children: [
-                  Builder(
-                    builder: (context) => GestureDetector(
-                      onTap: () => Scaffold.of(context).openDrawer(),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: theme.bgElevated,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: theme.border),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color.fromRGBO(0, 0, 0, 0.15),
-                              blurRadius: 8,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          Icons.menu,
-                          color: theme.textPrimary,
-                          size: 22,
-                        ),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    ),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: theme.bgElevated,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: theme.border),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color.fromRGBO(0, 0, 0, 0.15),
+                            blurRadius: 8,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                        image: user?.userMetadata?['avatar_url'] != null
+                            ? DecorationImage(
+                                image: NetworkImage(user!.userMetadata!['avatar_url']),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
                       ),
+                      child: user?.userMetadata?['avatar_url'] == null
+                          ? Icon(Icons.person_rounded, color: theme.textPrimary, size: 22)
+                          : null,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -399,7 +355,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => RouteMapScreen(umkmList: umkmList),
+                          builder: (_) => RouteMapScreen(placesList: placesList),
                         ),
                       );
                     },
@@ -433,15 +389,15 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: Builder(
                 builder: (context) {
-                  if (umkmProvider.isLoading && umkmProvider.umkmList.isEmpty) {
+                  if (placesProvider.isLoading && placesProvider.placesList.isEmpty) {
                     return Center(
                       child: CircularProgressIndicator(color: theme.iconColor),
                     );
                   }
 
                   // Error state - show retry option
-                  if (umkmProvider.error != null &&
-                      umkmProvider.umkmList.isEmpty) {
+                  if (placesProvider.error != null &&
+                      placesProvider.placesList.isEmpty) {
                     return Center(
                       child: Padding(
                         padding: const EdgeInsets.all(32),
@@ -473,8 +429,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 24),
                             ElevatedButton.icon(
                               onPressed: () {
-                                umkmProvider.clearError();
-                                umkmProvider.fetchUMKM(force: true);
+                                placesProvider.clearError();
+                                placesProvider.fetchPlaces(force: true);
                               },
                               icon: const Icon(Icons.refresh),
                               label: const Text('Coba Lagi'),
@@ -496,13 +452,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: RefreshIndicator(
                           onRefresh: () async {
-                            umkmProvider.clearError();
-                            await umkmProvider.fetchUMKM(force: true);
+                            placesProvider.clearError();
+                            await placesProvider.fetchPlaces(force: true);
                             // Refresh user location on pull-to-refresh
                             await _requestUserLocation();
                             // Show snackbar if refresh failed but we have cached data
-                            if (umkmProvider.error != null &&
-                                umkmProvider.umkmList.isNotEmpty) {
+                            if (placesProvider.error != null &&
+                                placesProvider.placesList.isNotEmpty) {
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
@@ -515,7 +471,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       label: 'Retry',
                                       textColor: Colors.white,
                                       onPressed: () =>
-                                          umkmProvider.fetchUMKM(force: true),
+                                          placesProvider.fetchPlaces(force: true),
                                     ),
                                   ),
                                 );
@@ -524,7 +480,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           },
                           color: theme.btnPrimary,
                           backgroundColor: theme.bgElevated,
-                          child: umkmList.isEmpty
+                          child: placesList.isEmpty
                               ? ListView(
                                   physics:
                                       const AlwaysScrollableScrollPhysics(),
@@ -564,16 +520,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                     20,
                                     20,
                                   ),
-                                  itemCount: umkmList.length,
+                                  itemCount: placesList.length,
                                   itemBuilder: (context, index) {
-                                    final umkm = umkmList[index];
-                                    return _UmkmCard(
-                                      umkm: umkm,
+                                    final place = placesList[index];
+                                    return _PlaceCard(
+                                      place: place,
                                       onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder: (_) =>
-                                              UmkmDetailScreen(umkm: umkm),
+                                              PoiDetailScreen(place: place),
                                         ),
                                       ),
                                       userPosition: _currentPosition,
@@ -589,54 +545,54 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+        // ── AI Chatbot Bubble ───────────────────────────────
+        const ChatBotBubble(),
+      ],
+    ),
       ),
     );
   }
 }
 
-class _UmkmCard extends StatelessWidget {
-  final Map<String, dynamic> umkm;
+class _PlaceCard extends StatelessWidget {
+  final Map<String, dynamic> place;
   final VoidCallback onTap;
   final Position? userPosition;
 
-  const _UmkmCard({required this.umkm, required this.onTap, this.userPosition});
+  const _PlaceCard({required this.place, required this.onTap, this.userPosition});
 
   String? _getDistanceText() {
     if (userPosition == null) return null;
 
-    final lat = (umkm['latitude'] as num?)?.toDouble();
-    final lng = (umkm['longitude'] as num?)?.toDouble();
+    final lat = (place['latitude'] as num?)?.toDouble();
+    final lng = (place['longitude'] as num?)?.toDouble();
     if (lat == null || lng == null || lat == 0 || lng == 0) return null;
 
-    final distance = Geolocator.distanceBetween(
+    final distanceKm = Haversine.distance(
       userPosition!.latitude,
       userPosition!.longitude,
       lat,
       lng,
     );
 
-    if (distance < 1000) {
-      return '${distance.round()} m';
-    } else {
-      return '${(distance / 1000).toStringAsFixed(1)} km';
-    }
+    return Haversine.formatDistance(distanceKm);
   }
 
   String _resolveCategory() {
-    final category = umkm['category']?.toString().trim();
+    final category = place['category']?.toString().trim();
     if (category == null || category.isEmpty) {
-      return UmkmCategory.lainnya;
+      return PoiCategory.lainnya;
     }
-    return UmkmCategory.isValidCategory(category)
+    return PoiCategory.isValidCategory(category)
         ? category
-        : UmkmCategory.lainnya;
+        : PoiCategory.lainnya;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
     final distanceText = _getDistanceText();
-    final imageUrl = UmkmImageHelper.primaryImageUrl(umkm);
+    final imageUrl = PoiImageHelper.primaryImageUrl(place);
     final category = _resolveCategory();
 
     return GestureDetector(
@@ -680,7 +636,7 @@ class _UmkmCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (umkm['is_featured'] == true)
+                  if (place['is_featured'] == true)
                     Positioned(
                       top: 12,
                       right: 12,
@@ -729,7 +685,7 @@ class _UmkmCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            UmkmCategory.getCategoryIcon(category),
+                            PoiCategory.getCategoryIcon(category),
                             size: 14,
                             color: Colors.white,
                           ),
@@ -769,7 +725,7 @@ class _UmkmCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    umkm['nama_tempat'] ?? 'Tanpa Nama',
+                    place['nama_tempat'] ?? 'Tanpa Nama',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -777,9 +733,9 @@ class _UmkmCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  if (umkm['deskripsi'] != null)
+                  if (place['deskripsi'] != null)
                     Text(
-                      umkm['deskripsi'],
+                      place['deskripsi'],
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -830,7 +786,7 @@ class _UmkmCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          umkm['alamat'] ?? 'Alamat tidak diketahui',
+                          place['alamat'] ?? 'Alamat tidak diketahui',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -923,231 +879,3 @@ class _InfoPill extends StatelessWidget {
   }
 }
 
-// ── Drawer builders (minimal, keep inside this file for locality) ──
-Widget _buildGuestDrawer(
-  BuildContext context,
-  ThemeProvider theme,
-  UMKMProvider umkmProvider,
-) {
-  return Drawer(
-    backgroundColor: theme.bgSurface,
-    child: SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: theme.bgElevated,
-                ),
-                child: Icon(Icons.person, size: 32, color: theme.iconColor),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Guest',
-                style: TextStyle(
-                  color: theme.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Temukan UMKM lokal',
-                style: TextStyle(color: theme.textSecondary),
-              ),
-            ],
-          ),
-        ),
-
-        ListTile(
-          leading: Icon(Icons.settings_outlined, color: theme.iconColor),
-          title: Text('Pengaturan', style: TextStyle(color: theme.textPrimary)),
-          onTap: () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            );
-          },
-        ),
-        const Spacer(),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              },
-              icon: Icon(Icons.login, color: theme.btnLabel),
-              label: Text(
-                'Masuk / Daftar',
-                style: TextStyle(color: theme.btnLabel),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.btnPrimary,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        ],
-      ),
-    ),
-  );
-}
-
-Widget _buildLoggedInDrawer(
-  BuildContext context,
-  ThemeProvider theme,
-  UMKMProvider umkmProvider,
-  User user,
-) {
-  return Drawer(
-    backgroundColor: theme.bgBase,
-    child: SafeArea(
-      child: Column(
-        children: [
-          ListTile(
-            title: Text(
-              'Menu',
-              style: TextStyle(
-                color: theme.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-              ),
-            ),
-            trailing: IconButton(
-              icon: Icon(Icons.close, color: theme.iconColor),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-          Divider(color: theme.border),
-
-          // Account header (compact)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: theme.bgElevated,
-                    image: user.userMetadata?['avatar_url'] != null
-                        ? DecorationImage(
-                            image: NetworkImage(user.userMetadata!['avatar_url']),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                  ),
-                  child: user.userMetadata?['avatar_url'] == null
-                      ? Icon(Icons.person, color: theme.iconColor)
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user.userMetadata?['full_name'] ??
-                            user.userMetadata?['nama'] ??
-                            'Pengguna',
-                        style: TextStyle(
-                          color: theme.textPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        user.email ?? '',
-                        style: TextStyle(
-                          color: theme.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Menu items (styled like admin)
-          ListTile(
-            leading: Icon(Icons.bookmark, color: theme.iconColor),
-            title: Text(
-              'Favorit Saya',
-              style: TextStyle(
-                color: theme.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const FavoriteScreen()),
-              );
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.settings_outlined, color: theme.iconColor),
-            title: Text(
-              'Pengaturan',
-              style: TextStyle(
-                color: theme.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
-            },
-          ),
-
-          const Spacer(),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  await Supabase.instance.client.auth.signOut();
-                },
-                icon: Icon(Icons.logout_rounded, color: theme.iconColor),
-                label: Text(
-                  'Keluar',
-                  style: TextStyle(color: theme.textPrimary),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: theme.border),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}

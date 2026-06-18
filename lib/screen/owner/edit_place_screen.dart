@@ -5,20 +5,20 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
-import '../../core/umkm_category.dart';
-import '../../core/umkm_facility.dart';
-import '../../core/umkm_image_helper.dart';
+import '../../core/poi_category.dart';
+import '../../core/poi_facility.dart';
+import '../../core/poi_image_helper.dart';
 
-class EditUmkmScreen extends StatefulWidget {
-  final Map<String, dynamic> umkm;
+class EditPlaceScreen extends StatefulWidget {
+  final Map<String, dynamic> place;
 
-  const EditUmkmScreen({super.key, required this.umkm});
+  const EditPlaceScreen({super.key, required this.place});
 
   @override
-  State<EditUmkmScreen> createState() => _EditUmkmScreenState();
+  State<EditPlaceScreen> createState() => _EditPlaceScreenState();
 }
 
-class _EditUmkmScreenState extends State<EditUmkmScreen> {
+class _EditPlaceScreenState extends State<EditPlaceScreen> {
   final _namaController = TextEditingController();
   final _alamatController = TextEditingController();
   final _deskripsiController = TextEditingController();
@@ -34,30 +34,30 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
   bool _isUploadingImage = false;
   final List<String> _imageUrls = [];
   int _selectedImageIndex = 0;
-  String _selectedCategory = UmkmCategory.lainnya;
+  String _selectedCategory = PoiCategory.lainnya;
   final Set<String> _selectedFacilities = {};
 
   @override
   void initState() {
     super.initState();
-    _namaController.text = widget.umkm['nama_tempat'] ?? '';
-    _alamatController.text = widget.umkm['alamat'] ?? '';
-    _deskripsiController.text = widget.umkm['deskripsi'] ?? '';
-    _nomorTeleponController.text = widget.umkm['nomor_telepon'] ?? '';
-    _jamBukaController.text = widget.umkm['jam_buka'] ?? '';
-    _jamTutupController.text = widget.umkm['jam_tutup'] ?? '';
-    _latController.text = widget.umkm['latitude']?.toString() ?? '';
-    _lngController.text = widget.umkm['longitude']?.toString() ?? '';
-    _minPriceController.text = (widget.umkm['min_price'] ?? 0).toString();
-    _maxPriceController.text = (widget.umkm['max_price'] ?? 100000).toString();
-    _imageUrls.addAll(UmkmImageHelper.extractImageUrls(widget.umkm));
+    _namaController.text = widget.place['nama_tempat'] ?? '';
+    _alamatController.text = widget.place['alamat'] ?? '';
+    _deskripsiController.text = widget.place['deskripsi'] ?? '';
+    _nomorTeleponController.text = widget.place['nomor_telepon'] ?? '';
+    _jamBukaController.text = widget.place['jam_buka'] ?? '';
+    _jamTutupController.text = widget.place['jam_tutup'] ?? '';
+    _latController.text = widget.place['latitude']?.toString() ?? '';
+    _lngController.text = widget.place['longitude']?.toString() ?? '';
+    _minPriceController.text = (widget.place['min_price'] ?? 0).toString();
+    _maxPriceController.text = (widget.place['max_price'] ?? 100000).toString();
+    _imageUrls.addAll(PoiImageHelper.extractImageUrls(widget.place));
 
-    final cat = widget.umkm['category'] ?? UmkmCategory.lainnya;
-    _selectedCategory = UmkmCategory.isValidCategory(cat)
+    final cat = widget.place['category'] ?? PoiCategory.lainnya;
+    _selectedCategory = PoiCategory.isValidCategory(cat)
         ? cat
-        : UmkmCategory.lainnya;
+        : PoiCategory.lainnya;
 
-    final fas = widget.umkm['fasilitas'];
+    final fas = widget.place['fasilitas'];
     if (fas is List) {
       _selectedFacilities.addAll(fas.cast<String>());
     }
@@ -163,9 +163,9 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
           100000;
 
       await Supabase.instance.client
-          .from('umkm')
+          .from('places')
           .update({
-            'owner_id': widget.umkm['owner_id'] ?? Supabase.instance.client.auth.currentUser?.id,
+            'owner_id': widget.place['owner_id'] ?? Supabase.instance.client.auth.currentUser?.id,
             'nama_tempat': _namaController.text.trim(),
             'alamat': _alamatController.text.trim(),
             'deskripsi': _deskripsiController.text.trim(),
@@ -187,7 +187,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
             'max_price': maxPrice,
             'fasilitas': _selectedFacilities.toList(),
           })
-          .eq('id', widget.umkm['id']);
+          .eq('id', widget.place['id']);
 
       if (mounted) {
         _toast('Data berhasil diperbarui.');
@@ -326,11 +326,11 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                       icon: Icons.category_outlined,
                       theme: theme,
                     ),
-                    items: UmkmCategory.allCategories.map((category) {
+                    items: PoiCategory.allCategories.map((category) {
                       return DropdownMenuItem(
                         value: category,
                         child: Text(
-                          '${UmkmCategory.getCategoryEmoji(category)} $category',
+                          '${PoiCategory.getCategoryEmoji(category)} $category',
                         ),
                       );
                     }).toList(),
@@ -346,7 +346,7 @@ class _EditUmkmScreenState extends State<EditUmkmScreen> {
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
-                    children: UmkmFacility.all.map((f) {
+                    children: PoiFacility.all.map((f) {
                       final selected = _selectedFacilities.contains(f.id);
                       return GestureDetector(
                         onTap: () {

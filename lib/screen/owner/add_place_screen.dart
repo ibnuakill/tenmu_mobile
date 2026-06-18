@@ -3,25 +3,24 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'dart:io';
 import '../../core/theme_provider.dart';
 import '../../core/location_permission_helper.dart';
-import '../../core/umkm_category.dart';
-import '../../core/umkm_facility.dart';
-import '../../core/umkm_image_helper.dart';
+import '../../core/poi_category.dart';
+import '../../core/poi_facility.dart';
+import '../../core/poi_image_helper.dart';
 
-class AddUmkmScreen extends StatefulWidget {
-  const AddUmkmScreen({super.key});
+class AddPlaceScreen extends StatefulWidget {
+  const AddPlaceScreen({super.key});
 
   @override
-  State<AddUmkmScreen> createState() => _AddUmkmScreenState();
+  State<AddPlaceScreen> createState() => _AddPlaceScreenState();
 }
 
-class _AddUmkmScreenState extends State<AddUmkmScreen> {
+class _AddPlaceScreenState extends State<AddPlaceScreen> {
   final _namaController = TextEditingController();
   final _alamatController = TextEditingController();
   final _deskripsiController = TextEditingController();
@@ -36,7 +35,7 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
 
   final _minPriceController = TextEditingController();
   final _maxPriceController = TextEditingController();
-  String _selectedCategory = UmkmCategory.lainnya; // Default category
+  String _selectedCategory = PoiCategory.lainnya; // Default category
   final Set<String> _selectedFacilities = {};
 
   bool _isLoading = false;
@@ -341,20 +340,17 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
   }
 
   Future<void> _bukaPetaPilihLokasi() async {
-    // Default location (misal Jakarta)
-    LatLng center = const LatLng(-6.200000, 106.816666);
-
-    // Jika sudah ada koordinat, gunakan itu sebagai titik tengah
+    LatLng center;
     if (_latController.text.isNotEmpty && _lngController.text.isNotEmpty) {
-      double? lat = double.tryParse(_latController.text);
-      double? lng = double.tryParse(_lngController.text);
-      if (lat != null && lng != null) {
-        center = LatLng(lat, lng);
-      }
+      final lat = double.tryParse(_latController.text);
+      final lng = double.tryParse(_lngController.text);
+      center = LatLng(lat ?? -6.200000, lng ?? 106.816666);
+    } else {
+      center = const LatLng(-6.200000, 106.816666);
     }
 
     LatLng? pickedLocation = center;
-    final mapController = MapController();
+    MapLibreMapController? mapCtrl;
 
     await showDialog(
       context: context,
@@ -373,43 +369,33 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                   width: double.infinity,
                   child: Stack(
                     children: [
-                      FlutterMap(
-                        mapController: mapController,
-                        options: MapOptions(
-                          initialCenter: center,
-                          initialZoom: 15.0,
-                          onTap: (tapPosition, point) {
-                            setStateDialog(() {
-                              pickedLocation = point;
-                            });
-                          },
+                      MapLibreMap(
+                        styleString: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+                        initialCameraPosition: CameraPosition(
+                          target: center,
+                          zoom: 15.0,
                         ),
-                        children: [
-                          TileLayer(
-                            urlTemplate:
-                                'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            subdomains: const ['a', 'b', 'c'],
-                            maxNativeZoom: 19,
-                            maxZoom: 22,
-                            userAgentPackageName: 'com.example.tenmu',
-                          ),
-                          if (pickedLocation != null)
-                            MarkerLayer(
-                              markers: [
-                                Marker(
-                                  point: pickedLocation!,
-                                  width: 50,
-                                  height: 50,
-                                  child: const Icon(
-                                    Icons.location_on,
-                                    color: Colors.red,
-                                    size: 50,
-                                  ),
-                                ),
-                              ],
-                            ),
-                        ],
+                        onMapCreated: (controller) {
+                          mapCtrl = controller;
+                        },
+                        onStyleLoadedCallback: () {
+                          if (mapCtrl != null) _placePin(mapCtrl!, center);
+                        },
+                        onMapClick: (point, latlng) {
+                          setStateDialog(() {
+                            pickedLocation = latlng;
+                          });
+                          _placePin(mapCtrl!, latlng);
+                        },
+                        compassEnabled: true,
+                        logoEnabled: false,
+                        myLocationEnabled: false,
+                        attributionButtonPosition:
+                            AttributionButtonPosition.bottomRight,
+                        minMaxZoomPreference:
+                            const MinMaxZoomPreference(4.0, 22.0),
                       ),
+                      // My-location button
                       Positioned(
                         right: 16,
                         bottom: 80,
@@ -438,22 +424,22 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                                 return;
                               }
 
-                              Position position =
+                              final position =
                                   await Geolocator.getCurrentPosition(
                                     locationSettings: const LocationSettings(
                                       accuracy: LocationAccuracy.high,
                                     ),
                                   );
                               if (!context.mounted) return;
-                              mapController.move(
-                                LatLng(position.latitude, position.longitude),
-                                16.0,
+                              final newLoc =
+                                  LatLng(position.latitude, position.longitude);
+                              mapCtrl?.animateCamera(
+                                CameraUpdate.newLatLngZoom(newLoc, 16.0),
                               );
+                              mapCtrl?.clearCircles();
+                              _placePin(mapCtrl!, newLoc);
                               setStateDialog(() {
-                                pickedLocation = LatLng(
-                                  position.latitude,
-                                  position.longitude,
-                                );
+                                pickedLocation = newLoc;
                               });
                             } catch (e) {
                               if (!context.mounted) return;
@@ -473,10 +459,11 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                           ),
                         ),
                       ),
+                      // Instruction banner
                       Positioned(
                         top: 16,
                         left: 16,
-                        right: 60, // Hindari tombol close
+                        right: 60,
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -493,6 +480,7 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                           ),
                         ),
                       ),
+                      // Confirm button
                       Positioned(
                         bottom: 16,
                         left: 16,
@@ -515,6 +503,7 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                           ),
                         ),
                       ),
+                      // Close button
                       Positioned(
                         top: 10,
                         right: 10,
@@ -582,7 +571,7 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
           ) ??
           100000;
 
-      await Supabase.instance.client.from('umkm').insert({
+      await Supabase.instance.client.from('places').insert({
         'owner_id': Supabase.instance.client.auth.currentUser?.id,
         'nama_tempat': _namaController.text.trim(),
         'alamat': _alamatController.text.trim().isNotEmpty
@@ -686,7 +675,7 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
   Widget _buildImageSection(ThemeProvider theme) {
     final previewUrl = _imageUrls.isNotEmpty
         ? _imageUrls[_selectedImageIndex]
-        : UmkmImageHelper.primaryImageUrl({'image_urls': _imageUrls});
+        : PoiImageHelper.primaryImageUrl({'image_urls': _imageUrls});
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -843,6 +832,19 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  void _placePin(MapLibreMapController ctrl, LatLng loc) {
+    ctrl.addCircle(
+      CircleOptions(
+        geometry: loc,
+        circleColor: '#FF0000',
+        circleRadius: 12,
+        circleStrokeColor: '#FFFFFF',
+        circleStrokeWidth: 3,
+        circleOpacity: 0.9,
+      ),
     );
   }
 
@@ -1037,12 +1039,12 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
                     borderSide: BorderSide(color: theme.borderFocus, width: 2),
                   ),
                 ),
-                items: UmkmCategory.allCategories.map((category) {
+                items: PoiCategory.allCategories.map((category) {
                   return DropdownMenuItem(
                     value: category,
                     child: Row(
                       children: [
-                        Text(UmkmCategory.getCategoryEmoji(category)),
+                        Text(PoiCategory.getCategoryEmoji(category)),
                         const SizedBox(width: 8),
                         Text(category),
                       ],
@@ -1096,7 +1098,7 @@ class _AddUmkmScreenState extends State<AddUmkmScreen> {
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
-                children: UmkmFacility.all.map((f) {
+                children: PoiFacility.all.map((f) {
                   final selected = _selectedFacilities.contains(f.id);
                   return GestureDetector(
                     onTap: () {

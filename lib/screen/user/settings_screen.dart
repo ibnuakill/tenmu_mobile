@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
-import '../../core/umkm_provider.dart';
+import '../../core/places_provider.dart';
 import '../../core/user_role.dart';
 import '../admin/admin_profile_screen.dart';
 import 'about_screen.dart';
@@ -69,8 +69,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _isClearing = true);
 
     try {
-      // Clear UMKM provider cache
-      Provider.of<UMKMProvider>(context, listen: false).fetchUMKM(force: true);
+      // Clear Places provider cache
+      Provider.of<PlacesProvider>(context, listen: false).fetchPlaces(force: true);
 
       // Clear image cache
       PaintingBinding.instance.imageCache.clear();
@@ -569,7 +569,7 @@ class _SwitchTile extends StatelessWidget {
           Switch.adaptive(
             value: value,
             onChanged: onChanged,
-            activeColor: theme.btnPrimary,
+            activeThumbColor: theme.btnPrimary,
             inactiveTrackColor: theme.bgElevated,
           ),
         ],

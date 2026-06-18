@@ -2,23 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
-import '../../core/umkm_image_helper.dart';
+import '../../core/poi_image_helper.dart';
 
-class VerifyUmkmScreen extends StatefulWidget {
-  const VerifyUmkmScreen({super.key});
+class VerifyPlaceScreen extends StatefulWidget {
+  const VerifyPlaceScreen({super.key});
 
   @override
-  State<VerifyUmkmScreen> createState() => _VerifyUmkmScreenState();
+  State<VerifyPlaceScreen> createState() => _VerifyPlaceScreenState();
 }
 
-class _VerifyUmkmScreenState extends State<VerifyUmkmScreen>
+class _VerifyPlaceScreenState extends State<VerifyPlaceScreen>
     with SingleTickerProviderStateMixin {
   final _client = Supabase.instance.client;
   late TabController _tabController;
 
-  List<Map<String, dynamic>> _pendingUmkm = [];
-  List<Map<String, dynamic>> _verifiedUmkm = [];
-  List<Map<String, dynamic>> _rejectedUmkm = [];
+  List<Map<String, dynamic>> _pendingPlaces = [];
+  List<Map<String, dynamic>> _verifiedPlaces = [];
+  List<Map<String, dynamic>> _rejectedPlaces = [];
 
   bool _loadingPending = true;
   bool _loadingVerified = true;
@@ -28,7 +28,7 @@ class _VerifyUmkmScreenState extends State<VerifyUmkmScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadUmkm();
+    _loadPlaces();
   }
 
   @override
@@ -37,7 +37,7 @@ class _VerifyUmkmScreenState extends State<VerifyUmkmScreen>
     super.dispose();
   }
 
-  Future<void> _loadUmkm() async {
+  Future<void> _loadPlaces() async {
     await Future.wait([_loadPending(), _loadVerified(), _loadRejected()]);
   }
 
@@ -45,13 +45,13 @@ class _VerifyUmkmScreenState extends State<VerifyUmkmScreen>
     setState(() => _loadingPending = true);
     try {
       final data = await _client
-          .from('umkm')
+          .from('places')
           .select('*, owner_id(*)')
           .eq('verification_status', 'pending')
           .order('created_at', ascending: true);
 
       setState(() {
-        _pendingUmkm = List<Map<String, dynamic>>.from(data);
+        _pendingPlaces = List<Map<String, dynamic>>.from(data);
         _loadingPending = false;
       });
     } catch (_) {
@@ -63,14 +63,14 @@ class _VerifyUmkmScreenState extends State<VerifyUmkmScreen>
     setState(() => _loadingVerified = true);
     try {
       final data = await _client
-          .from('umkm')
+          .from('places')
           .select('*, owner_id(*)')
           .eq('verification_status', 'verified')
           .order('verified_at', ascending: false)
           .limit(50);
 
       setState(() {
-        _verifiedUmkm = List<Map<String, dynamic>>.from(data);
+        _verifiedPlaces = List<Map<String, dynamic>>.from(data);
         _loadingVerified = false;
       });
     } catch (_) {
@@ -82,14 +82,14 @@ class _VerifyUmkmScreenState extends State<VerifyUmkmScreen>
     setState(() => _loadingRejected = true);
     try {
       final data = await _client
-          .from('umkm')
+          .from('places')
           .select('*, owner_id(*)')
           .eq('verification_status', 'rejected')
           .order('created_at', ascending: false)
           .limit(50);
 
       setState(() {
-        _rejectedUmkm = List<Map<String, dynamic>>.from(data);
+        _rejectedPlaces = List<Map<String, dynamic>>.from(data);
         _loadingRejected = false;
       });
     } catch (_) {
@@ -97,27 +97,27 @@ class _VerifyUmkmScreenState extends State<VerifyUmkmScreen>
     }
   }
 
-  Future<void> _approveUmkm(Map<String, dynamic> umkm) async {
+  Future<void> _approvePlace(Map<String, dynamic> place) async {
     final userId = _client.auth.currentUser?.id;
     try {
       await _client
-          .from('umkm')
+          .from('places')
           .update({
             'verification_status': 'verified',
             'verified_by': userId,
             'verified_at': DateTime.now().toIso8601String(),
             'rejection_reason': null,
           })
-          .eq('id', umkm['id']);
+          .eq('id', place['id']);
 
-      await _loadUmkm();
-      _snack('UMKM berhasil diverifikasi!', isError: false);
+      await _loadPlaces();
+      _snack('Tempat berhasil diverifikasi!', isError: false);
     } catch (e) {
       _snack('Gagal: $e', isError: true);
     }
   }
 
-  Future<void> _rejectUmkm(Map<String, dynamic> umkm, String reason) async {
+  Future<void> _rejectPlace(Map<String, dynamic> place, String reason) async {
     if (reason.trim().isEmpty) {
       _snack('Alasan penolakan tidak boleh kosong.', isError: true);
       return;
@@ -125,16 +125,16 @@ class _VerifyUmkmScreenState extends State<VerifyUmkmScreen>
 
     try {
       await _client
-          .from('umkm')
+          .from('places')
           .update({
             'verification_status': 'rejected',
             'rejection_reason': reason.trim(),
             'verified_by': _client.auth.currentUser?.id,
           })
-          .eq('id', umkm['id']);
+          .eq('id', place['id']);
 
-      await _loadUmkm();
-      _snack('UMKM ditolak.', isError: false);
+      await _loadPlaces();
+      _snack('Tempat ditolak.', isError: false);
     } catch (e) {
       _snack('Gagal: $e', isError: true);
     }
@@ -199,9 +199,9 @@ class _VerifyUmkmScreenState extends State<VerifyUmkmScreen>
             fontSize: 13,
           ),
           tabs: [
-            Tab(text: 'Pending (${_pendingUmkm.length})'),
-            Tab(text: 'Verified (${_verifiedUmkm.length})'),
-            Tab(text: 'Rejected (${_rejectedUmkm.length})'),
+            Tab(text: 'Pending (${_pendingPlaces.length})'),
+            Tab(text: 'Verified (${_verifiedPlaces.length})'),
+            Tab(text: 'Rejected (${_rejectedPlaces.length})'),
           ],
         ),
       ),
@@ -209,19 +209,19 @@ class _VerifyUmkmScreenState extends State<VerifyUmkmScreen>
         controller: _tabController,
         children: [
           _PendingTab(
-            umkmList: _pendingUmkm,
+            placesList: _pendingPlaces,
             isLoading: _loadingPending,
-            onApprove: _approveUmkm,
-            onReject: _rejectUmkm,
+            onApprove: _approvePlace,
+            onReject: _rejectPlace,
             onRefresh: _loadPending,
           ),
           _VerifiedTab(
-            umkmList: _verifiedUmkm,
+            placesList: _verifiedPlaces,
             isLoading: _loadingVerified,
             onRefresh: _loadVerified,
           ),
           _RejectedTab(
-            umkmList: _rejectedUmkm,
+            placesList: _rejectedPlaces,
             isLoading: _loadingRejected,
             onRefresh: _loadRejected,
           ),
@@ -233,14 +233,14 @@ class _VerifyUmkmScreenState extends State<VerifyUmkmScreen>
 
 // ── Tab Pending ──────────────────────────────────────────────
 class _PendingTab extends StatelessWidget {
-  final List<Map<String, dynamic>> umkmList;
+  final List<Map<String, dynamic>> placesList;
   final bool isLoading;
   final Future<void> Function(Map<String, dynamic>) onApprove;
   final Future<void> Function(Map<String, dynamic>, String) onReject;
   final Future<void> Function() onRefresh;
 
   const _PendingTab({
-    required this.umkmList,
+    required this.placesList,
     required this.isLoading,
     required this.onApprove,
     required this.onReject,
@@ -256,7 +256,7 @@ class _PendingTab extends StatelessWidget {
       backgroundColor: theme.bgSurface,
       child: isLoading
           ? Center(child: CircularProgressIndicator(color: theme.iconColor))
-          : umkmList.isEmpty
+          : placesList.isEmpty
           ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -268,7 +268,7 @@ class _PendingTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Tidak ada UMKM menunggu verifikasi.',
+                    'Tidak ada tempat menunggu verifikasi.',
                     style: TextStyle(color: theme.textSecondary),
                   ),
                 ],
@@ -276,14 +276,14 @@ class _PendingTab extends StatelessWidget {
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: umkmList.length,
+              itemCount: placesList.length,
               itemBuilder: (context, index) {
-                final umkm = umkmList[index];
-                return _UmkmCard(
-                  umkm: umkm,
+                final place = placesList[index];
+                return _PlaceCard(
+                  place: place,
                   theme: theme,
-                  onApprove: () => onApprove(umkm),
-                  onReject: () => _showRejectDialog(context, theme, umkm),
+                  onApprove: () => onApprove(place),
+                  onReject: () => _showRejectDialog(context, theme, place),
                 );
               },
             ),
@@ -293,7 +293,7 @@ class _PendingTab extends StatelessWidget {
   void _showRejectDialog(
     BuildContext context,
     ThemeProvider theme,
-    Map<String, dynamic> umkm,
+    Map<String, dynamic> place,
   ) {
     final reasonController = TextEditingController();
     showDialog(
@@ -302,7 +302,7 @@ class _PendingTab extends StatelessWidget {
         backgroundColor: theme.bgSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
-          'Tolak UMKM',
+          'Tolak Tempat',
           style: TextStyle(
             color: theme.textPrimary,
             fontWeight: FontWeight.w700,
@@ -340,7 +340,7 @@ class _PendingTab extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              onReject(umkm, reasonController.text);
+              onReject(place, reasonController.text);
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
@@ -357,12 +357,12 @@ class _PendingTab extends StatelessWidget {
 
 // ── Tab Verified ─────────────────────────────────────────────
 class _VerifiedTab extends StatelessWidget {
-  final List<Map<String, dynamic>> umkmList;
+  final List<Map<String, dynamic>> placesList;
   final bool isLoading;
   final Future<void> Function() onRefresh;
 
   const _VerifiedTab({
-    required this.umkmList,
+    required this.placesList,
     required this.isLoading,
     required this.onRefresh,
   });
@@ -376,7 +376,7 @@ class _VerifiedTab extends StatelessWidget {
       backgroundColor: theme.bgSurface,
       child: isLoading
           ? Center(child: CircularProgressIndicator(color: theme.iconColor))
-          : umkmList.isEmpty
+          : placesList.isEmpty
           ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -388,7 +388,7 @@ class _VerifiedTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Belum ada UMKM yang diverifikasi.',
+                    'Belum ada tempat yang diverifikasi.',
                     style: TextStyle(color: theme.textSecondary),
                   ),
                 ],
@@ -396,12 +396,12 @@ class _VerifiedTab extends StatelessWidget {
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: umkmList.length,
+              itemCount: placesList.length,
               itemBuilder: (context, index) {
-                final umkm = umkmList[index];
-                final imageUrl = UmkmImageHelper.primaryImageUrl(umkm);
-                final verifiedAt = umkm['verified_at'] != null
-                    ? DateTime.tryParse(umkm['verified_at'])
+                final place = placesList[index];
+                final imageUrl = PoiImageHelper.primaryImageUrl(place);
+                final verifiedAt = place['verified_at'] != null
+                    ? DateTime.tryParse(place['verified_at'])
                     : null;
 
                 return Container(
@@ -442,7 +442,7 @@ class _VerifiedTab extends StatelessWidget {
                             ),
                     ),
                     title: Text(
-                      umkm['nama_tempat'] ?? 'Tanpa Nama',
+                      place['nama_tempat'] ?? 'Tanpa Nama',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: theme.textPrimary,
@@ -452,7 +452,7 @@ class _VerifiedTab extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          umkm['alamat'] ?? '-',
+                          place['alamat'] ?? '-',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -486,12 +486,12 @@ class _VerifiedTab extends StatelessWidget {
 
 // ── Tab Rejected ─────────────────────────────────────────────
 class _RejectedTab extends StatelessWidget {
-  final List<Map<String, dynamic>> umkmList;
+  final List<Map<String, dynamic>> placesList;
   final bool isLoading;
   final Future<void> Function() onRefresh;
 
   const _RejectedTab({
-    required this.umkmList,
+    required this.placesList,
     required this.isLoading,
     required this.onRefresh,
   });
@@ -505,7 +505,7 @@ class _RejectedTab extends StatelessWidget {
       backgroundColor: theme.bgSurface,
       child: isLoading
           ? Center(child: CircularProgressIndicator(color: theme.iconColor))
-          : umkmList.isEmpty
+          : placesList.isEmpty
           ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -513,7 +513,7 @@ class _RejectedTab extends StatelessWidget {
                   Icon(Icons.cancel_outlined, size: 56, color: theme.textHint),
                   const SizedBox(height: 12),
                   Text(
-                    'Belum ada UMKM yang ditolak.',
+                    'Belum ada tempat yang ditolak.',
                     style: TextStyle(color: theme.textSecondary),
                   ),
                 ],
@@ -521,10 +521,10 @@ class _RejectedTab extends StatelessWidget {
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: umkmList.length,
+              itemCount: placesList.length,
               itemBuilder: (context, index) {
-                final umkm = umkmList[index];
-                final imageUrl = UmkmImageHelper.primaryImageUrl(umkm);
+                final place = placesList[index];
+                final imageUrl = PoiImageHelper.primaryImageUrl(place);
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -564,7 +564,7 @@ class _RejectedTab extends StatelessWidget {
                             ),
                     ),
                     title: Text(
-                      umkm['nama_tempat'] ?? 'Tanpa Nama',
+                      place['nama_tempat'] ?? 'Tanpa Nama',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: theme.textPrimary,
@@ -574,7 +574,7 @@ class _RejectedTab extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          umkm['alamat'] ?? '-',
+                          place['alamat'] ?? '-',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -582,9 +582,9 @@ class _RejectedTab extends StatelessWidget {
                             fontSize: 12,
                           ),
                         ),
-                        if (umkm['rejection_reason'] != null)
+                        if (place['rejection_reason'] != null)
                           Text(
-                            'Alasan: ${umkm['rejection_reason']}',
+                            'Alasan: ${place['rejection_reason']}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -607,15 +607,15 @@ class _RejectedTab extends StatelessWidget {
   }
 }
 
-// ── UMKM Card untuk Pending Tab ──────────────────────────────
-class _UmkmCard extends StatelessWidget {
-  final Map<String, dynamic> umkm;
+// ── Place Card untuk Pending Tab ──────────────────────────────
+class _PlaceCard extends StatelessWidget {
+  final Map<String, dynamic> place;
   final ThemeProvider theme;
   final VoidCallback onApprove;
   final VoidCallback onReject;
 
-  const _UmkmCard({
-    required this.umkm,
+  const _PlaceCard({
+    required this.place,
     required this.theme,
     required this.onApprove,
     required this.onReject,
@@ -623,7 +623,7 @@ class _UmkmCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = UmkmImageHelper.primaryImageUrl(umkm);
+    final imageUrl = PoiImageHelper.primaryImageUrl(place);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -673,7 +673,7 @@ class _UmkmCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  umkm['nama_tempat'] ?? 'Tanpa Nama',
+                  place['nama_tempat'] ?? 'Tanpa Nama',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     color: theme.textPrimary,
@@ -682,16 +682,16 @@ class _UmkmCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  umkm['alamat'] ?? '-',
+                  place['alamat'] ?? '-',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: theme.textSecondary, fontSize: 12),
                 ),
-                if (umkm['deskripsi'] != null &&
-                    umkm['deskripsi']!.isNotEmpty) ...[
+                if (place['deskripsi'] != null &&
+                    place['deskripsi']!.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
-                    umkm['deskripsi'],
+                    place['deskripsi'],
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: theme.textHint, fontSize: 12),

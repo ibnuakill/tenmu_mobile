@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
-import '../../core/umkm_image_helper.dart';
-import 'umkm_detail_screen.dart';
+import '../../core/poi_image_helper.dart';
+import 'poi_detail_screen.dart';
 
 class FavoriteScreen extends StatefulWidget {
   const FavoriteScreen({super.key});
@@ -20,11 +20,11 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
 
     final response = await Supabase.instance.client
         .from('favorites')
-        .select('umkm_id, umkm(*)')
+        .select('umkm_id, places(*)')
         .eq('user_id', user!.id)
         .order('created_at', ascending: false);
 
-    return (response as List).map((fav) => fav['umkm'] as Map<String, dynamic>).toList();
+    return (response as List).map((fav) => fav['places'] as Map<String, dynamic>).toList();
   }
 
   @override
@@ -71,13 +71,13 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                   padding: const EdgeInsets.all(16),
                   itemCount: favorites.length,
                   itemBuilder: (context, index) {
-                    final umkm = favorites[index];
+                    final place = favorites[index];
                     return _FavoriteCard(
-                      umkm: umkm, 
+                      place: place,
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => UmkmDetailScreen(umkm: umkm)),
+                          MaterialPageRoute(builder: (_) => PoiDetailScreen(place: place)),
                         ).then((_) => setState(() {})); // Refresh if un-favorited
                       }
                     );
@@ -90,15 +90,15 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
 }
 
 class _FavoriteCard extends StatelessWidget {
-  final Map<String, dynamic> umkm;
+  final Map<String, dynamic> place;
   final VoidCallback onTap;
 
-  const _FavoriteCard({required this.umkm, required this.onTap});
+  const _FavoriteCard({required this.place, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
-    final imageUrl = UmkmImageHelper.primaryImageUrl(umkm);
+    final imageUrl = PoiImageHelper.primaryImageUrl(place);
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -128,7 +128,7 @@ class _FavoriteCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(umkm['nama_tempat'] ?? 'Tanpa Nama', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.textPrimary)),
+                    Text(place['nama_tempat'] ?? 'Tanpa Nama', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.textPrimary)),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -136,7 +136,7 @@ class _FavoriteCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            umkm['alamat'] ?? '-',
+                            place['alamat'] ?? '-',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontSize: 12, color: theme.textSecondary),

@@ -37,7 +37,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
 
     try {
       final umkmData = await _client
-          .from('umkm')
+          .from('places')
           .select('id, category, is_featured');
       final reviewData = await _client.from('reviews').select('rating');
       final profileData = await _client.from('profiles').select('role');

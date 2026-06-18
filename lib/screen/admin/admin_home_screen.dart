@@ -7,7 +7,7 @@ import 'admin_analytics_screen.dart';
 import 'manage_users_screen.dart';
 import 'admin_profile_screen.dart';
 import 'manage_kategori_screen.dart';
-import 'verify_umkm_screen.dart';
+import 'verify_place_screen.dart';
 import 'manage_role_requests_screen.dart';
 
 class AdminHomeScreen extends StatelessWidget {
@@ -179,7 +179,7 @@ class AdminHomeScreen extends StatelessWidget {
 
               StreamBuilder<int>(
                 stream: _pendingCountStream(
-                  table: 'umkm',
+                  table: 'places',
                   column: 'verification_status',
                   value: 'pending',
                 ),
@@ -195,7 +195,7 @@ class AdminHomeScreen extends StatelessWidget {
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const VerifyUmkmScreen(),
+                        builder: (_) => const VerifyPlaceScreen(),
                       ),
                     ),
                     isPrimary: false,

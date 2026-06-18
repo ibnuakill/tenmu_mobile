@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme_provider.dart';
-import '../../core/umkm_image_helper.dart';
-import 'edit_umkm_screen.dart';
+import '../../core/poi_image_helper.dart';
+import 'edit_place_screen.dart';
 
-class ManageUmkmScreen extends StatefulWidget {
+class ManagePlaceScreen extends StatefulWidget {
   final bool isOwnerView;
 
-  const ManageUmkmScreen({super.key, this.isOwnerView = false});
+  const ManagePlaceScreen({super.key, this.isOwnerView = false});
 
   @override
-  State<ManageUmkmScreen> createState() => _ManageUmkmScreenState();
+  State<ManagePlaceScreen> createState() => _ManagePlaceScreenState();
 }
 
-class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
+class _ManagePlaceScreenState extends State<ManagePlaceScreen> {
   late final Stream<List<Map<String, dynamic>>> _umkmStream;
 
   @override
@@ -22,7 +22,7 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
     super.initState();
     final userId = Supabase.instance.client.auth.currentUser?.id;
     final baseQuery = Supabase.instance.client
-        .from('umkm')
+        .from('places')
         .stream(primaryKey: ['id']);
 
     if (widget.isOwnerView && userId != null) {
@@ -77,7 +77,7 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
 
     if (confirm == true) {
       try {
-        await Supabase.instance.client.from('umkm').delete().eq('id', id);
+        await Supabase.instance.client.from('places').delete().eq('id', id);
         if (mounted) {
           final theme = Provider.of<ThemeProvider>(context, listen: false);
           ScaffoldMessenger.of(context).showSnackBar(
@@ -190,8 +190,8 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
             itemCount: umkmList.length,
             itemBuilder: (context, index) {
-              final umkm = umkmList[index];
-              final imageUrl = UmkmImageHelper.primaryImageUrl(umkm);
+              final place = umkmList[index];
+              final imageUrl = PoiImageHelper.primaryImageUrl(place);
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
@@ -235,7 +235,7 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          umkm['nama_tempat'] ?? 'Tanpa Nama',
+                          place['nama_tempat'] ?? 'Tanpa Nama',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             color: theme.textPrimary,
@@ -246,14 +246,14 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
                       const SizedBox(width: 8),
                       _statusBadge(
                         theme,
-                        umkm['verification_status'] ?? 'pending',
+                        place['verification_status'] ?? 'pending',
                       ),
                     ],
                   ),
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      umkm['alamat'] ?? '-',
+                      place['alamat'] ?? '-',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -271,7 +271,7 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => EditUmkmScreen(umkm: umkm),
+                            builder: (_) => EditPlaceScreen(place: place),
                           ),
                         ),
                       ),
@@ -281,7 +281,7 @@ class _ManageUmkmScreenState extends State<ManageUmkmScreen> {
                           icon: Icons.delete_outline,
                           color: const Color(0xFF8B2020),
                           onTap: () =>
-                              _hapusData(umkm['id'], umkm['nama_tempat']),
+                              _hapusData(place['id'], place['nama_tempat']),
                         ),
                     ],
                   ),

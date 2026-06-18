@@ -5,8 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
 import '../admin/admin_profile_screen.dart';
 import '../user/about_screen.dart';
-import 'add_umkm_screen.dart';
-import 'manage_umkm_screen.dart';
+import 'add_place_screen.dart';
+import 'manage_place_screen.dart';
 
 class OwnerHomeScreen extends StatelessWidget {
   const OwnerHomeScreen({super.key});
@@ -84,7 +84,7 @@ class OwnerHomeScreen extends StatelessWidget {
                   Navigator.pop(context);
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const AddUmkmScreen()),
+                    MaterialPageRoute(builder: (_) => const AddPlaceScreen()),
                   );
                 },
               ),
@@ -98,7 +98,7 @@ class OwnerHomeScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const ManageUmkmScreen(isOwnerView: true),
+                      builder: (_) => const ManagePlaceScreen(isOwnerView: true),
                     ),
                   );
                 },
@@ -254,7 +254,7 @@ class OwnerHomeScreen extends StatelessWidget {
                 subtitle: 'Buat data UMKM baru atas akun pemilik ini',
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const AddUmkmScreen()),
+                  MaterialPageRoute(builder: (_) => const AddPlaceScreen()),
                 ),
                 isPrimary: true,
               ),
@@ -268,7 +268,7 @@ class OwnerHomeScreen extends StatelessWidget {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const ManageUmkmScreen(isOwnerView: true),
+                    builder: (_) => const ManagePlaceScreen(isOwnerView: true),
                   ),
                 ),
                 isPrimary: false,

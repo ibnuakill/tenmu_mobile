@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'login_screen.dart';
 import 'role_checker.dart';
 import 'email_verification_screen.dart';
-import '../user/home_screen.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -23,21 +23,20 @@ class AuthGate extends StatelessWidget {
 
         final session = snapshot.hasData ? snapshot.data!.session : null;
 
-        // Sudah login → cek email verification dan role
-        if (session != null) {
-          final user = Supabase.instance.client.auth.currentUser;
-          
-          // Email belum diverifikasi → tampilkan halaman verifikasi
-          if (user != null && user.emailConfirmedAt == null) {
-            return EmailVerificationScreen(email: user.email);
-          }
-          
-          // Email sudah diverifikasi → cek role
-          return const RoleChecker();
+        // Wajib login — ga ada guest mode
+        if (session == null) {
+          return const LoginScreen();
         }
 
-        // Belum login → langsung ke HomeScreen sebagai guest
-        return const HomeScreen();
+        final user = Supabase.instance.client.auth.currentUser;
+
+        // Email belum diverifikasi
+        if (user != null && user.emailConfirmedAt == null) {
+          return EmailVerificationScreen(email: user.email);
+        }
+
+        // Udah login & terverifikasi → cek role
+        return const RoleChecker();
       },
     );
   }

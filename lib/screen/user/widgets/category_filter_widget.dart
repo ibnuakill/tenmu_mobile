@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme_provider.dart';
-import '../../../core/umkm_category.dart';
+import '../../../core/poi_category.dart';
 
 /// CategoryFilterWidget - Menampilkan chip kategori yang bisa di-toggle
 /// User bisa select multiple categories untuk filter
@@ -49,7 +49,7 @@ class _CategoryFilterWidgetState extends State<CategoryFilterWidget> {
 
   void _selectAll() {
     setState(() {
-      _localSelected = Set.from(UmkmCategory.allCategories);
+      _localSelected = Set.from(PoiCategory.allCategories);
     });
     widget.onCategoriesChanged(_localSelected);
   }
@@ -112,9 +112,9 @@ class _CategoryFilterWidgetState extends State<CategoryFilterWidget> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: UmkmCategory.allCategories.map((category) {
+              children: PoiCategory.allCategories.map((category) {
                 final isSelected = _localSelected.contains(category);
-                final emoji = UmkmCategory.getCategoryEmoji(category);
+                final emoji = PoiCategory.getCategoryEmoji(category);
 
                 return GestureDetector(
                   onTap: () => _toggleCategory(category),
