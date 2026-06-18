@@ -50,14 +50,13 @@ class _RouteStep {
   final double distanceM;
   final double lat;
   final double lng;
-  bool spoken;
+  bool spoken = false;
 
   _RouteStep({
     required this.instruction,
     required this.distanceM,
     required this.lat,
     required this.lng,
-    this.spoken = false,
   });
 }
 
@@ -396,48 +395,57 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   Future<(List<LatLng> points, double distanceM, double durationS, List<_RouteStep> steps)?>
       _fetchFullRoute(Position position, {int retry = 1}) async {
     if (_destinationLat == null || _destinationLng == null) return null;
-    for (int attempt = 0; attempt <= retry; attempt++) {
-      try {
-        final profile = _travelMode.osrmProfile;
-        final url = Uri.parse(
-          'https://router.project-osrm.org/route/v1/$profile/'
-          '${position.longitude},${position.latitude};'
-          '$_destinationLng,$_destinationLat'
-          '?geometries=geojson&overview=full&steps=true&language=en',
-        );
-        final response = await http.get(url).timeout(const Duration(seconds: 10));
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          final routes = data['routes'] as List;
-          if (routes.isEmpty) continue;
-          final route = routes[0] as Map<String, dynamic>;
-          final geometry = route['geometry']['coordinates'] as List;
-          final points = geometry
-              .map((c) => LatLng(c[1] as double, c[0] as double))
-              .toList();
-          final distance = (route['distance'] as num).toDouble();
-          final duration = (route['duration'] as num).toDouble();
 
-          final steps = <_RouteStep>[];
-          final legs = route['legs'] as List;
-          if (legs.isNotEmpty) {
-            final leg = legs[0] as Map<String, dynamic>;
-            final rawSteps = leg['steps'] as List;
-            for (final s in rawSteps) {
-              final maneuver = s['maneuver'] as Map<String, dynamic>;
-              final loc = maneuver['location'] as List;
-              steps.add(_RouteStep(
-                instruction: s['instruction'] ?? '',
-                distanceM: (s['distance'] as num).toDouble(),
-                lat: loc[1] as double,
-                lng: loc[0] as double,
-              ));
+    const servers = [
+      'https://router.project-osrm.org/route/v1',
+      'https://routing.openstreetmap.de/routed-car/route/v1',
+      // fallback ke endpoint yg lebih stabil kalo dua diatas down
+    ];
+
+    for (final baseUrl in servers) {
+      for (int attempt = 0; attempt <= retry; attempt++) {
+        try {
+          final profile = _travelMode.osrmProfile;
+          final url = Uri.parse(
+            '$baseUrl/$profile/'
+            '${position.longitude},${position.latitude};'
+            '$_destinationLng,$_destinationLat'
+            '?geometries=geojson&overview=full&steps=true&language=en',
+          );
+          final response = await http.get(url).timeout(const Duration(seconds: 10));
+          if (response.statusCode == 200) {
+            final data = json.decode(response.body);
+            final routes = data['routes'] as List;
+            if (routes.isEmpty) continue;
+            final route = routes[0] as Map<String, dynamic>;
+            final geometry = route['geometry']['coordinates'] as List;
+            final points = geometry
+                .map((c) => LatLng(c[1] as double, c[0] as double))
+                .toList();
+            final distance = (route['distance'] as num).toDouble();
+            final duration = (route['duration'] as num).toDouble();
+
+            final steps = <_RouteStep>[];
+            final legs = route['legs'] as List;
+            if (legs.isNotEmpty) {
+              final leg = legs[0] as Map<String, dynamic>;
+              final rawSteps = leg['steps'] as List;
+              for (final s in rawSteps) {
+                final maneuver = s['maneuver'] as Map<String, dynamic>;
+                final loc = maneuver['location'] as List;
+                steps.add(_RouteStep(
+                  instruction: s['instruction'] ?? '',
+                  distanceM: (s['distance'] as num).toDouble(),
+                  lat: loc[1] as double,
+                  lng: loc[0] as double,
+                ));
+              }
             }
+            return (points, distance, duration, steps);
           }
-          return (points, distance, duration, steps);
+        } catch (_) {
+          // attempt berikutnya
         }
-      } catch (_) {
-        // attempt berikutnya
       }
     }
     return null;
@@ -760,20 +768,28 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                       ),
                     ),
 
-                    // --- Fallback banner ---
+                    // --- Fallback indicator ---
                     if (_useFallback)
                       Positioned(
                         top: 12, left: 16, right: 16,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: theme.bgElevated.withAlpha(240),
+                            color: Colors.orange.shade50,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.orange.withAlpha(120)),
+                            border: Border.all(color: Colors.orange.shade300),
                           ),
-                          child: Text(
-                            'Server rute tidak tersedia. Menampilkan jarak lurus.',
-                            style: TextStyle(fontSize: 12, color: theme.textSecondary),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline, size: 16, color: Colors.orange.shade800),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Rute offline — perkiraan jarak lurus',
+                                  style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -978,7 +994,6 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
                     // Step list
                     ..._steps.asMap().entries.map((entry) {
-                      final i = entry.key;
                       final step = entry.value;
                       final done = step.spoken;
                       return Padding(
@@ -1021,7 +1036,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _infoColumn(
-            'Jarak',
+            _useFallback ? 'Lurus' : 'Jarak',
             _distanceInKm != null ? '${_distanceInKm!.toStringAsFixed(1)} km' : '-',
             theme,
           ),

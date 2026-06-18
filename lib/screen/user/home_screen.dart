@@ -13,6 +13,7 @@ import 'route_map_screen.dart';
 
 import 'widgets/category_filter_widget.dart';
 import 'widgets/sort_filter_widget.dart';
+import 'favorite_screen.dart';
 import '../../core/haversine.dart';
 import 'widgets/chat_bot.dart';
 
@@ -28,13 +29,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Set<String> _selectedCategories = {};
   SortOption _selectedSort = SortOption.terbaru;
   Position? _currentPosition;
+  int _currentNavIndex = 0;
 
   bool get _hasActiveFilters => _selectedCategories.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
-    // optimization: fetch via provider with caching logic
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<PlacesProvider>(context, listen: false).fetchPlaces();
       _requestUserLocation();
@@ -88,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       } else {
         setState(() {
-          _selectedSort = SortOption.terbaru; // Fallback jika ditolak
+          _selectedSort = SortOption.terbaru;
         });
       }
     } catch (e) {
@@ -99,6 +100,45 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _onNavTap(int index) {
+    if (index == _currentNavIndex) return;
+    if (index == 2) {
+      // AI Chat — show bottom sheet
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => const ChatBotSheet(),
+      );
+      return;
+    }
+    setState(() => _currentNavIndex = index);
+    switch (index) {
+      case 1: // Map
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RouteMapScreen(
+              placesList: Provider.of<PlacesProvider>(
+                context,
+                listen: false,
+              ).placesList,
+            ),
+          ),
+        );
+      case 3: // Favorite
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const FavoriteScreen()),
+        );
+      case 4: // Profile
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+        );
+    }
+  }
+
   void _showFilterBottomSheet(BuildContext context, ThemeProvider theme) {
     showModalBottomSheet(
       context: context,
@@ -106,14 +146,13 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Container(
-          height: MediaQuery.of(context).size.height * 0.65,
+          height: MediaQuery.of(context).size.height * 0.55,
           decoration: BoxDecoration(
             color: theme.bgBase,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             children: [
-              // ── Handle Drag ──
               Center(
                 child: Container(
                   margin: const EdgeInsets.only(top: 12, bottom: 20),
@@ -125,7 +164,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              // ── Header Title ──
               Text(
                 'Filter Pencarian',
                 style: TextStyle(
@@ -163,7 +201,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // ── Apply Button ──
               Padding(
                 padding: const EdgeInsets.all(20),
                 child: SizedBox(
@@ -229,24 +266,271 @@ class _HomeScreenState extends State<HomeScreen> {
     return placesList;
   }
 
+  double _getRating(PlacesProvider p, int? id) => p.ratings[id] ?? 0.0;
+
+  // ── Featured horizontal list ──
+  Widget _buildFeaturedSection(
+    ThemeProvider theme,
+    List<Map<String, dynamic>> featured,
+    PlacesProvider provider,
+  ) {
+    if (featured.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+          child: Row(
+            children: [
+              Icon(Icons.star_rounded, size: 18, color: theme.btnPrimary),
+              const SizedBox(width: 6),
+              Text(
+                'Rekomendasi',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: theme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 200,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: featured.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 14),
+            itemBuilder: (context, index) {
+              final place = featured[index];
+              final imageUrl = PoiImageHelper.primaryImageUrl(place);
+              final rating = _getRating(provider, place['id']);
+              return GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PoiDetailScreen(place: place),
+                  ),
+                ),
+                child: Container(
+                  width: 260,
+                  decoration: BoxDecoration(
+                    color: theme.bgSurface,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color.fromRGBO(0, 0, 0, 0.12),
+                        blurRadius: 12,
+                        offset: Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            imageUrl != null
+                                ? Image.network(
+                                    imageUrl,
+                                    width: double.infinity,
+                                    height: 140,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) =>
+                                        _placeholder(theme),
+                                  )
+                                : _placeholder(theme),
+                            Positioned(
+                              top: 10,
+                              right: 10,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.45),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.star_rounded,
+                                      size: 12,
+                                      color: Colors.amber,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      rating > 0
+                                          ? rating.toStringAsFixed(1)
+                                          : 'Baru',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              place['nama_tempat'] ?? '',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: theme.textPrimary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on_outlined,
+                                  size: 12,
+                                  color: theme.iconColor,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    place['alamat'] ?? '',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: theme.textSecondary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _placeholder(ThemeProvider theme) {
+    return Container(
+      height: 140,
+      color: theme.bgElevated,
+      child: Center(
+        child: Icon(Icons.image_outlined, size: 32, color: theme.textHint),
+      ),
+    );
+  }
+
+  // ── Bottom Nav Bar ──
+  Widget _bottomNav(ThemeProvider theme) {
+    final items = [
+      ('Beranda', Icons.home_rounded, 0),
+      ('Peta', Icons.map_rounded, 1),
+      ('AI', Icons.auto_awesome_rounded, 2),
+      ('Favorit', Icons.favorite_outline_rounded, 3),
+      ('Profil', Icons.person_rounded, 4),
+    ];
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.bgSurface,
+        border: Border(top: BorderSide(color: theme.border, width: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: items.map((item) {
+              final active = item.$3 == _currentNavIndex;
+              return GestureDetector(
+                onTap: () => _onNavTap(item.$3),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: active
+                        ? theme.btnPrimary.withValues(alpha: 0.1)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        item.$2,
+                        size: 20,
+                        color: active ? theme.btnPrimary : theme.iconColor,
+                      ),
+                      if (active) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          item.$1,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: theme.btnPrimary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
     final placesProvider = Provider.of<PlacesProvider>(context);
     final user = Supabase.instance.client.auth.currentUser;
-    final placesList = _getFilteredPlaces(placesProvider);
+    final allPlaces = _getFilteredPlaces(placesProvider);
+    final featured = allPlaces.where((p) => p['is_featured'] == true).toList();
 
     return Scaffold(
       backgroundColor: theme.bgBase,
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── HEADER ─────────────────────────────────────────────────────
+            // ── HEADER (avatar + search bar) ──
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Row(
                 children: [
                   GestureDetector(
@@ -261,22 +545,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: theme.bgElevated,
                         shape: BoxShape.circle,
                         border: Border.all(color: theme.border),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color.fromRGBO(0, 0, 0, 0.15),
-                            blurRadius: 8,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
                         image: user?.userMetadata?['avatar_url'] != null
                             ? DecorationImage(
-                                image: NetworkImage(user!.userMetadata!['avatar_url']),
+                                image: NetworkImage(
+                                  user!.userMetadata!['avatar_url'],
+                                ),
                                 fit: BoxFit.cover,
                               )
                             : null,
                       ),
                       child: user?.userMetadata?['avatar_url'] == null
-                          ? Icon(Icons.person_rounded, color: theme.textPrimary, size: 22)
+                          ? Icon(Icons.person_rounded,
+                              color: theme.textPrimary, size: 22)
                           : null,
                     ),
                   ),
@@ -286,45 +566,49 @@ class _HomeScreenState extends State<HomeScreen> {
                       height: 44,
                       decoration: BoxDecoration(
                         color: theme.bgElevated,
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: theme.border),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color.fromRGBO(0, 0, 0, 0.15),
-                            blurRadius: 8,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
                       ),
                       child: TextField(
                         onChanged: (v) =>
                             setState(() => _searchQuery = v.toLowerCase()),
-                        style: TextStyle(
-                          color: theme.textPrimary,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: theme.textPrimary, fontSize: 14),
                         cursorColor: theme.borderFocus,
                         textAlignVertical: TextAlignVertical.center,
                         decoration: InputDecoration(
                           hintText: 'Cari tempat...',
-                          hintStyle: TextStyle(
-                            color: theme.textHint,
-                            fontSize: 13,
-                          ),
+                          hintStyle: TextStyle(color: theme.textHint, fontSize: 13),
                           prefixIcon: Icon(
-                            Icons.search,
+                            Icons.search_rounded,
                             color: theme.iconColor,
-                            size: 18,
+                            size: 20,
                           ),
-                          suffixIcon: GestureDetector(
-                            onTap: () => _showFilterBottomSheet(context, theme),
-                            child: Icon(
-                              Icons.tune_rounded,
-                              color: _hasActiveFilters
-                                  ? theme.btnPrimary
-                                  : theme.iconColor,
-                              size: 18,
-                            ),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              GestureDetector(
+                                onTap: () =>
+                                    _showFilterBottomSheet(context, theme),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: _hasActiveFilters
+                                        ? theme.btnPrimary
+                                            .withValues(alpha: 0.1)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    Icons.tune_rounded,
+                                    color: _hasActiveFilters
+                                        ? theme.btnPrimary
+                                        : theme.iconColor,
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                            ],
                           ),
                           border: InputBorder.none,
                           isDense: true,
@@ -336,239 +620,229 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => RouteMapScreen(placesList: placesList),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: theme.btnPrimary,
-                        shape: BoxShape.circle,
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color.fromRGBO(0, 0, 0, 0.15),
-                            blurRadius: 8,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        Icons.map_rounded,
-                        color: theme.btnLabel,
-                        size: 22,
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
 
-            // ── LIST & FILTER (Using Provider for caching and performance) ─────────
+            // ── LIST ──
             Expanded(
               child: Builder(
                 builder: (context) {
-                  if (placesProvider.isLoading && placesProvider.placesList.isEmpty) {
+                  if (placesProvider.isLoading &&
+                      placesProvider.placesList.isEmpty) {
                     return Center(
                       child: CircularProgressIndicator(color: theme.iconColor),
                     );
                   }
 
-                  // Error state - show retry option
                   if (placesProvider.error != null &&
                       placesProvider.placesList.isEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.wifi_off_rounded,
-                              size: 56,
-                              color: theme.textHint,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Gagal memuat data',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: theme.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Pastikan koneksi internet aktif',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: theme.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                placesProvider.clearError();
-                                placesProvider.fetchPlaces(force: true);
-                              },
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Coba Lagi'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: theme.btnPrimary,
-                                foregroundColor: theme.btnLabel,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+                    return _errorState(theme, placesProvider);
                   }
 
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── LIST UMKM ──────────────────────────────────────────────────
-                      Expanded(
-                        child: RefreshIndicator(
-                          onRefresh: () async {
-                            final messenger = ScaffoldMessenger.of(context);
-                            placesProvider.clearError();
-                            await placesProvider.fetchPlaces(force: true);
-                            // Refresh user location on pull-to-refresh
-                            await _requestUserLocation();
-                            // Show snackbar if refresh failed but we have cached data
-                            if (placesProvider.error != null &&
-                                placesProvider.placesList.isNotEmpty) {
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: const Text(
-                                    'Gagal memperbarui data',
-                                  ),
-                                  backgroundColor: Colors.red.shade700,
-                                  behavior: SnackBarBehavior.floating,
-                                  action: SnackBarAction(
-                                    label: 'Retry',
-                                    textColor: Colors.white,
-                                    onPressed: () =>
-                                        placesProvider.fetchPlaces(force: true),
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                          color: theme.btnPrimary,
-                          backgroundColor: theme.bgElevated,
-                          child: placesList.isEmpty
-                              ? ListView(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
+                  final bool isIdle =
+                      _searchQuery.isEmpty && _selectedCategories.isEmpty;
+
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      placesProvider.clearError();
+                      await placesProvider.fetchPlaces(force: true);
+                      await _requestUserLocation();
+                      if (placesProvider.error != null &&
+                          placesProvider.placesList.isNotEmpty) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: const Text('Gagal memperbarui data'),
+                            backgroundColor: Colors.red.shade700,
+                            behavior: SnackBarBehavior.floating,
+                            action: SnackBarAction(
+                              label: 'Retry',
+                              textColor: Colors.white,
+                              onPressed: () =>
+                                  placesProvider.fetchPlaces(force: true),
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    color: theme.btnPrimary,
+                    backgroundColor: theme.bgElevated,
+                    child: allPlaces.isEmpty
+                        ? _emptyState(theme)
+                        : ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 80),
+                            children: [
+                              if (isIdle)
+                                const SizedBox.shrink(),
+                              _buildFeaturedSection(
+                                theme,
+                                featured,
+                                placesProvider,
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
+                                child: Row(
                                   children: [
-                                    SizedBox(
-                                      height:
-                                          MediaQuery.of(context).size.height *
-                                          0.5,
-                                      child: Center(
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.storefront_outlined,
-                                              size: 56,
-                                              color: theme.textHint,
-                                            ),
-                                            const SizedBox(height: 12),
-                                            Text(
-                                              'Belum ada tempat ditemukan.',
-                                              style: TextStyle(
-                                                color: theme.textSecondary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                    Icon(
+                                      Icons.grid_view_rounded,
+                                      size: 18,
+                                      color: theme.btnPrimary,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Semua Tempat',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        color: theme.textPrimary,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Text(
+                                      '${allPlaces.length} tempat',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: theme.textSecondary,
                                       ),
                                     ),
                                   ],
-                                )
-                              : ListView.builder(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  padding: const EdgeInsets.fromLTRB(
-                                    20,
-                                    0,
-                                    20,
-                                    20,
-                                  ),
-                                  itemCount: placesList.length,
-                                  itemBuilder: (context, index) {
-                                    final place = placesList[index];
-                                    return _PlaceCard(
-                                      place: place,
-                                      onTap: () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              PoiDetailScreen(place: place),
-                                        ),
-                                      ),
-                                      userPosition: _currentPosition,
-                                    );
-                                  },
                                 ),
-                        ),
-                      ),
-                    ],
+                              ),
+                              ...allPlaces.map(
+                                (place) => _PlaceCard(
+                                  place: place,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          PoiDetailScreen(place: place),
+                                    ),
+                                  ),
+                                  userPosition: _currentPosition,
+                                  rating: _getRating(
+                                    placesProvider,
+                                    place['id'],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                   );
                 },
               ),
             ),
           ],
         ),
-        // ── AI Chatbot Bubble ───────────────────────────────
-        const ChatBotBubble(),
-      ],
-    ),
       ),
+      bottomNavigationBar: _bottomNav(theme),
+    );
+  }
+
+  Widget _errorState(ThemeProvider theme, PlacesProvider provider) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.wifi_off_rounded, size: 56, color: theme.textHint),
+            const SizedBox(height: 16),
+            Text(
+              'Gagal memuat data',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: theme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Pastikan koneksi internet aktif',
+              style: TextStyle(fontSize: 13, color: theme.textSecondary),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                provider.clearError();
+                provider.fetchPlaces(force: true);
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.btnPrimary,
+                foregroundColor: theme.btnLabel,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _emptyState(ThemeProvider theme) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(
+          height: MediaQuery.of(context).size.height * 0.3,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.storefront_outlined,
+                  size: 56,
+                  color: theme.textHint,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Belum ada tempat ditemukan.',
+                  style: TextStyle(color: theme.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
 
+// ── Place Card ──
 class _PlaceCard extends StatelessWidget {
   final Map<String, dynamic> place;
   final VoidCallback onTap;
   final Position? userPosition;
+  final double rating;
 
-  const _PlaceCard({required this.place, required this.onTap, this.userPosition});
+  const _PlaceCard({
+    required this.place,
+    required this.onTap,
+    this.userPosition,
+    this.rating = 0,
+  });
 
   String? _getDistanceText() {
     if (userPosition == null) return null;
-
     final lat = (place['latitude'] as num?)?.toDouble();
     final lng = (place['longitude'] as num?)?.toDouble();
     if (lat == null || lng == null || lat == 0 || lng == 0) return null;
-
     final distanceKm = Haversine.distance(
       userPosition!.latitude,
       userPosition!.longitude,
       lat,
       lng,
     );
-
     return Haversine.formatDistance(distanceKm);
   }
 
   String _resolveCategory() {
     final category = place['category']?.toString().trim();
-    if (category == null || category.isEmpty) {
-      return PoiCategory.lainnya;
-    }
+    if (category == null || category.isEmpty) return PoiCategory.lainnya;
     return PoiCategory.isValidCategory(category)
         ? category
         : PoiCategory.lainnya;
@@ -600,7 +874,6 @@ class _PlaceCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Gambar
             if (imageUrl != null)
               Stack(
                 children: [
@@ -609,7 +882,7 @@ class _PlaceCard extends StatelessWidget {
                     height: 180,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    cacheWidth: 600, // optimization: limit image cache size
+                    cacheWidth: 600,
                     errorBuilder: (_, _, _) => Container(
                       height: 180,
                       color: theme.bgElevated,
@@ -704,7 +977,6 @@ class _PlaceCard extends StatelessWidget {
                 ),
               ),
 
-            // Info
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -820,4 +1092,3 @@ class _PlaceCard extends StatelessWidget {
     );
   }
 }
-

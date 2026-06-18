@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tenmu/core/theme_provider.dart';
 import 'package:tenmu/core/places_provider.dart';
 import 'package:tenmu/screen/auth/auth_gate.dart';
@@ -11,9 +12,11 @@ Future<void> main() async {
   // Memastikan bahwa framework Flutter sudah siap sebelum menjalankan kode lain
   WidgetsFlutterBinding.ensureInitialized();
 
+  await dotenv.load(fileName: '.env');
+
   await Supabase.initialize(
-    url: 'https://axtkquxgojewinwdndtt.supabase.co',
-    anonKey: 'sb_publishable_ZREX99FnrmwrdqSn4x7Afw_qFLnjP9F',
+    url: dotenv.env['SUPABASE_URL']!,
+    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
 
   // Menjalankan aplikasi
