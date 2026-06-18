@@ -1,6 +1,7 @@
 /// Floating AI Chatbot — bubble pojok kanan + chat bottom sheet
 ///
 /// Integrasi n8n webhook via [ChatBotConfig.webhookUrl].
+library;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;

@@ -24,10 +24,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
   String? _currentRole;
   String? _requestStatus;
-  DateTime? _requestCreatedAt;
   String? _requestMessage;
   String? _requestHandledAt;
-  String? _requestHandledBy;
 
   @override
   void initState() {
@@ -56,11 +54,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
           _currentRole = profileData['role']?.toString();
           _requestStatus = profileData['request_status']?.toString();
           _requestMessage = profileData['request_message']?.toString();
-          _requestCreatedAt = profileData['request_created_at'] != null
-              ? DateTime.tryParse(profileData['request_created_at'])
-              : null;
           _requestHandledAt = profileData['request_handled_at']?.toString();
-          _requestHandledBy = profileData['request_handled_by']?.toString();
         });
       }
     } catch (e) {
@@ -83,6 +77,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     }
 
     setState(() => _isRequestLoading = true);
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await Supabase.instance.client
           .from('profiles')
@@ -99,10 +94,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       setState(() {
         _requestStatus = 'pending';
         _requestMessage = _requestMessageController.text.trim();
-        _requestCreatedAt = DateTime.now();
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
           content: Text(
             'Permintaan role owner berhasil dikirim. Tunggu verifikasi admin.',
@@ -111,7 +105,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text('Gagal mengirim permintaan: $e'),
           backgroundColor: Colors.red,
@@ -196,8 +190,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       UserAttributes attributes = UserAttributes(data: updates);
 
       if (_passwordController.text.isNotEmpty) {
-        if (_passwordController.text.length < 6)
+        if (_passwordController.text.length < 6) {
           throw 'Password min 6 karakter';
+        }
         attributes = UserAttributes(
           data: updates,
           password: _passwordController.text.trim(),

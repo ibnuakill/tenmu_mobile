@@ -5,7 +5,6 @@ import '../../core/theme_provider.dart';
 import '../user/settings_screen.dart';
 import 'admin_analytics_screen.dart';
 import 'manage_users_screen.dart';
-import 'admin_profile_screen.dart';
 import 'manage_kategori_screen.dart';
 import 'verify_place_screen.dart';
 import 'manage_role_requests_screen.dart';

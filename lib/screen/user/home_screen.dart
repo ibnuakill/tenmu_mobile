@@ -13,7 +13,6 @@ import 'route_map_screen.dart';
 
 import 'widgets/category_filter_widget.dart';
 import 'widgets/sort_filter_widget.dart';
-import 'favorite_screen.dart';
 import '../../core/haversine.dart';
 import 'widgets/chat_bot.dart';
 
@@ -30,19 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   SortOption _selectedSort = SortOption.terbaru;
   Position? _currentPosition;
 
-  bool get _hasActiveFilters =>
-      _selectedCategories.isNotEmpty ||
-
-  String _sortLabel(SortOption option) {
-    switch (option) {
-      case SortOption.terbaru:
-        return 'Terbaru';
-      case SortOption.terdekat:
-        return 'Terdekat';
-      case SortOption.rating:
-        return 'Rating';
-    }
-  }
+  bool get _hasActiveFilters => _selectedCategories.isNotEmpty;
 
   @override
   void initState() {
@@ -452,6 +439,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: RefreshIndicator(
                           onRefresh: () async {
+                            final messenger = ScaffoldMessenger.of(context);
                             placesProvider.clearError();
                             await placesProvider.fetchPlaces(force: true);
                             // Refresh user location on pull-to-refresh
@@ -459,23 +447,21 @@ class _HomeScreenState extends State<HomeScreen> {
                             // Show snackbar if refresh failed but we have cached data
                             if (placesProvider.error != null &&
                                 placesProvider.placesList.isNotEmpty) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text(
-                                      'Gagal memperbarui data',
-                                    ),
-                                    backgroundColor: Colors.red.shade700,
-                                    behavior: SnackBarBehavior.floating,
-                                    action: SnackBarAction(
-                                      label: 'Retry',
-                                      textColor: Colors.white,
-                                      onPressed: () =>
-                                          placesProvider.fetchPlaces(force: true),
-                                    ),
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    'Gagal memperbarui data',
                                   ),
-                                );
-                              }
+                                  backgroundColor: Colors.red.shade700,
+                                  behavior: SnackBarBehavior.floating,
+                                  action: SnackBarAction(
+                                    label: 'Retry',
+                                    textColor: Colors.white,
+                                    onPressed: () =>
+                                        placesProvider.fetchPlaces(force: true),
+                                  ),
+                                ),
+                              );
                             }
                           },
                           color: theme.btnPrimary,
@@ -830,50 +816,6 @@ class _PlaceCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _InfoPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool highlighted;
-
-  const _InfoPill({
-    required this.icon,
-    required this.label,
-    this.highlighted = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Provider.of<ThemeProvider>(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: highlighted ? theme.btnPrimary : theme.bgElevated,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 14,
-            color: highlighted ? theme.btnLabel : theme.iconColor,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: highlighted ? theme.btnLabel : theme.textPrimary,
-            ),
-          ),
-        ],
       ),
     );
   }

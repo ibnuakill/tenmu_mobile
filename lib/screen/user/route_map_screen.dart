@@ -1169,7 +1169,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                   borderRadius: BorderRadius.circular(12),
                   child: imageUrl != null
                       ? Image.network(imageUrl, width: 60, height: 60, fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _placeholderImage(theme))
+                          errorBuilder: (_, _, _) => _placeholderImage(theme))
                       : _placeholderImage(theme),
                 ),
                 const SizedBox(width: 16),

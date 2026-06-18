@@ -421,7 +421,7 @@ class _VerifiedTab extends StatelessWidget {
                               width: 50,
                               height: 50,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
+                              errorBuilder: (_, _, _) => Container(
                                 width: 50,
                                 height: 50,
                                 color: theme.bgElevated,
@@ -543,7 +543,7 @@ class _RejectedTab extends StatelessWidget {
                               width: 50,
                               height: 50,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
+                              errorBuilder: (_, _, _) => Container(
                                 width: 50,
                                 height: 50,
                                 color: theme.bgElevated,
@@ -643,7 +643,7 @@ class _PlaceCard extends StatelessWidget {
                     width: double.infinity,
                     height: 160,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       width: double.infinity,
                       height: 160,
                       color: theme.bgElevated,

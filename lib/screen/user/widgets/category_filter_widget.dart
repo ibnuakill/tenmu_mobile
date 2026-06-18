@@ -10,10 +10,10 @@ class CategoryFilterWidget extends StatefulWidget {
   final ValueChanged<Set<String>> onCategoriesChanged;
 
   const CategoryFilterWidget({
-    Key? key,
+    super.key,
     required this.selectedCategories,
     required this.onCategoriesChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<CategoryFilterWidget> createState() => _CategoryFilterWidgetState();

@@ -117,7 +117,7 @@ class _FavoriteCard extends StatelessWidget {
                 width: 100,
                 height: 100,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(width: 100, height: 100, color: theme.bgElevated, child: Icon(Icons.broken_image, color: theme.textHint)),
+                errorBuilder: (_, _, _) => Container(width: 100, height: 100, color: theme.bgElevated, child: Icon(Icons.broken_image, color: theme.textHint)),
               )
             else
               Container(width: 100, height: 100, color: theme.bgElevated, child: Icon(Icons.storefront, color: theme.textHint)),
