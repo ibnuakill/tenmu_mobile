@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -70,7 +71,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       // Clear Places provider cache
-      Provider.of<PlacesProvider>(context, listen: false).fetchPlaces(force: true);
+      Provider.of<PlacesProvider>(
+        context,
+        listen: false,
+      ).fetchPlaces(force: true);
 
       // Clear image cache
       PaintingBinding.instance.imageCache.clear();
@@ -108,183 +112,244 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _confirmLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Yakin ingin logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await Supabase.instance.client.auth.signOut();
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
     final user = Supabase.instance.client.auth.currentUser;
 
-    return Scaffold(
-      backgroundColor: theme.bgBase,
-      appBar: AppBar(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        systemNavigationBarColor: Color(0xFF1E1E1E),
+        systemNavigationBarIconBrightness: Brightness.light,
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: theme.isDarkMode
+            ? Brightness.light
+            : Brightness.dark,
+      ),
+      child: Scaffold(
         backgroundColor: theme.bgBase,
-        elevation: 0,
-        title: Text(
-          'Pengaturan',
-          style: TextStyle(
-            color: theme.textPrimary,
-            fontWeight: FontWeight.w800,
-            fontSize: 20,
+        appBar: AppBar(
+          backgroundColor: theme.bgBase,
+          elevation: 0,
+          title: Text(
+            'Pengaturan',
+            style: TextStyle(
+              color: theme.textPrimary,
+              fontWeight: FontWeight.w800,
+              fontSize: 20,
+            ),
+          ),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_rounded, color: theme.textPrimary),
+            onPressed: () => Navigator.pop(context),
           ),
         ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: theme.textPrimary),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── TAMPILAN ────────────────────────────────────────────────
-            _SectionHeader(title: 'Tampilan', theme: theme),
-            const SizedBox(height: 8),
-            _SettingsCard(
-              theme: theme,
-              children: [_ThemeModeTile(theme: theme)],
-            ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── TAMPILAN ────────────────────────────────────────────────
+              _SectionHeader(title: 'Tampilan', theme: theme),
+              const SizedBox(height: 8),
+              _SettingsCard(
+                theme: theme,
+                children: [_ThemeModeTile(theme: theme)],
+              ),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // ── NOTIFIKASI ──────────────────────────────────────────────
-            _SectionHeader(title: 'Notifikasi', theme: theme),
-            const SizedBox(height: 8),
-            _SettingsCard(
-              theme: theme,
-              children: [
-                _SwitchTile(
-                  icon: Icons.campaign_outlined,
-                  iconColor: const Color(0xFFFF9800),
-                  title: 'Promosi & Penawaran',
-                  subtitle: 'Dapatkan info promo dari UMKM',
-                  value: _notifikasiPromo,
-                  onChanged: (v) {
-                    setState(() => _notifikasiPromo = v);
-                    _savePreference('notif_promo', v);
-                  },
-                  theme: theme,
-                ),
-                Divider(color: theme.border, height: 1, indent: 56),
-                _SwitchTile(
-                  icon: Icons.store_outlined,
-                  iconColor: const Color(0xFF4CAF50),
-                  title: 'UMKM Baru',
-                  subtitle: 'Notifikasi saat UMKM baru muncul',
-                  value: _notifikasiUmkmBaru,
-                  onChanged: (v) {
-                    setState(() => _notifikasiUmkmBaru = v);
-                    _savePreference('notif_umkm_baru', v);
-                  },
-                  theme: theme,
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── UMUM ────────────────────────────────────────────────────
-            _SectionHeader(title: 'Umum', theme: theme),
-            const SizedBox(height: 8),
-            _SettingsCard(
-              theme: theme,
-              children: [
-                _DropdownTile(
-                  icon: Icons.straighten_outlined,
-                  iconColor: const Color(0xFF2196F3),
-                  title: 'Satuan Jarak',
-                  subtitle: _satuanJarak == 'km'
-                      ? 'Kilometer (km)'
-                      : 'Mil (mi)',
-                  theme: theme,
-                  onTap: () {
-                    _showDistanceUnitPicker(context, theme);
-                  },
-                ),
-                Divider(color: theme.border, height: 1, indent: 56),
-                _ActionTile(
-                  icon: Icons.cached_rounded,
-                  iconColor: const Color(0xFF9C27B0),
-                  title: 'Bersihkan Cache',
-                  subtitle: 'Hapus data cache & gambar tersimpan',
-                  isLoading: _isClearing,
-                  theme: theme,
-                  onTap: () => _clearCache(context),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── AKUN & LAINNYA ──────────────────────────────────────────
-            _SectionHeader(title: 'Lainnya', theme: theme),
-            const SizedBox(height: 8),
-            _SettingsCard(
-              theme: theme,
-              children: [
-                if (user != null) ...[
-                  _NavigationTile(
-                    icon: Icons.person_outline_rounded,
-                    iconColor: const Color(0xFF00BCD4),
-                    title: 'Pengaturan Akun',
-                    subtitle: 'Ubah nama, foto profil, dan password',
-                    theme: theme,
-                    onTap: () {
-                      if (_userRole == UserRole.superadmin ||
-                          _userRole == UserRole.owner) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const AdminProfileScreen(),
-                          ),
-                        );
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ProfileSettingsScreen(),
-                          ),
-                        );
-                      }
+              // ── NOTIFIKASI ──────────────────────────────────────────────
+              _SectionHeader(title: 'Notifikasi', theme: theme),
+              const SizedBox(height: 8),
+              _SettingsCard(
+                theme: theme,
+                children: [
+                  _SwitchTile(
+                    icon: Icons.campaign_outlined,
+                    iconColor: const Color(0xFFFF9800),
+                    title: 'Promosi & Penawaran',
+                    subtitle: 'Dapatkan info promo dari UMKM',
+                    value: _notifikasiPromo,
+                    onChanged: (v) {
+                      setState(() => _notifikasiPromo = v);
+                      _savePreference('notif_promo', v);
                     },
+                    theme: theme,
                   ),
                   Divider(color: theme.border, height: 1, indent: 56),
-                ],
-                _NavigationTile(
-                  icon: Icons.info_outline_rounded,
-                  iconColor: const Color(0xFF607D8B),
-                  title: 'Tentang Aplikasi',
-                  subtitle: 'Versi, teknologi, dan informasi lainnya',
-                  theme: theme,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AboutScreen()),
-                    );
-                  },
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 40),
-
-            // ── APP VERSION ─────────────────────────────────────────────
-            Center(
-              child: Column(
-                children: [
-                  Text(
-                    'TenMu v1.0.0',
-                    style: TextStyle(
-                      color: theme.textHint,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  _SwitchTile(
+                    icon: Icons.store_outlined,
+                    iconColor: const Color(0xFF4CAF50),
+                    title: 'UMKM Baru',
+                    subtitle: 'Notifikasi saat UMKM baru muncul',
+                    value: _notifikasiUmkmBaru,
+                    onChanged: (v) {
+                      setState(() => _notifikasiUmkmBaru = v);
+                      _savePreference('notif_umkm_baru', v);
+                    },
+                    theme: theme,
                   ),
                 ],
               ),
-            ),
 
-            const SizedBox(height: 24),
-          ],
+              const SizedBox(height: 24),
+
+              // ── UMUM ────────────────────────────────────────────────────
+              _SectionHeader(title: 'Umum', theme: theme),
+              const SizedBox(height: 8),
+              _SettingsCard(
+                theme: theme,
+                children: [
+                  _DropdownTile(
+                    icon: Icons.straighten_outlined,
+                    iconColor: const Color(0xFF2196F3),
+                    title: 'Satuan Jarak',
+                    subtitle: _satuanJarak == 'km'
+                        ? 'Kilometer (km)'
+                        : 'Mil (mi)',
+                    theme: theme,
+                    onTap: () {
+                      _showDistanceUnitPicker(context, theme);
+                    },
+                  ),
+                  Divider(color: theme.border, height: 1, indent: 56),
+                  _ActionTile(
+                    icon: Icons.cached_rounded,
+                    iconColor: const Color(0xFF9C27B0),
+                    title: 'Bersihkan Cache',
+                    subtitle: 'Hapus data cache & gambar tersimpan',
+                    isLoading: _isClearing,
+                    theme: theme,
+                    onTap: () => _clearCache(context),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── AKUN & LAINNYA ──────────────────────────────────────────
+              _SectionHeader(title: 'Lainnya', theme: theme),
+              const SizedBox(height: 8),
+              _SettingsCard(
+                theme: theme,
+                children: [
+                  if (user != null) ...[
+                    _NavigationTile(
+                      icon: Icons.person_outline_rounded,
+                      iconColor: const Color(0xFF00BCD4),
+                      title: 'Pengaturan Akun',
+                      subtitle: 'Ubah nama, foto profil, dan password',
+                      theme: theme,
+                      onTap: () {
+                        if (_userRole == UserRole.superadmin ||
+                            _userRole == UserRole.owner) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AdminProfileScreen(),
+                            ),
+                          );
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ProfileSettingsScreen(),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    Divider(color: theme.border, height: 1, indent: 56),
+                  ],
+                  _NavigationTile(
+                    icon: Icons.info_outline_rounded,
+                    iconColor: const Color(0xFF607D8B),
+                    title: 'Tentang Aplikasi',
+                    subtitle: 'Versi, teknologi, dan informasi lainnya',
+                    theme: theme,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AboutScreen()),
+                      );
+                    },
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 40),
+
+              // ── APP VERSION ─────────────────────────────────────────────
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: _confirmLogout,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.logout_rounded),
+                  label: const Text(
+                    'Logout',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── APP VERSION ─────────────────────────────────────────────
+              Center(
+                child: Column(
+                  children: [
+                    Text(
+                      'TenMu v1.0.0',
+                      style: TextStyle(
+                        color: theme.textHint,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );

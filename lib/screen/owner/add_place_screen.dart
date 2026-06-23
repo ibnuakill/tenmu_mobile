@@ -3,7 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
-import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -12,6 +13,7 @@ import '../../core/location_permission_helper.dart';
 import '../../core/poi_category.dart';
 import '../../core/poi_facility.dart';
 import '../../core/poi_image_helper.dart';
+import '../../core/geocoding_service.dart';
 
 class AddPlaceScreen extends StatefulWidget {
   const AddPlaceScreen({super.key});
@@ -33,8 +35,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   final _jamBukaController = TextEditingController();
   final _jamTutupController = TextEditingController();
 
-  final _minPriceController = TextEditingController();
-  final _maxPriceController = TextEditingController();
   String _selectedCategory = PoiCategory.lainnya; // Default category
   final Set<String> _selectedFacilities = {};
 
@@ -317,6 +317,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         _lngController.text = position.longitude.toString();
       });
 
+      // Reverse geocode otomatis
+      _autoFillAddress(position.latitude, position.longitude);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -339,6 +342,19 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     }
   }
 
+  Future<void> _autoFillAddress(double lat, double lng) async {
+    try {
+      final alamat = await GeocodingService.reverse(lat, lng);
+      if (alamat != null && mounted) {
+        setState(() {
+          if (_alamatController.text.isEmpty) {
+            _alamatController.text = alamat;
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
   Future<void> _bukaPetaPilihLokasi() async {
     LatLng center;
     if (_latController.text.isNotEmpty && _lngController.text.isNotEmpty) {
@@ -350,7 +366,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     }
 
     LatLng? pickedLocation = center;
-    MapLibreMapController? mapCtrl;
+    final mapController = MapController();
 
     await showDialog(
       context: context,
@@ -369,31 +385,45 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                   width: double.infinity,
                   child: Stack(
                     children: [
-                      MapLibreMap(
-                        styleString: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
-                        initialCameraPosition: CameraPosition(
-                          target: center,
-                          zoom: 15.0,
+                      FlutterMap(
+                        mapController: mapController,
+                        options: MapOptions(
+                          initialCenter: center,
+                          initialZoom: 15.0,
+                          minZoom: 4,
+                          maxZoom: 22,
+                          onTap: (tapPos, latlng) {
+                            setStateDialog(() {
+                              pickedLocation = latlng;
+                            });
+                            // Pin shown via rebuild with marker
+                          },
+                          interactionOptions: const InteractionOptions(
+                            flags: InteractiveFlag.all,
+                          ),
                         ),
-                        onMapCreated: (controller) {
-                          mapCtrl = controller;
-                        },
-                        onStyleLoadedCallback: () {
-                          if (mapCtrl != null) _placePin(mapCtrl!, center);
-                        },
-                        onMapClick: (point, latlng) {
-                          setStateDialog(() {
-                            pickedLocation = latlng;
-                          });
-                          _placePin(mapCtrl!, latlng);
-                        },
-                        compassEnabled: true,
-                        logoEnabled: false,
-                        myLocationEnabled: false,
-                        attributionButtonPosition:
-                            AttributionButtonPosition.bottomRight,
-                        minMaxZoomPreference:
-                            const MinMaxZoomPreference(4.0, 22.0),
+                        children: [
+                          TileLayer(
+                            urlTemplate:
+                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.tenmu.app',
+                          ),
+                          if (pickedLocation != null)
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: pickedLocation!,
+                                  width: 40,
+                                  height: 40,
+                                  child: const Icon(
+                                    Icons.location_on,
+                                    color: Colors.red,
+                                    size: 40,
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
                       ),
                       // My-location button
                       Positioned(
@@ -431,13 +461,11 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                                     ),
                                   );
                               if (!context.mounted) return;
-                              final newLoc =
-                                  LatLng(position.latitude, position.longitude);
-                              mapCtrl?.animateCamera(
-                                CameraUpdate.newLatLngZoom(newLoc, 16.0),
+                              final newLoc = LatLng(
+                                position.latitude,
+                                position.longitude,
                               );
-                              mapCtrl?.clearCircles();
-                              _placePin(mapCtrl!, newLoc);
+                              mapController.move(newLoc, 16.0);
                               setStateDialog(() {
                                 pickedLocation = newLoc;
                               });
@@ -526,10 +554,12 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     ).then((result) {
       if (!mounted) return;
       if (result != null && result is LatLng) {
+        final latLng = result;
         setState(() {
-          _latController.text = result.latitude.toString();
-          _lngController.text = result.longitude.toString();
+          _latController.text = latLng.latitude.toString();
+          _lngController.text = latLng.longitude.toString();
         });
+        _autoFillAddress(latLng.latitude, latLng.longitude);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Lokasi berhasil dipilih dari peta! 🗺️✅'),
@@ -560,17 +590,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final minPrice =
-          int.tryParse(
-            _minPriceController.text.replaceAll(RegExp(r'[^0-9]'), ''),
-          ) ??
-          0;
-      final maxPrice =
-          int.tryParse(
-            _maxPriceController.text.replaceAll(RegExp(r'[^0-9]'), ''),
-          ) ??
-          100000;
-
       await Supabase.instance.client.from('places').insert({
         'owner_id': Supabase.instance.client.auth.currentUser?.id,
         'nama_tempat': _namaController.text.trim(),
@@ -592,8 +611,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
             ? _jamTutupController.text.trim()
             : null,
         'category': _selectedCategory,
-        'min_price': minPrice,
-        'max_price': maxPrice,
         'is_featured': false,
         'verification_status': 'pending',
         'fasilitas': _selectedFacilities.toList(),
@@ -681,7 +698,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Galeri UMKM',
+          'Galeri Foto',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
@@ -835,19 +852,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     );
   }
 
-  void _placePin(MapLibreMapController ctrl, LatLng loc) {
-    ctrl.addCircle(
-      CircleOptions(
-        geometry: loc,
-        circleColor: '#FF0000',
-        circleRadius: 12,
-        circleStrokeColor: '#FFFFFF',
-        circleStrokeWidth: 3,
-        circleOpacity: 0.9,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
@@ -865,425 +869,410 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         elevation: 0,
         iconTheme: IconThemeData(color: theme.textPrimary),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _darkField(
-                controller: _namaController,
-                label: 'Nama Tempat',
-                hint: 'Contoh: Kopi Kenangan Merdeka',
-                icon: Icons.storefront_outlined,
-              ),
-              const SizedBox(height: 12),
-              _darkField(
-                controller: _alamatController,
-                label: 'Alamat Lengkap',
-                hint: 'Contoh: Jl. Merdeka No. 12, Bandung',
-                icon: Icons.location_on_outlined,
-                maxLines: 2,
-              ),
-              const SizedBox(height: 12),
-              _darkField(
-                controller: _deskripsiController,
-                label: 'Deskripsi Singkat',
-                hint: 'Ceritakan keunikan tempat ini...',
-                icon: Icons.description_outlined,
-                maxLines: 3,
-              ),
-              const SizedBox(height: 12),
-              _darkField(
-                controller: _nomorTeleponController,
-                label: 'Nomor Telepon / WhatsApp',
-                hint: 'Contoh: 081234567890',
-                icon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 12),
-              // ── Jam Operasional ──
-              Row(
-                children: [
-                  Expanded(
-                    child: _darkField(
-                      controller: _jamBukaController,
-                      label: 'Jam Buka',
-                      hint: '08:00',
-                      icon: Icons.access_time,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          Icons.schedule,
-                          color: theme.iconColor,
-                          size: 20,
-                        ),
-                        onPressed: () async {
-                          final picked = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay.now(),
-                          );
-                          if (picked != null) {
-                            setState(() {
-                              _jamBukaController.text =
-                                  '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
-                            });
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _darkField(
-                      controller: _jamTutupController,
-                      label: 'Jam Tutup',
-                      hint: '22:00',
-                      icon: Icons.access_time_filled,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          Icons.schedule,
-                          color: theme.iconColor,
-                          size: 20,
-                        ),
-                        onPressed: () async {
-                          final picked = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay.now(),
-                          );
-                          if (picked != null) {
-                            setState(() {
-                              _jamTutupController.text =
-                                  '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
-                            });
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _buildImageSection(theme),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _isUploadingImage ? null : _pickAndUploadImage,
-                  icon: _isUploadingImage
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: theme.textSecondary,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _darkField(
+                  controller: _namaController,
+                  label: 'Nama Tempat',
+                  hint: 'Contoh: Kopi Kenangan Merdeka',
+                  icon: Icons.storefront_outlined,
+                ),
+                const SizedBox(height: 12),
+                _darkField(
+                  controller: _alamatController,
+                  label: 'Alamat Lengkap',
+                  hint: 'Contoh: Jl. Merdeka No. 12, Bandung',
+                  icon: Icons.location_on_outlined,
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 12),
+                _darkField(
+                  controller: _deskripsiController,
+                  label: 'Deskripsi Singkat',
+                  hint: 'Ceritakan keunikan tempat ini...',
+                  icon: Icons.description_outlined,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 12),
+                _darkField(
+                  controller: _nomorTeleponController,
+                  label: 'Nomor Telepon / WhatsApp',
+                  hint: 'Contoh: 081234567890',
+                  icon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 12),
+                // ── Jam Operasional ──
+                Row(
+                  children: [
+                    Expanded(
+                      child: _darkField(
+                        controller: _jamBukaController,
+                        label: 'Jam Buka',
+                        hint: '08:00',
+                        icon: Icons.access_time,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            Icons.schedule,
+                            color: theme.iconColor,
+                            size: 20,
                           ),
-                        )
-                      : Icon(
-                          Icons.photo_library_outlined,
-                          size: 18,
-                          color: theme.iconColor,
-                        ),
-                  label: Text(
-                    _isUploadingImage
-                        ? 'Mengunggah Gambar...'
-                        : 'Upload Foto Tempat / Menu / Pricelist',
-                    style: TextStyle(color: theme.textSecondary, fontSize: 14),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: theme.border),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16.0),
-                child: Divider(color: theme.border),
-              ),
-
-              Text(
-                'Kategori & Harga',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: theme.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // ── Dropdown Kategori ──
-              DropdownButtonFormField<String>(
-                initialValue: _selectedCategory,
-                dropdownColor: theme.bgSurface,
-                style: TextStyle(color: theme.textPrimary, fontSize: 15),
-                decoration: InputDecoration(
-                  labelText: 'Kategori Tempat',
-                  labelStyle: TextStyle(
-                    color: theme.textSecondary,
-                    fontSize: 13,
-                  ),
-                  prefixIcon: Icon(
-                    Icons.category_outlined,
-                    color: theme.iconColor,
-                    size: 20,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: theme.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: theme.borderFocus, width: 2),
-                  ),
-                ),
-                items: PoiCategory.allCategories.map((category) {
-                  return DropdownMenuItem(
-                    value: category,
-                    child: Row(
-                      children: [
-                        Text(PoiCategory.getCategoryEmoji(category)),
-                        const SizedBox(width: 8),
-                        Text(category),
-                      ],
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    if (value != null) _selectedCategory = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-
-              // ── Rentang Harga ──
-              Row(
-                children: [
-                  Expanded(
-                    child: _darkField(
-                      controller: _minPriceController,
-                      label: 'Harga Termurah',
-                      hint: '10000',
-                      icon: Icons.payments_outlined,
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _darkField(
-                      controller: _maxPriceController,
-                      label: 'Harga Termahal',
-                      hint: '100000',
-                      icon: Icons.payments_outlined,
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                ],
-              ),
-
-              // ── Fasilitas ──
-              const SizedBox(height: 16),
-              Text(
-                'Fasilitas',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: theme.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: PoiFacility.all.map((f) {
-                  final selected = _selectedFacilities.contains(f.id);
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        if (selected) {
-                          _selectedFacilities.remove(f.id);
-                        } else {
-                          _selectedFacilities.add(f.id);
-                        }
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: selected ? theme.btnPrimary : theme.bgElevated,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: selected ? theme.btnPrimary : theme.border,
+                          onPressed: () async {
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime: TimeOfDay.now(),
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                _jamBukaController.text =
+                                    '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                              });
+                            }
+                          },
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            f.icon,
-                            size: 16,
-                            color: selected ? theme.btnLabel : theme.iconColor,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _darkField(
+                        controller: _jamTutupController,
+                        label: 'Jam Tutup',
+                        hint: '22:00',
+                        icon: Icons.access_time_filled,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            Icons.schedule,
+                            color: theme.iconColor,
+                            size: 20,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            f.label,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: selected
-                                  ? theme.btnLabel
-                                  : theme.textPrimary,
+                          onPressed: () async {
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime: TimeOfDay.now(),
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                _jamTutupController.text =
+                                    '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildImageSection(theme),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _isUploadingImage ? null : _pickAndUploadImage,
+                    icon: _isUploadingImage
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.textSecondary,
                             ),
+                          )
+                        : Icon(
+                            Icons.photo_library_outlined,
+                            size: 18,
+                            color: theme.iconColor,
                           ),
+                    label: Text(
+                      _isUploadingImage
+                          ? 'Mengunggah Gambar...'
+                          : 'Upload Foto Tempat / Menu / Pricelist',
+                      style: TextStyle(
+                        color: theme.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: theme.border),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  child: Divider(color: theme.border),
+                ),
+
+                Text(
+                  'Kategori',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: theme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // ── Dropdown Kategori ──
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedCategory,
+                  dropdownColor: theme.bgSurface,
+                  style: TextStyle(color: theme.textPrimary, fontSize: 15),
+                  decoration: InputDecoration(
+                    labelText: 'Kategori Tempat',
+                    labelStyle: TextStyle(
+                      color: theme.textSecondary,
+                      fontSize: 13,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.category_outlined,
+                      color: theme.iconColor,
+                      size: 20,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: theme.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: theme.borderFocus,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                  items: PoiCategory.allCategories.map((category) {
+                    return DropdownMenuItem(
+                      value: category,
+                      child: Row(
+                        children: [
+                          Text(PoiCategory.getCategoryEmoji(category)),
+                          const SizedBox(width: 8),
+                          Text(category),
                         ],
                       ),
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16.0),
-                child: Divider(color: theme.border),
-              ),
-              Text(
-                'Lokasi Maps',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: theme.textPrimary,
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      if (value != null) _selectedCategory = value;
+                    });
+                  },
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _darkField(
-                controller: _searchController,
-                label: 'Cari Nama Tempat / Jalan (Gratis)',
-                hint: 'Contoh: Alun-alun Bandung',
-                icon: Icons.search,
-                suffixIcon: IconButton(
-                  icon: Icon(Icons.search, color: theme.iconColor),
-                  onPressed: _searchLocationOSM,
-                  tooltip: 'Cari Lokasi',
-                ),
-                onSubmitted: (_) => _searchLocationOSM(),
-              ),
-              const SizedBox(height: 12),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _getCurrentLocation,
-                  icon: Icon(Icons.my_location, color: theme.btnLabel),
-                  label: Text(
-                    'Dapatkan Lokasi Saat Ini (GPS)',
-                    style: TextStyle(color: theme.btnLabel),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.btnPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    elevation: 0,
+                // ── Fasilitas ──
+                const SizedBox(height: 16),
+                Text(
+                  'Fasilitas',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: theme.textPrimary,
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _bukaPetaPilihLokasi,
-                  icon: Icon(Icons.map_outlined, color: theme.iconColor),
-                  label: Text(
-                    'Pilih Manual dari Peta',
-                    style: TextStyle(color: theme.textSecondary),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: theme.border),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: _darkField(
-                      controller: _latController,
-                      label: 'Latitude',
-                      hint: '-6.917464',
-                      icon: Icons.my_location,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                        signed: true,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _darkField(
-                      controller: _lngController,
-                      label: 'Longitude',
-                      hint: '107.619123',
-                      icon: Icons.my_location,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                        signed: true,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _simpanData,
-                  icon: _isLoading
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: theme.btnLabel,
-                          ),
-                        )
-                      : Icon(
-                          Icons.check_rounded,
-                          color: theme.btnLabel,
-                          size: 20,
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: PoiFacility.all.map((f) {
+                    final selected = _selectedFacilities.contains(f.id);
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          if (selected) {
+                            _selectedFacilities.remove(f.id);
+                          } else {
+                            _selectedFacilities.add(f.id);
+                          }
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
                         ),
-                  label: Text(
-                    'Simpan Data',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: theme.btnLabel,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.btnPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
+                        decoration: BoxDecoration(
+                          color: selected ? theme.btnPrimary : theme.bgElevated,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: selected ? theme.btnPrimary : theme.border,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              f.icon,
+                              size: 16,
+                              color: selected
+                                  ? theme.btnLabel
+                                  : theme.iconColor,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              f.label,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: selected
+                                    ? theme.btnLabel
+                                    : theme.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  child: Divider(color: theme.border),
+                ),
+                Text(
+                  'Lokasi Maps',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: theme.textPrimary,
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+
+                _darkField(
+                  controller: _searchController,
+                  label: 'Cari Nama Tempat / Jalan',
+                  hint: 'Contoh: Alun-alun Bandung',
+                  icon: Icons.search,
+                  suffixIcon: IconButton(
+                    icon: Icon(Icons.search, color: theme.iconColor),
+                    onPressed: _searchLocationOSM,
+                    tooltip: 'Cari Lokasi',
+                  ),
+                  onSubmitted: (_) => _searchLocationOSM(),
+                ),
+                const SizedBox(height: 12),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _getCurrentLocation,
+                    icon: Icon(Icons.my_location, color: theme.btnLabel),
+                    label: Text(
+                      'Dapatkan Lokasi Saat Ini (GPS)',
+                      style: TextStyle(color: theme.btnLabel),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.btnPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _isLoading ? null : _bukaPetaPilihLokasi,
+                    icon: Icon(Icons.map_outlined, color: theme.iconColor),
+                    label: Text(
+                      'Pilih Manual dari Peta',
+                      style: TextStyle(color: theme.textSecondary),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: theme.border),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: _darkField(
+                        controller: _latController,
+                        label: 'Latitude',
+                        hint: '-6.917464',
+                        icon: Icons.my_location,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                          signed: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _darkField(
+                        controller: _lngController,
+                        label: 'Longitude',
+                        hint: '107.619123',
+                        icon: Icons.my_location,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                          signed: true,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _simpanData,
+                    icon: _isLoading
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.btnLabel,
+                            ),
+                          )
+                        : Icon(
+                            Icons.check_rounded,
+                            color: theme.btnLabel,
+                            size: 20,
+                          ),
+                    label: Text(
+                      'Simpan Data',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: theme.btnLabel,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.btnPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -16,7 +17,7 @@ Future<void> main() async {
 
   await Supabase.initialize(
     url: dotenv.env['SUPABASE_URL']!,
-    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    publishableKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
 
   // Menjalankan aplikasi
@@ -37,6 +38,16 @@ class TenMuApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: [
+      SystemUiOverlay.top,
+      SystemUiOverlay.bottom,
+    ]);
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      systemNavigationBarColor: Color(0xFF121212),
+      systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarDividerColor: Color(0xFF121212),
+      statusBarColor: Colors.transparent,
+    ));
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'TenMu',

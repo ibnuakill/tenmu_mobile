@@ -126,14 +126,18 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
         final openParts = jamBuka.split(':');
         final closeParts = jamTutup.split(':');
 
-        final openMinutes = int.parse(openParts[0]) * 60 + int.parse(openParts[1]);
-        final closeMinutes = int.parse(closeParts[0]) * 60 + int.parse(closeParts[1]);
+        final openMinutes =
+            int.parse(openParts[0]) * 60 + int.parse(openParts[1]);
+        final closeMinutes =
+            int.parse(closeParts[0]) * 60 + int.parse(closeParts[1]);
 
         if (closeMinutes < openMinutes) {
           // Buka melewati tengah malam
-          isOpen = currentMinutes >= openMinutes || currentMinutes <= closeMinutes;
+          isOpen =
+              currentMinutes >= openMinutes || currentMinutes <= closeMinutes;
         } else {
-          isOpen = currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
+          isOpen =
+              currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
         }
       } catch (_) {}
     }
@@ -343,7 +347,9 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: isActive ? theme.borderFocus : theme.border,
+                                  color: isActive
+                                      ? theme.borderFocus
+                                      : theme.border,
                                   width: isActive ? 2 : 1,
                                 ),
                               ),
@@ -405,9 +411,14 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
                         ),
                         const SizedBox(width: 12),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
-                            color: isOpen ? Colors.green.withValues(alpha: 0.2) : Colors.red.withValues(alpha: 0.2),
+                            color: isOpen
+                                ? Colors.green.withValues(alpha: 0.2)
+                                : Colors.red.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: isOpen ? Colors.green : Colors.red,
@@ -432,32 +443,34 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
                     spacing: 10,
                     runSpacing: 10,
                     children: PoiFacility.fromList(widget.place['fasilitas'])
-                        .map((f) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: theme.bgSurface,
-                                borderRadius: BorderRadius.circular(999),
-                                border: Border.all(color: theme.border),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(f.icon, size: 16, color: theme.btnPrimary),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    f.label,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: theme.textPrimary,
-                                    ),
+                        .map(
+                          (f) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.bgSurface,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: theme.border),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(f.icon, size: 16, color: theme.btnPrimary),
+                                const SizedBox(width: 6),
+                                Text(
+                                  f.label,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.textPrimary,
                                   ),
-                                ],
-                              ),
-                            ))
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
                         .toList(),
                   ),
 
@@ -476,7 +489,8 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    widget.place['deskripsi'] ?? 'Tidak ada deskripsi yang tersedia.',
+                    widget.place['deskripsi'] ??
+                        'Tidak ada deskripsi yang tersedia.',
                     style: TextStyle(
                       fontSize: 15,
                       height: 1.7,
@@ -496,23 +510,31 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
                           // Format nomor untuk WA (ganti 0 di awal dengan 62)
                           String formattedNumber = nomorTelepon;
                           if (formattedNumber.startsWith('0')) {
-                            formattedNumber = '62${formattedNumber.substring(1)}';
+                            formattedNumber =
+                                '62${formattedNumber.substring(1)}';
                           }
 
-                          final Uri waUri = Uri.parse('https://wa.me/$formattedNumber');
+                          final Uri waUri = Uri.parse(
+                            'https://wa.me/$formattedNumber',
+                          );
                           final Uri telUri = Uri.parse('tel:$nomorTelepon');
 
                           // Coba WA dulu, kalau gagal coba Telepon biasa
                           try {
                             if (await canLaunchUrl(waUri)) {
-                              await launchUrl(waUri, mode: LaunchMode.externalApplication);
+                              await launchUrl(
+                                waUri,
+                                mode: LaunchMode.externalApplication,
+                              );
                             } else if (await canLaunchUrl(telUri)) {
                               await launchUrl(telUri);
                             } else {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('Tidak dapat membuka WhatsApp atau Telepon untuk nomor $nomorTelepon'),
+                                    content: Text(
+                                      'Tidak dapat membuka WhatsApp atau Telepon untuk nomor $nomorTelepon',
+                                    ),
                                     backgroundColor: theme.snackError,
                                   ),
                                 );
@@ -535,7 +557,7 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
                           size: 20,
                         ),
                         label: Text(
-                          'Hubungi (WhatsApp / Telepon)',
+                          'WhatsApp',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -565,7 +587,8 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
                               builder: (_) => RouteMapScreen(
                                 destinationLat: lat,
                                 destinationLng: lng,
-                                destinationName: widget.place['nama_tempat'] ?? '',
+                                destinationName:
+                                    widget.place['nama_tempat'] ?? '',
                               ),
                             ),
                           );

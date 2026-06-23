@@ -11,6 +11,7 @@ import '../../core/location_permission_helper.dart';
 import 'poi_detail_screen.dart';
 import 'route_map_screen.dart';
 
+import '../owner/add_place_screen.dart';
 import 'widgets/category_filter_widget.dart';
 import 'widgets/sort_filter_widget.dart';
 import 'favorite_screen.dart';
@@ -103,6 +104,14 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onNavTap(int index) {
     if (index == _currentNavIndex) return;
     if (index == 2) {
+      // Add Place
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AddPlaceScreen()),
+      );
+      return;
+    }
+    if (index == 3) {
       // AI Chat — show bottom sheet
       showModalBottomSheet(
         context: context,
@@ -126,12 +135,12 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         );
-      case 3: // Favorite
+      case 4: // Favorite
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const FavoriteScreen()),
         );
-      case 4: // Profile
+      case 5: // Profile
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const SettingsScreen()),
@@ -447,9 +456,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final items = [
       ('Beranda', Icons.home_rounded, 0),
       ('Peta', Icons.map_rounded, 1),
-      ('AI', Icons.auto_awesome_rounded, 2),
-      ('Favorit', Icons.favorite_outline_rounded, 3),
-      ('Profil', Icons.person_rounded, 4),
+      ('Tambah', Icons.add_box_rounded, 2),
+      ('AI', Icons.auto_awesome_rounded, 3),
+      ('Favorit', Icons.favorite_outline_rounded, 4),
+      ('Profil', Icons.person_rounded, 5),
     ];
     return Container(
       decoration: BoxDecoration(
@@ -533,32 +543,29 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                    ),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: theme.bgElevated,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: theme.border),
-                        image: user?.userMetadata?['avatar_url'] != null
-                            ? DecorationImage(
-                                image: NetworkImage(
-                                  user!.userMetadata!['avatar_url'],
-                                ),
-                                fit: BoxFit.cover,
-                              )
-                            : null,
-                      ),
-                      child: user?.userMetadata?['avatar_url'] == null
-                          ? Icon(Icons.person_rounded,
-                              color: theme.textPrimary, size: 22)
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: theme.bgElevated,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: theme.border),
+                      image: user?.userMetadata?['avatar_url'] != null
+                          ? DecorationImage(
+                              image: NetworkImage(
+                                user!.userMetadata!['avatar_url'],
+                              ),
+                              fit: BoxFit.cover,
+                            )
                           : null,
                     ),
+                    child: user?.userMetadata?['avatar_url'] == null
+                        ? Icon(
+                            Icons.person_rounded,
+                            color: theme.textPrimary,
+                            size: 22,
+                          )
+                        : null,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -572,12 +579,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: TextField(
                         onChanged: (v) =>
                             setState(() => _searchQuery = v.toLowerCase()),
-                        style: TextStyle(color: theme.textPrimary, fontSize: 14),
+                        style: TextStyle(
+                          color: theme.textPrimary,
+                          fontSize: 14,
+                        ),
                         cursorColor: theme.borderFocus,
                         textAlignVertical: TextAlignVertical.center,
                         decoration: InputDecoration(
                           hintText: 'Cari tempat...',
-                          hintStyle: TextStyle(color: theme.textHint, fontSize: 13),
+                          hintStyle: TextStyle(
+                            color: theme.textHint,
+                            fontSize: 13,
+                          ),
                           prefixIcon: Icon(
                             Icons.search_rounded,
                             color: theme.iconColor,
@@ -593,8 +606,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
                                     color: _hasActiveFilters
-                                        ? theme.btnPrimary
-                                            .withValues(alpha: 0.1)
+                                        ? theme.btnPrimary.withValues(
+                                            alpha: 0.1,
+                                          )
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
@@ -676,41 +690,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.fromLTRB(20, 0, 20, 80),
                             children: [
-                              if (isIdle)
-                                const SizedBox.shrink(),
+                              if (isIdle) const SizedBox.shrink(),
                               _buildFeaturedSection(
                                 theme,
                                 featured,
                                 placesProvider,
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.grid_view_rounded,
-                                      size: 18,
-                                      color: theme.btnPrimary,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Semua Tempat',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                        color: theme.textPrimary,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Text(
-                                      '${allPlaces.length} tempat',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: theme.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
                               ),
                               ...allPlaces.map(
                                 (place) => _PlaceCard(
@@ -982,13 +966,45 @@ class _PlaceCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    place['nama_tempat'] ?? 'Tanpa Nama',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: theme.textPrimary,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          place['nama_tempat'] ?? 'Tanpa Nama',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: theme.textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (place['verification_status'] == 'verified' && place['owner_id'] != null)
+                        Container(
+                          margin: const EdgeInsets.only(left: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1B8132),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.verified, size: 11, color: Colors.white),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Owner',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   if (place['deskripsi'] != null)

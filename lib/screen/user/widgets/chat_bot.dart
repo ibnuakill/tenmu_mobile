@@ -204,6 +204,7 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final bottomPad = MediaQuery.of(context).padding.bottom;
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.72,
@@ -317,7 +318,7 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
 
           // ── Input ───────────────────────────────────────────
           Container(
-            padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + bottomInset),
+            padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + bottomInset + (bottomPad > 0 ? bottomPad : 12)),
             decoration: BoxDecoration(
               color: theme.bgSurface,
               border: Border(top: BorderSide(color: theme.border)),
