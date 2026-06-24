@@ -21,7 +21,7 @@ enum TravelMode {
   car;
 
   String get osrmProfile => switch (this) {
-    TravelMode.walking => 'foot',
+    TravelMode.walking => 'walking',
     TravelMode.motorcycle => 'driving',
     TravelMode.car => 'driving',
   };
@@ -402,7 +402,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
   /// Fetch OSRM route — returns points, distance, duration.
   Future<(List<LatLng> points, double distanceM, double durationS)?>
-  _fetchRoute(Position position, {int retry = 2}) async {
+  _fetchRoute(Position position, {int retry = 1}) async {
     if (_destinationLat == null || _destinationLng == null) return null;
 
     String profileUrl(String baseUrl) {
@@ -413,7 +413,12 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           TravelMode.motorcycle => 'car',
           TravelMode.car => 'car',
         };
-        return 'https://routing.openstreetmap.de/routed-$sub/route/v1/$profile';
+        final osmProfile = switch (_travelMode) {
+          TravelMode.walking => 'foot',
+          TravelMode.motorcycle => 'driving',
+          TravelMode.car => 'driving',
+        };
+        return 'https://routing.openstreetmap.de/routed-$sub/route/v1/$osmProfile';
       }
       return '$baseUrl/$profile';
     }
@@ -433,7 +438,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           );
           final response = await http
               .get(url)
-              .timeout(const Duration(seconds: 12));
+              .timeout(const Duration(seconds: 6));
           if (response.statusCode == 200) {
             final data = json.decode(response.body);
             final code = data['code'] as String?;
@@ -639,7 +644,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
             _destinationLng!,
           );
           _distanceInKm = distanceMeters / 1000;
-          _estimatedTimeInMins = (durationSeconds / 60).round();
+          _estimatedTimeInMins =
+              ((distanceMeters / 1000) / _travelMode.speedKmh * 60).round();
           _useFallback = false;
           _isLoading = false;
           _hasArrived = false;

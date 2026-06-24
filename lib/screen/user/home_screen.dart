@@ -14,7 +14,6 @@ import 'route_map_screen.dart';
 import '../owner/add_place_screen.dart';
 import 'widgets/category_filter_widget.dart';
 import 'widgets/sort_filter_widget.dart';
-import 'favorite_screen.dart';
 import '../../core/haversine.dart';
 import 'widgets/chat_bot.dart';
 
@@ -102,17 +101,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onNavTap(int index) {
-    if (index == _currentNavIndex) return;
+    if (index == _currentNavIndex && index != 0) return;
+    if (index == 0) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      setState(() => _currentNavIndex = 0);
+      return;
+    }
     if (index == 2) {
-      // Add Place
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const AddPlaceScreen()),
-      );
+      ).then((_) {
+        if (mounted) setState(() => _currentNavIndex = 0);
+      });
       return;
     }
     if (index == 3) {
-      // AI Chat — show bottom sheet
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -123,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     setState(() => _currentNavIndex = index);
     switch (index) {
-      case 1: // Map
+      case 1:
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -134,17 +138,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ).placesList,
             ),
           ),
-        );
-      case 4: // Favorite
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const FavoriteScreen()),
-        );
-      case 5: // Profile
+        ).then((_) {
+          if (mounted) setState(() => _currentNavIndex = 0);
+        });
+      case 4:
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const SettingsScreen()),
-        );
+        ).then((_) {
+          if (mounted) setState(() => _currentNavIndex = 0);
+        });
     }
   }
 
@@ -453,73 +456,101 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ── Bottom Nav Bar ──
   Widget _bottomNav(ThemeProvider theme) {
-    final items = [
-      ('Beranda', Icons.home_rounded, 0),
-      ('Peta', Icons.map_rounded, 1),
-      ('Tambah', Icons.add_box_rounded, 2),
-      ('AI', Icons.auto_awesome_rounded, 3),
-      ('Favorit', Icons.favorite_outline_rounded, 4),
-      ('Profil', Icons.person_rounded, 5),
-    ];
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.bgSurface,
-        border: Border(top: BorderSide(color: theme.border, width: 0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, -4),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: theme.bgSurface,
+            border: Border(top: BorderSide(color: theme.border, width: 0.5)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 12,
+                offset: const Offset(0, -4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: items.map((item) {
-              final active = item.$3 == _currentNavIndex;
-              return GestureDetector(
-                onTap: () => _onNavTap(item.$3),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: active
-                        ? theme.btnPrimary.withValues(alpha: 0.1)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        item.$2,
-                        size: 20,
-                        color: active ? theme.btnPrimary : theme.iconColor,
-                      ),
-                      if (active) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          item.$1,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: theme.btnPrimary,
-                          ),
-                        ),
-                      ],
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _navIcon(theme, Icons.home_rounded, 0),
+                  _navIcon(theme, Icons.map_rounded, 1),
+                  const SizedBox(width: 56),
+                  _navIcon(theme, Icons.auto_awesome_rounded, 3),
+                  _navIcon(theme, Icons.person_rounded, 4),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: -24,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: GestureDetector(
+              onTap: () => _onNavTap(2),
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      theme.btnPrimary,
+                      theme.btnPrimary.withValues(alpha: 0.8),
                     ],
                   ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.btnPrimary.withValues(alpha: 0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-              );
-            }).toList(),
+                child: Icon(
+                  Icons.add,
+                  color: theme.btnLabel,
+                  size: 28,
+                ),
+              ),
+            ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _navIcon(ThemeProvider theme, IconData icon, int index) {
+    final active = index == _currentNavIndex;
+    return GestureDetector(
+      onTap: () => _onNavTap(index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: active
+              ? theme.btnPrimary.withValues(alpha: 0.1)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          icon,
+          size: 22,
+          color: active ? theme.btnPrimary : theme.iconColor,
         ),
       ),
     );

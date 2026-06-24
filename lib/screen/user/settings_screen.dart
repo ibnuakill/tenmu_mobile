@@ -8,6 +8,7 @@ import '../../core/places_provider.dart';
 import '../../core/user_role.dart';
 import '../admin/admin_profile_screen.dart';
 import 'about_screen.dart';
+import 'favorite_screen.dart';
 import 'profile_settings_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -289,6 +290,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     Divider(color: theme.border, height: 1, indent: 56),
                   ],
+                  _NavigationTile(
+                    icon: Icons.favorite_outline_rounded,
+                    iconColor: const Color(0xFFE91E63),
+                    title: 'Favorit Saya',
+                    subtitle: 'Lihat UMKM yang kamu simpan',
+                    theme: theme,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const FavoriteScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  Divider(color: theme.border, height: 1, indent: 56),
                   _NavigationTile(
                     icon: Icons.info_outline_rounded,
                     iconColor: const Color(0xFF607D8B),

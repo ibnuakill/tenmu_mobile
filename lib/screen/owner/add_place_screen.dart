@@ -883,6 +883,117 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                   icon: Icons.storefront_outlined,
                 ),
                 const SizedBox(height: 12),
+
+                Container(
+                  decoration: BoxDecoration(
+                    color: theme.bgSurface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: theme.border),
+                  ),
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Lokasi Tempat',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: theme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _darkField(
+                        controller: _searchController,
+                        label: 'Cari Nama Tempat / Jalan',
+                        hint: 'Contoh: Alun-alun Bandung',
+                        icon: Icons.search,
+                        suffixIcon: IconButton(
+                          icon: Icon(Icons.search, color: theme.iconColor),
+                          onPressed: _searchLocationOSM,
+                          tooltip: 'Cari Lokasi',
+                        ),
+                        onSubmitted: (_) => _searchLocationOSM(),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 42,
+                              child: ElevatedButton.icon(
+                                onPressed: _isLoading ? null : _getCurrentLocation,
+                                icon: Icon(Icons.my_location, size: 16, color: theme.btnLabel),
+                                label: Text(
+                                  'GPS',
+                                  style: TextStyle(color: theme.btnLabel, fontSize: 13),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: theme.btnPrimary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  elevation: 0,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: SizedBox(
+                              height: 42,
+                              child: OutlinedButton.icon(
+                                onPressed: _isLoading ? null : _bukaPetaPilihLokasi,
+                                icon: Icon(Icons.map_outlined, size: 16, color: theme.iconColor),
+                                label: Text(
+                                  'Peta Manual',
+                                  style: TextStyle(color: theme.textSecondary, fontSize: 13),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: theme.border),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _darkField(
+                              controller: _latController,
+                              label: 'Latitude',
+                              hint: '-6.917464',
+                              icon: Icons.my_location,
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                                signed: true,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _darkField(
+                              controller: _lngController,
+                              label: 'Longitude',
+                              hint: '107.619123',
+                              icon: Icons.my_location,
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                                signed: true,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 _darkField(
                   controller: _alamatController,
                   label: 'Alamat Lengkap',
@@ -1136,105 +1247,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                   }).toList(),
                 ),
 
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  child: Divider(color: theme.border),
-                ),
-                Text(
-                  'Lokasi Maps',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: theme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                _darkField(
-                  controller: _searchController,
-                  label: 'Cari Nama Tempat / Jalan',
-                  hint: 'Contoh: Alun-alun Bandung',
-                  icon: Icons.search,
-                  suffixIcon: IconButton(
-                    icon: Icon(Icons.search, color: theme.iconColor),
-                    onPressed: _searchLocationOSM,
-                    tooltip: 'Cari Lokasi',
-                  ),
-                  onSubmitted: (_) => _searchLocationOSM(),
-                ),
-                const SizedBox(height: 12),
-
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _getCurrentLocation,
-                    icon: Icon(Icons.my_location, color: theme.btnLabel),
-                    label: Text(
-                      'Dapatkan Lokasi Saat Ini (GPS)',
-                      style: TextStyle(color: theme.btnLabel),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.btnPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      elevation: 0,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: _isLoading ? null : _bukaPetaPilihLokasi,
-                    icon: Icon(Icons.map_outlined, color: theme.iconColor),
-                    label: Text(
-                      'Pilih Manual dari Peta',
-                      style: TextStyle(color: theme.textSecondary),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: theme.border),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: _darkField(
-                        controller: _latController,
-                        label: 'Latitude',
-                        hint: '-6.917464',
-                        icon: Icons.my_location,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _darkField(
-                        controller: _lngController,
-                        label: 'Longitude',
-                        hint: '107.619123',
-                        icon: Icons.my_location,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   height: 52,
