@@ -7,7 +7,7 @@ import 'admin_analytics_screen.dart';
 import 'manage_users_screen.dart';
 import 'manage_kategori_screen.dart';
 import 'verify_place_screen.dart';
-import 'manage_role_requests_screen.dart';
+
 
 class AdminHomeScreen extends StatelessWidget {
   const AdminHomeScreen({super.key});
@@ -195,34 +195,6 @@ class AdminHomeScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const VerifyPlaceScreen(),
-                      ),
-                    ),
-                    isPrimary: false,
-                  );
-                },
-              ),
-
-              const SizedBox(height: 12),
-
-              StreamBuilder<int>(
-                stream: _pendingCountStream(
-                  table: 'profiles',
-                  column: 'request_status',
-                  value: 'pending',
-                ),
-                builder: (context, snapshot) {
-                  final pendingCount = snapshot.data ?? 0;
-                  return _menuButton(
-                    context: context,
-                    theme: theme,
-                    icon: Icons.request_page_outlined,
-                    title: 'Permintaan Owner',
-                    subtitle: 'Lihat dan approve permintaan role owner',
-                    pendingCount: pendingCount,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ManageRoleRequestsScreen(),
                       ),
                     ),
                     isPrimary: false,

@@ -612,7 +612,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
             : null,
         'category': _selectedCategory,
         'is_featured': false,
-        'verification_status': 'pending',
         'fasilitas': _selectedFacilities.toList(),
       });
 

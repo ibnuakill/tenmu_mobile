@@ -23,6 +23,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   bool _isVerifying = false; // Track if user is in verification step
   bool _isCheckingVerification = false;
   String? _registeredEmail; // Store email for verification
+  String _selectedRole = 'user'; // Default role: user biasa
 
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
@@ -86,6 +87,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         data: {
           'full_name': _namaController.text.trim(),
           'nama': _namaController.text.trim(),
+          if (_selectedRole == 'owner') 'pending_role': 'owner',
         },
         emailRedirectTo: 'tenmu://login-callback',
       );
@@ -328,6 +330,36 @@ class _RegisterScreenState extends State<RegisterScreen>
                             () => _obscureConfirmPassword =
                                 !_obscureConfirmPassword,
                           ),
+                        ),
+                        const SizedBox(height: 18),
+
+                        // DIVIDER
+                        const Divider(color: AppColors.border, height: 1),
+                        const SizedBox(height: 18),
+
+                        // PILIH ROLE
+                        _label('Daftar Sebagai'),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _roleChip(
+                                icon: Icons.person_outline,
+                                label: 'User Biasa',
+                                isSelected: _selectedRole == 'user',
+                                onTap: () => setState(() => _selectedRole = 'user'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _roleChip(
+                                icon: Icons.storefront_outlined,
+                                label: 'Pemilik UMKM',
+                                isSelected: _selectedRole == 'owner',
+                                onTap: () => setState(() => _selectedRole = 'owner'),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 32),
 
@@ -693,6 +725,46 @@ class _RegisterScreenState extends State<RegisterScreen>
             color: AppColors.borderFocus,
             width: 1.5,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _roleChip({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.btnPrimary : AppColors.bgElevated,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.btnPrimary : AppColors.border,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? AppColors.btnLabel : AppColors.iconColor,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? AppColors.btnLabel : AppColors.textPrimary,
+              ),
+            ),
+          ],
         ),
       ),
     );

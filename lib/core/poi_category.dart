@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 
 class PoiCategory {
   static const String cafe = 'Cafe';
-  static const String tempatNongkrong = 'Tempat Nongkrong';
+  static const String fashion = 'Fashion';
   static const String wisata = 'Wisata';
   static const String kuliner = 'Kuliner';
   static const String hotel = 'Hotel';
@@ -16,7 +16,7 @@ class PoiCategory {
 
   static const List<String> allCategories = [
     cafe,
-    tempatNongkrong,
+    fashion,
     wisata,
     kuliner,
     hotel,
@@ -33,8 +33,8 @@ class PoiCategory {
     switch (category) {
       case cafe:
         return '☕';
-      case tempatNongkrong:
-        return '🛋️';
+      case fashion:
+        return '👗';
       case wisata:
         return '🏖️';
       case kuliner:
@@ -54,8 +54,8 @@ class PoiCategory {
     switch (category) {
       case cafe:
         return Icons.local_cafe_outlined;
-      case tempatNongkrong:
-        return Icons.weekend_outlined;
+      case fashion:
+        return Icons.checkroom_outlined;
       case wisata:
         return Icons.flight_outlined;
       case kuliner:

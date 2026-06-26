@@ -113,16 +113,14 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   static const Duration _rerouteCooldown = Duration(seconds: 15);
 
   static const Map<String, Color> _categoryColors = {
-    'Cafe': Color(0xFF8B4513),
-    'Warung': Color(0xFFE67E22),
-    'Restoran': Color(0xFFE74C3C),
-    'Bakery': Color(0xFFD4A017),
-    'Fashion': Color(0xFFE91E63),
-    'Elektronik': Color(0xFF2E86C1),
-    'Farmasi': Color(0xFF27AE60),
-    'Kecantikan': Color(0xFF8E44AD),
-    'Toko': Color(0xFFF39C12),
-    'Lainnya': Color(0xFF95A5A6),
+    'Cafe':             Color(0xFF8B4513),
+    'Fashion':          Color(0xFFE91E63),
+    'Wisata':           Color(0xFF2196F3),
+    'Kuliner':          Color(0xFFE74C3C),
+    'Hotel':            Color(0xFF1565C0),
+    'Oleh-Oleh':        Color(0xFFFF6F61),
+    'UMKM':             Color(0xFF4CAF50),
+    'Lainnya':          Color(0xFF95A5A6),
   };
 
   // =======================================================================
@@ -268,7 +266,11 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                     ),
                   ],
                 ),
-                child: const SizedBox.shrink(),
+                child: Icon(
+                  PoiCategory.getCategoryIcon(cat),
+                  color: Colors.white,
+                  size: isSelected ? 16 : 14,
+                ),
               ),
             ),
           ),

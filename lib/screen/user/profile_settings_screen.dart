@@ -15,17 +15,12 @@ class ProfileSettingsScreen extends StatefulWidget {
 class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   final _namaController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _requestMessageController = TextEditingController();
 
   bool _isLoading = false;
   bool _isUploadingImage = false;
-  bool _isRequestLoading = false;
   File? _selectedImage;
 
   String? _currentRole;
-  String? _requestStatus;
-  String? _requestMessage;
-  String? _requestHandledAt;
 
   @override
   void initState() {
@@ -33,86 +28,27 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     final user = Supabase.instance.client.auth.currentUser;
     _namaController.text =
         user?.userMetadata?['full_name'] ?? user?.userMetadata?['nama'] ?? '';
-    _loadProfileRequestInfo();
+    _loadRole();
   }
 
-  Future<void> _loadProfileRequestInfo() async {
+  Future<void> _loadRole() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
 
     try {
       final profileData = await Supabase.instance.client
           .from('profiles')
-          .select(
-            'role, request_status, request_message, request_created_at, request_handled_at, request_handled_by',
-          )
+          .select('role')
           .eq('id', user.id)
           .maybeSingle();
 
       if (profileData != null) {
         setState(() {
           _currentRole = profileData['role']?.toString();
-          _requestStatus = profileData['request_status']?.toString();
-          _requestMessage = profileData['request_message']?.toString();
-          _requestHandledAt = profileData['request_handled_at']?.toString();
         });
       }
     } catch (e) {
-      debugPrint('Failed to load request info: $e');
-    }
-  }
-
-  Future<void> _submitRoleRequest() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
-
-    if (_requestMessageController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tolong isi alasan permintaan terlebih dahulu.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isRequestLoading = true);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await Supabase.instance.client
-          .from('profiles')
-          .update({
-            'requested_role': 'owner',
-            'request_message': _requestMessageController.text.trim(),
-            'request_status': 'pending',
-            'request_created_at': DateTime.now().toIso8601String(),
-            'request_handled_by': null,
-            'request_handled_at': null,
-          })
-          .eq('id', user.id);
-
-      setState(() {
-        _requestStatus = 'pending';
-        _requestMessage = _requestMessageController.text.trim();
-      });
-
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Permintaan role owner berhasil dikirim. Tunggu verifikasi admin.',
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('Gagal mengirim permintaan: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _isRequestLoading = false);
+      debugPrint('Failed to load role: $e');
     }
   }
 
@@ -334,146 +270,49 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            if (_currentRole == 'user') ...[
-              if (_requestStatus == null || _requestStatus == 'rejected') ...[
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Ajukan permintaan menjadi pemilik UMKM',
+            // Role info
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Role Akun',
+                style: TextStyle(
+                  color: theme.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.bgSurface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: theme.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _currentRole == 'owner'
+                        ? Icons.storefront_outlined
+                        : Icons.person_outline,
+                    color: theme.iconColor,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    _currentRole == 'owner'
+                        ? 'Pemilik UMKM'
+                        : 'User Biasa',
                     style: TextStyle(
-                      color: theme.textSecondary,
-                      fontSize: 13,
+                      color: theme.textPrimary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _requestMessageController,
-                  maxLines: 3,
-                  style: TextStyle(color: theme.textPrimary),
-                  decoration: InputDecoration(
-                    labelText: 'Alasan Anda ingin jadi owner',
-                    labelStyle: TextStyle(color: theme.textSecondary),
-                    fillColor: theme.bgSurface,
-                    filled: true,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: theme.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: theme.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: theme.borderFocus),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _isRequestLoading ? null : _submitRoleRequest,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.btnPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isRequestLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
-                            'Ajukan Request Owner',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (_requestStatus == 'pending') ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: theme.bgSurface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: theme.border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Status Permintaan',
-                        style: TextStyle(
-                          color: theme.textPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Permintaan sedang menunggu verifikasi admin.',
-                        style: TextStyle(color: theme.textSecondary),
-                      ),
-                      if (_requestMessage != null &&
-                          _requestMessage!.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          'Pesan: $_requestMessage',
-                          style: TextStyle(color: theme.textSecondary),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (_requestStatus == 'rejected') ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFEBEE),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFB71C1C)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Permintaan Ditolak',
-                        style: TextStyle(
-                          color: const Color(0xFFB71C1C),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Alasan: ${_requestMessage ?? '-'}',
-                        style: TextStyle(color: const Color(0xFFB71C1C)),
-                      ),
-                      if (_requestHandledAt != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          'Diperbarui: $_requestHandledAt',
-                          style: TextStyle(
-                            color: const Color(0xFFB71C1C),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
               obscureText: true,

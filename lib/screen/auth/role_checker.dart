@@ -39,7 +39,23 @@ class _RoleCheckerState extends State<RoleChecker> {
       throw Exception('Profil user tidak ditemukan di tabel profiles.');
     }
 
-    return parseUserRole(response['role']);
+    final role = response['role']?.toString() ?? 'user';
+
+    // Auto-apply owner role jika user daftar sebagai owner
+    if (role == 'user' && user.userMetadata?['pending_role'] == 'owner') {
+      await Supabase.instance.client
+          .from('profiles')
+          .update({'role': 'owner'})
+          .eq('id', user.id);
+
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(data: {'pending_role': null}),
+      );
+
+      return parseUserRole('owner');
+    }
+
+    return parseUserRole(role);
   }
 
   void _reloadRole() {
