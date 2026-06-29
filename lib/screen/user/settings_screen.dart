@@ -7,6 +7,8 @@ import '../../core/theme_provider.dart';
 import '../../core/places_provider.dart';
 import '../../core/user_role.dart';
 import '../admin/admin_profile_screen.dart';
+import '../owner/manage_place_screen.dart';
+import '../owner/add_place_screen.dart';
 import 'about_screen.dart';
 import 'favorite_screen.dart';
 import 'profile_settings_screen.dart';
@@ -262,6 +264,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _SettingsCard(
                 theme: theme,
                 children: [
+                  // ── Owner Management (khusus owner) ──
+                  if (_userRole == UserRole.owner) ...[
+                    _NavigationTile(
+                      icon: Icons.store_rounded,
+                      iconColor: const Color(0xFFFF6F00),
+                      title: 'Tambah Tempat',
+                      subtitle: 'Buat data tempat baru',
+                      theme: theme,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AddPlaceScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    Divider(color: theme.border, height: 1, indent: 56),
+                    _NavigationTile(
+                      icon: Icons.edit_location_alt_outlined,
+                      iconColor: const Color(0xFFFF6F00),
+                      title: 'Kelola Tempat Saya',
+                      subtitle: 'Edit & kelola tempat milikmu',
+                      theme: theme,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ManagePlaceScreen(isOwnerView: true),
+                          ),
+                        );
+                      },
+                    ),
+                    Divider(color: theme.border, height: 1, indent: 56),
+                  ],
                   if (user != null) ...[
                     _NavigationTile(
                       icon: Icons.person_outline_rounded,

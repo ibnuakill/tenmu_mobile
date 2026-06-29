@@ -1,5 +1,8 @@
 # Miscellaneous
 CLAUDE.md
+AGENTS.md
+DESIGN.md
+scripts/
 *.class
 *.log
 *.pyc

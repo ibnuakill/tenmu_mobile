@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/user_role.dart';
 import '../admin/admin_home_screen.dart';
-import '../owner/owner_home_screen.dart';
 import '../user/home_screen.dart';
 
 class RoleChecker extends StatefulWidget {
@@ -116,7 +115,6 @@ class _RoleCheckerState extends State<RoleChecker> {
           case UserRole.superadmin:
             return const AdminHomeScreen();
           case UserRole.owner:
-            return const OwnerHomeScreen();
           case UserRole.user:
             return const HomeScreen();
         }

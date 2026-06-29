@@ -1,18 +1,18 @@
 /// Floating AI Chatbot — bubble pojok kanan + chat bottom sheet
 ///
-/// Integrasi n8n webhook via [ChatBotConfig.webhookUrl].
+/// Search lokal dari [PlacesProvider] — filter nama/deskripsi/kategori tempat.
+/// Hasil tappable → navigasi ke [PoiDetailScreen].
 library;
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../../../core/theme_provider.dart';
+import '../../../core/places_provider.dart';
+import '../../../core/poi_image_helper.dart' show PoiImageHelper;
+import '../poi_detail_screen.dart';
 
 // ── Config ─────────────────────────────────────────────────────────
 class ChatBotConfig {
-  /// Ganti dengan URL webhook n8n lo nanti
-  static const String webhookUrl = 'https://n8n.example.com/webhook/chat';
-  static const String botName = 'AI Assistant';
+  static const String botName = 'TenMu AI';
   static const String botAvatar = '🤖';
   static const String userAvatar = '👤';
 }
@@ -118,6 +118,7 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   bool _isLoading = false;
+  List<Map<String, dynamic>> _searchResults = [];
 
   @override
   void initState() {
@@ -145,46 +146,55 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
     _inputController.clear();
     _scrollToBottom();
 
-    try {
-      // Panggil n8n webhook
-      final res = await http
-          .post(
-            Uri.parse(ChatBotConfig.webhookUrl),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'message': text.trim()}),
-          )
-          .timeout(const Duration(seconds: 15));
-
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        final reply = data['reply'] ?? data['response'] ?? data['text'] ?? 'Maaf, saya tidak paham.';
-        if (mounted) {
-          setState(() {
-            _messages.add(ChatMessage(text: reply, isUser: false));
-            _isLoading = false;
-          });
-        }
-      } else {
-        _fallbackReply(text);
-      }
-    } catch (_) {
-      _fallbackReply(text);
+    // Search langsung dari PlacesProvider
+    final provider = context.read<PlacesProvider>();
+    if (provider.placesList.isEmpty) {
+      await provider.fetchPlaces();
     }
-  }
 
-  void _fallbackReply(String userMsg) {
-    // Fallback kalo n8n blm connect
-    final replies = [
-      'Wah, lagi ramai nih! Coba tanya lagi ya.',
-      'Aku lagi mikir... Coba ulangi pertanyaannya!',
-      'Maaf, aku belum bisa jawab sekarang. Nanti coba lagi!',
-    ];
-    final reply = replies[userMsg.length % replies.length];
+    final query = text.trim().toLowerCase();
+    final results = provider.placesList.where((p) {
+      final nama = (p['nama_tempat']?.toString() ?? '').toLowerCase();
+      final deskripsi = (p['deskripsi']?.toString() ?? '').toLowerCase();
+      final category = (p['category']?.toString() ?? '').toLowerCase();
+      final fasilitas = (p['fasilitas']?.toString() ?? '').toLowerCase();
+      return nama.contains(query) ||
+          deskripsi.contains(query) ||
+          category.contains(query) ||
+          fasilitas.contains(query);
+    }).toList();
+
+    String reply;
+    if (results.isEmpty) {
+      reply = 'Maaf, ga nemu tempat yang cocok dengan "$text". Coba keyword lain ya!';
+    } else if (results.length == 1) {
+      final p = results.first;
+      reply = 'Ketemu 1 tempat:\n${p['nama_tempat']}\n📍 ${p['alamat'] ?? ''}';
+    } else {
+      final sb = StringBuffer('Ketemu ${results.length} tempat:\n');
+      for (var i = 0; i < results.length && i < 5; i++) {
+        sb.writeln('${i + 1}. ${results[i]['nama_tempat']}');
+      }
+      if (results.length > 5) {
+        sb.writeln('...dan ${results.length - 5} lainnya.');
+      }
+      sb.write('\nTap pilihan di bawah buat lihat detail!');
+      reply = sb.toString();
+    }
+
     if (mounted) {
       setState(() {
         _messages.add(ChatMessage(text: reply, isUser: false));
         _isLoading = false;
       });
+      _scrollToBottom();
+
+      // Kalo ada hasil, tampilin kartu tempat
+      if (results.isNotEmpty) {
+        setState(() {
+          _searchResults = results.take(5).toList();
+        });
+      }
     }
   }
 
@@ -315,6 +325,71 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
                     },
                   ),
           ),
+
+          // ── Search Result Cards ─────────────────────────────
+          if (_searchResults.isNotEmpty)
+            Container(
+              constraints: const BoxConstraints(maxHeight: 200),
+              decoration: BoxDecoration(
+                color: theme.bgSurface,
+                border: Border(top: BorderSide(color: theme.border)),
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                itemCount: _searchResults.length,
+                separatorBuilder: (_, _) => Divider(height: 1, color: theme.border.withValues(alpha: 0.3)),
+                itemBuilder: (context, i) {
+                  final place = _searchResults[i];
+                  final name = place['nama_tempat'] ?? '';
+                  final alamat = place['alamat'] ?? '';
+                  final imgUrl = PoiImageHelper.primaryImageUrl(place);
+                  return GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PoiDetailScreen(place: place),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: imgUrl != null
+                                ? Image.network(imgUrl, width: 48, height: 48, fit: BoxFit.cover)
+                                : Container(
+                                    width: 48, height: 48,
+                                    color: theme.bgElevated,
+                                    child: Icon(Icons.image_outlined, color: theme.textHint, size: 20),
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(name, style: TextStyle(
+                                  color: theme.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(alamat, style: TextStyle(
+                                  color: theme.textSecondary, fontSize: 11),
+                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded, color: theme.textHint, size: 18),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
 
           // ── Input ───────────────────────────────────────────
           Container(

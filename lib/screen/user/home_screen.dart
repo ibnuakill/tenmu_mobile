@@ -8,6 +8,7 @@ import '../../core/places_provider.dart';
 import 'settings_screen.dart';
 import '../../core/poi_category.dart';
 import '../../core/location_permission_helper.dart';
+import '../../core/user_role.dart';
 import 'poi_detail_screen.dart';
 import 'route_map_screen.dart';
 
@@ -30,8 +31,10 @@ class _HomeScreenState extends State<HomeScreen> {
   SortOption _selectedSort = SortOption.terbaru;
   Position? _currentPosition;
   int _currentNavIndex = 0;
+  UserRole? _userRole;
 
   bool get _hasActiveFilters => _selectedCategories.isNotEmpty;
+  bool get _isOwner => _userRole == UserRole.owner;
 
   @override
   void initState() {
@@ -39,7 +42,21 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<PlacesProvider>(context, listen: false).fetchPlaces();
       _requestUserLocation();
+      _loadUserRole();
     });
+  }
+
+  Future<void> _loadUserRole() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    final res = await Supabase.instance.client
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+    if (res != null && mounted) {
+      setState(() => _userRole = parseUserRole(res['role']));
+    }
   }
 
   Future<void> _requestUserLocation() async {
@@ -108,6 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     if (index == 2) {
+      if (!_isOwner) return; // non-owner gabisa tambah tempat
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const AddPlaceScreen()),
@@ -480,7 +498,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _navIcon(theme, Icons.home_rounded, 0),
                   _navIcon(theme, Icons.map_rounded, 1),
-                  const SizedBox(width: 56),
+                  if (_isOwner) const SizedBox(width: 56),
                   _navIcon(theme, Icons.auto_awesome_rounded, 3),
                   _navIcon(theme, Icons.person_rounded, 4),
                 ],
@@ -488,48 +506,50 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-        Positioned(
-          top: -24,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: GestureDetector(
-              onTap: () => _onNavTap(2),
-              child: Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      theme.btnPrimary,
-                      theme.btnPrimary.withValues(alpha: 0.8),
+        if (_isOwner) ...[
+          Positioned(
+            top: -24,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: () => _onNavTap(2),
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        theme.btnPrimary,
+                        theme.btnPrimary.withValues(alpha: 0.8),
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.btnPrimary.withValues(alpha: 0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
                     ],
                   ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.btnPrimary.withValues(alpha: 0.4),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.add,
-                  color: theme.btnLabel,
-                  size: 28,
+                  child: Icon(
+                    Icons.add,
+                    color: theme.btnLabel,
+                    size: 28,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }

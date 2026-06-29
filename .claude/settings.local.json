@@ -11,7 +11,8 @@
       "Bash(dart --version)",
       "Bash(flutter --version)",
       "Bash(dart pub *)",
-      "Bash(dart analyze *)"
+      "Bash(dart analyze *)",
+      "Bash(bash *)"
     ]
   }
 }

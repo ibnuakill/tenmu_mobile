@@ -204,23 +204,36 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   void _updateMapState() {
     final markers = <Marker>[];
 
-    // Current position marker
+    // Current position marker (arrow panah sesuai bearing HP)
     if (_currentPosition != null) {
+      final heading = _currentPosition!.heading;
       markers.add(
         Marker(
           point: LatLng(
             _currentPosition!.latitude,
             _currentPosition!.longitude,
           ),
-          width: 24,
-          height: 24,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.blue,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 3),
+          width: 28,
+          height: 28,
+          child: GestureDetector(
+            onTap: _recenterMap,
+            child: Transform.rotate(
+              angle: heading * 3.1415927 / 180,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.navigation, color: Colors.white, size: 16),
+              ),
             ),
-            child: const Icon(Icons.my_location, color: Colors.white, size: 14),
           ),
         ),
       );
@@ -492,7 +505,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   void _startLiveTracking() {
     const settings = LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 10,
+      distanceFilter: 5, // lebih responsif buat rotasi panah
     );
     _positionStreamSubscription =
         Geolocator.getPositionStream(locationSettings: settings).listen((
@@ -784,19 +797,38 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                     ),
                   ),
 
-                // --- Recenter button ---
+                // --- Compass + Recenter buttons ---
                 Positioned(
                   right: 16,
-                  bottom: 140 + bottomPadding,
-                  child: FloatingActionButton(
-                    onPressed: _recenterMap,
-                    backgroundColor: theme.bgSurface,
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: theme.border),
-                    ),
-                    child: Icon(Icons.my_location, color: theme.iconColor),
+                  bottom: 200 + bottomPadding,
+                  child: Column(
+                    children: [
+                      // Compass
+                      FloatingActionButton(
+                        onPressed: () {
+                          _mapController.rotate(0); // reset north up
+                        },
+                        backgroundColor: theme.bgSurface,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: theme.border),
+                        ),
+                        child: Icon(Icons.explore_outlined, color: theme.btnPrimary),
+                      ),
+                      const SizedBox(height: 12),
+                      // Recenter
+                      FloatingActionButton(
+                        onPressed: _recenterMap,
+                        backgroundColor: theme.bgSurface,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: theme.border),
+                        ),
+                        child: Icon(Icons.my_location, color: theme.iconColor),
+                      ),
+                    ],
                   ),
                 ),
 

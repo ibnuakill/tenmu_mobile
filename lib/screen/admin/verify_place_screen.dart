@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
 import '../../core/poi_image_helper.dart';
+import '../owner/edit_place_screen.dart';
 
 class VerifyPlaceScreen extends StatefulWidget {
   const VerifyPlaceScreen({super.key});
@@ -471,10 +472,32 @@ class _VerifiedTab extends StatelessWidget {
                           ),
                       ],
                     ),
-                    trailing: Icon(
-                      Icons.verified_rounded,
-                      color: const Color(0xFF28A745),
-                      size: 24,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EditPlaceScreen(place: place),
+                            ),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: theme.bgElevated,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.edit_outlined, color: theme.textHint, size: 18),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.verified_rounded,
+                          color: const Color(0xFF28A745),
+                          size: 24,
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -594,10 +617,32 @@ class _RejectedTab extends StatelessWidget {
                           ),
                       ],
                     ),
-                    trailing: Icon(
-                      Icons.block,
-                      color: const Color(0xFF8B2020),
-                      size: 24,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EditPlaceScreen(place: place),
+                            ),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: theme.bgElevated,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.edit_outlined, color: theme.textHint, size: 18),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.block,
+                          color: const Color(0xFF8B2020),
+                          size: 24,
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -700,6 +745,28 @@ class _PlaceCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 Row(
                   children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => EditPlaceScreen(place: place),
+                          ),
+                        ),
+                        icon: const Icon(Icons.edit_outlined, size: 16),
+                        label: const Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.bgElevated,
+                          foregroundColor: theme.textPrimary,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(color: theme.border),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: onReject,
