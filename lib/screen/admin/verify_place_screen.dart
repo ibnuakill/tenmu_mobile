@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
 import '../../core/poi_image_helper.dart';
+import '../../core/notification_service.dart';
 import '../owner/edit_place_screen.dart';
 
 class VerifyPlaceScreen extends StatefulWidget {
@@ -113,6 +114,12 @@ class _VerifyPlaceScreenState extends State<VerifyPlaceScreen>
 
       await _loadPlaces();
       _snack('Tempat berhasil diverifikasi!', isError: false);
+
+      // Kirim push notification ke semua user via OneSignal
+      NotificationService.sendNewPlaceNotification(
+        placeId: place['id'],
+        placeName: place['nama_tempat'] ?? 'Tempat baru',
+      );
     } catch (e) {
       _snack('Gagal: $e', isError: true);
     }

@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tenmu/core/theme_provider.dart';
 import 'package:tenmu/core/places_provider.dart';
+import 'package:tenmu/core/notification_service.dart';
 import 'package:tenmu/screen/auth/auth_gate.dart';
 import 'package:tenmu/screen/splash/animated_splash_screen.dart';
 
@@ -19,6 +20,9 @@ Future<void> main() async {
     url: dotenv.env['SUPABASE_URL']!,
     publishableKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
+
+  // Init OneSignal (tanpa externalUserId dulu — SDK login menyusul setelah auth)
+  NotificationService.init();
 
   // Menjalankan aplikasi
   runApp(
