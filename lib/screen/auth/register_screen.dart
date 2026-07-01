@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/app_colors.dart';
 
@@ -58,6 +59,26 @@ class _RegisterScreenState extends State<RegisterScreen>
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _signUpWithGoogle() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+    try {
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'tenmu://login-callback',
+      );
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+      }
+    } on AuthException catch (e) {
+      _toast(e.message, isError: true);
+    } catch (_) {
+      _toast('Gagal daftar dengan Google. Coba lagi.', isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _signUp() async {
@@ -369,6 +390,29 @@ class _RegisterScreenState extends State<RegisterScreen>
                           onTap: _isLoading ? null : _signUp,
                           isLoading: _isLoading,
                         ),
+                        const SizedBox(height: 20),
+
+                        // Divider
+                        Row(
+                          children: [
+                            const Expanded(child: Divider(color: AppColors.border)),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: Text(
+                                'atau daftar dengan',
+                                style: TextStyle(
+                                  color: AppColors.textHint,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            const Expanded(child: Divider(color: AppColors.border)),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Tombol Google
+                        _googleButton(),
                       ],
                     ),
                   ),
@@ -765,6 +809,34 @@ class _RegisterScreenState extends State<RegisterScreen>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _googleButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: OutlinedButton.icon(
+        onPressed: _isLoading ? null : _signUpWithGoogle,
+        icon: SvgPicture.asset(
+          'assets/branding/google-logo.svg',
+          height: 22,
+          width: 22,
+        ),
+        label: const Text(
+          'Daftar dengan Google',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: AppColors.border, width: 1.5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(vertical: 14),
         ),
       ),
     );

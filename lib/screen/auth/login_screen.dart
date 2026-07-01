@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/app_colors.dart';
+import '../../core/auth_rate_limit.dart';
 import 'register_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   bool _isLoading = false;
   bool _obscurePassword = true;
+  static const int _maxLoginAttempts = 5;
 
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
@@ -52,12 +56,45 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
+  Future<void> _signInWithGoogle() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+    try {
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'tenmu://login-callback',
+      );
+      // After OAuth, AuthGate stream akan detect session & redirect otomatis
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+      }
+    } on AuthException catch (e) {
+      _toast(e.message, isError: true);
+    } catch (_) {
+      _toast('Gagal masuk dengan Google. Coba lagi.', isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _signIn() async {
     if (_isLoading) return;
 
-    if (_emailController.text.trim().isEmpty ||
-        _passwordController.text.trim().isEmpty) {
+    final email = _emailController.text.trim();
+
+    if (email.isEmpty || _passwordController.text.trim().isEmpty) {
       _toast('Email dan password tidak boleh kosong.', isError: true);
+      return;
+    }
+
+    // Cek rate limit lock
+    final locked = await AuthRateLimit.isLoginLocked(email);
+    if (locked) {
+      final remaining = await AuthRateLimit.getLoginRemainingLockSeconds(email);
+      _toast(
+        'Terlalu banyak percobaan. Coba lagi setelah ${AuthRateLimit.formatDuration(remaining)}.',
+        isError: true,
+      );
       return;
     }
 
@@ -68,6 +105,9 @@ class _LoginScreenState extends State<LoginScreen>
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+
+      // Login berhasil — reset attempt counter
+      await AuthRateLimit.resetLoginAttempts(email);
 
       // Check if email is verified
       final user = Supabase.instance.client.auth.currentUser;
@@ -83,7 +123,20 @@ class _LoginScreenState extends State<LoginScreen>
         }
       }
     } on AuthException catch (e) {
-      _toast(e.message, isError: true);
+      final attempts = await AuthRateLimit.incrementLoginAttempt(email);
+      final remaining = _maxLoginAttempts - attempts;
+      if (!mounted) return;
+      if (remaining > 0) {
+        _toast(
+          '${e.message} ($attempts/$_maxLoginAttempts)',
+          isError: true,
+        );
+      } else {
+        _toast(
+          'Terlalu banyak percobaan gagal. Coba lagi setelah 3 jam.',
+          isError: true,
+        );
+      }
     } catch (_) {
       _toast('Terjadi kesalahan. Coba lagi.', isError: true);
     } finally {
@@ -237,7 +290,29 @@ class _LoginScreenState extends State<LoginScreen>
                                 () => _obscurePassword = !_obscurePassword,
                               ),
                             ),
-                            const SizedBox(height: 32),
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: GestureDetector(
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const ForgotPasswordScreen(),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Lupa Password?',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
 
                             // Tombol Masuk
                             _primaryButton(
@@ -245,6 +320,29 @@ class _LoginScreenState extends State<LoginScreen>
                               onTap: _isLoading ? null : _signIn,
                               isLoading: _isLoading,
                             ),
+                            const SizedBox(height: 20),
+
+                            // Divider
+                            Row(
+                              children: [
+                                const Expanded(child: Divider(color: AppColors.border)),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  child: Text(
+                                    'atau',
+                                    style: TextStyle(
+                                      color: AppColors.textHint,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                const Expanded(child: Divider(color: AppColors.border)),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Tombol Google
+                            _googleButton(),
                           ],
                         ),
                       ),
@@ -361,6 +459,34 @@ class _LoginScreenState extends State<LoginScreen>
             color: AppColors.borderFocus,
             width: 1.5,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _googleButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: OutlinedButton.icon(
+        onPressed: _isLoading ? null : _signInWithGoogle,
+        icon: SvgPicture.asset(
+          'assets/branding/google-logo.svg',
+          height: 22,
+          width: 22,
+        ),
+        label: const Text(
+          'Masuk dengan Google',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: AppColors.border, width: 1.5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(vertical: 14),
         ),
       ),
     );

@@ -7,6 +7,7 @@ import 'package:tenmu/core/theme_provider.dart';
 import 'package:tenmu/core/places_provider.dart';
 import 'package:tenmu/core/notification_service.dart';
 import 'package:tenmu/screen/auth/auth_gate.dart';
+import 'package:tenmu/screen/auth/forgot_password_screen.dart';
 import 'package:tenmu/screen/splash/animated_splash_screen.dart';
 
 // Fungsi main() adalah titik awal berjalannya aplikasi Flutter
@@ -57,6 +58,16 @@ class TenMuApp extends StatelessWidget {
       title: 'TenMu',
       theme: ThemeData(primarySwatch: Colors.blue),
       home: const AnimatedSplashScreen(nextScreen: AuthGate()),
+      onGenerateRoute: (settings) {
+        // Handle deep link reset password
+        if (settings.name != null &&
+            settings.name!.contains('reset-callback')) {
+          return MaterialPageRoute(
+            builder: (_) => const ForgotPasswordScreen(),
+          );
+        }
+        return null;
+      },
     );
   }
 }

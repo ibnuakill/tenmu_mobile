@@ -35,7 +35,24 @@ class _RoleCheckerState extends State<RoleChecker> {
         .maybeSingle();
 
     if (response == null) {
-      throw Exception('Profil user tidak ditemukan di tabel profiles.');
+      // User baru dari Google OAuth — belum punya profile, auto-create
+      final metadata = user.userMetadata ?? {};
+      final fullName = metadata['full_name']?.toString() ??
+          metadata['name']?.toString() ??
+          'User';
+      final avatarUrl = metadata['avatar_url']?.toString() ??
+          metadata['picture']?.toString();
+
+      await Supabase.instance.client.from('profiles').insert({
+        'id': user.id,
+        'full_name': fullName,
+        'nama': fullName,
+        'avatar_url': avatarUrl,
+        'role': 'user',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      return parseUserRole('user');
     }
 
     final role = response['role']?.toString() ?? 'user';
