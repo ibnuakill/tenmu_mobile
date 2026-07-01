@@ -42,14 +42,15 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
     try {
       final data = await _client
           .from('profiles')
-          .select('id, role, full_name, nama')
-          .order('created_at', ascending: false);
+          .select('id, role, nama, status')
+          .order('id', ascending: false);
 
       setState(() {
         _users = List<Map<String, dynamic>>.from(data);
         _loadingUsers = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Load users error: $e');
       setState(() => _loadingUsers = false);
     }
   }
@@ -77,6 +78,28 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
       _snack('Role berhasil diubah ke ${role.label}.', isError: false);
     } catch (e) {
       _snack('Gagal mengubah role: $e', isError: true);
+    }
+  }
+
+  Future<void> _toggleBanUser(String userId, String currentName, bool isBanned) async {
+    final action = isBanned ? 'Aktifkan' : 'Nonaktifkan';
+    final confirm = await _showConfirmDialog(
+      title: '$action User?',
+      content: isBanned
+          ? 'User "$currentName" akan bisa login kembali.'
+          : 'User "$currentName" tidak bisa login sampai diaktifkan kembali.',
+    );
+    if (confirm == true && mounted) {
+      try {
+        await _client
+            .from('profiles')
+            .update({'status': isBanned ? 'active' : 'banned'})
+            .eq('id', userId);
+        await _loadUsers();
+        _snack('User $currentName $action.', isError: false);
+      } catch (e) {
+        _snack('Gagal: $e', isError: true);
+      }
     }
   }
 
@@ -181,22 +204,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
       appBar: AppBar(
         backgroundColor: theme.bgBase,
         elevation: 0,
-        leading: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: theme.bgElevated,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: theme.border),
-            ),
-            child: Icon(
-              Icons.arrow_back_ios_new,
-              color: theme.textPrimary,
-              size: 16,
-            ),
-          ),
-        ),
+        automaticallyImplyLeading: false,
         title: Text(
           'Kelola User & Ulasan',
           style: TextStyle(
@@ -212,14 +220,26 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
           unselectedLabelColor: theme.textHint,
           labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           tabs: const [
+            Tab(text: 'Daftar User'),
             Tab(text: 'Semua Ulasan'),
-            Tab(text: 'Role User'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
+          _UserListTab(
+            users: _users,
+            reviews: _reviews,
+            isLoading: _loadingUsers,
+            onDeleteAll: _deleteAllReviewsByUser,
+            onRoleChanged: _updateUserRole,
+            onToggleBan: _toggleBanUser,
+            onRefresh: () async {
+              await _loadUsers();
+              await _loadReviews();
+            },
+          ),
           _AllReviewsTab(
             reviews: _reviews,
             isLoading: _loadingReviews,
@@ -227,17 +247,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
             onSearchChanged: (v) => setState(() => _searchQuery = v),
             onDelete: _deleteReview,
             onRefresh: _loadReviews,
-          ),
-          _UserListTab(
-            users: _users,
-            reviews: _reviews,
-            isLoading: _loadingUsers,
-            onDeleteAll: _deleteAllReviewsByUser,
-            onRoleChanged: _updateUserRole,
-            onRefresh: () async {
-              await _loadUsers();
-              await _loadReviews();
-            },
           ),
         ],
       ),
@@ -357,6 +366,7 @@ class _UserListTab extends StatelessWidget {
   final bool isLoading;
   final Future<void> Function(String userId) onDeleteAll;
   final Future<void> Function(String userId, UserRole role) onRoleChanged;
+  final Future<void> Function(String userId, String name, bool isBanned) onToggleBan;
   final Future<void> Function() onRefresh;
 
   const _UserListTab({
@@ -365,6 +375,7 @@ class _UserListTab extends StatelessWidget {
     required this.isLoading,
     required this.onDeleteAll,
     required this.onRoleChanged,
+    required this.onToggleBan,
     required this.onRefresh,
   });
 
@@ -395,17 +406,20 @@ class _UserListTab extends StatelessWidget {
                     .where((r) => r['user_id'] == userId)
                     .toList();
 
+                final isBanned = user['status']?.toString() == 'banned';
+
                 return _UserTile(
                   userId: userId,
                   name:
-                      user['full_name']?.toString() ??
                       user['nama']?.toString() ??
                       'Tanpa nama',
                   role: parseUserRole(user['role']),
                   reviewCount: userReviews.length,
                   reviews: userReviews,
+                  isBanned: isBanned,
                   onDeleteAll: () => onDeleteAll(userId),
                   onRoleChanged: (role) => onRoleChanged(userId, role),
+                  onToggleBan: () => onToggleBan(userId, user['nama']?.toString() ?? 'User', isBanned),
                 );
               },
             ),
@@ -536,8 +550,10 @@ class _UserTile extends StatelessWidget {
   final UserRole role;
   final int reviewCount;
   final List<Map<String, dynamic>> reviews;
+  final bool isBanned;
   final VoidCallback onDeleteAll;
   final ValueChanged<UserRole> onRoleChanged;
+  final VoidCallback onToggleBan;
 
   const _UserTile({
     required this.userId,
@@ -545,8 +561,10 @@ class _UserTile extends StatelessWidget {
     required this.role,
     required this.reviewCount,
     required this.reviews,
+    required this.isBanned,
     required this.onDeleteAll,
     required this.onRoleChanged,
+    required this.onToggleBan,
   });
 
   @override
@@ -559,25 +577,53 @@ class _UserTile extends StatelessWidget {
       childrenPadding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
       iconColor: theme.iconColor,
       collapsedIconColor: theme.iconColor,
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: theme.bgElevated,
-          shape: BoxShape.circle,
-          border: Border.all(color: theme.border),
-        ),
-        child: Center(
-          child: Icon(Icons.person_outline, size: 20, color: theme.iconColor),
-        ),
+      leading: Stack(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: isBanned ? theme.snackError.withValues(alpha: 0.15) : theme.bgElevated,
+              shape: BoxShape.circle,
+              border: Border.all(color: isBanned ? theme.snackError.withValues(alpha: 0.4) : theme.border),
+            ),
+            child: Center(
+              child: Icon(
+                isBanned ? Icons.block : Icons.person_outline,
+                size: 20,
+                color: isBanned ? const Color(0xFF8B2020) : theme.iconColor,
+              ),
+            ),
+          ),
+        ],
       ),
-      title: Text(
-        name,
-        style: TextStyle(
-          fontSize: 13,
-          color: theme.textPrimary,
-          fontWeight: FontWeight.w600,
-        ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              name,
+              style: TextStyle(
+                fontSize: 13,
+                color: isBanned ? theme.textHint : theme.textPrimary,
+                fontWeight: FontWeight.w600,
+                decoration: isBanned ? TextDecoration.lineThrough : null,
+              ),
+            ),
+          ),
+          if (isBanned)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: theme.snackError.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: theme.snackError.withValues(alpha: 0.3)),
+              ),
+              child: const Text(
+                'Banned',
+                style: TextStyle(fontSize: 9, color: Color(0xFF8B2020), fontWeight: FontWeight.w700),
+              ),
+            ),
+        ],
       ),
       subtitle: Text(
         '$reviewCount ulasan • $shortId',
@@ -638,7 +684,72 @@ class _UserTile extends StatelessWidget {
                   }
                 },
               ),
+
               const SizedBox(height: 12),
+              Row(
+                children: [
+                  if (!isBanned)
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: onToggleBan,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF8B0000).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF8B0000).withValues(alpha: 0.3)),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.block, size: 14, color: Color(0xFF8B2020)),
+                              SizedBox(width: 6),
+                              Text(
+                                'Nonaktifkan',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF8B2020),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (isBanned)
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: onToggleBan,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: theme.btnPrimary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: theme.btnPrimary.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.check_circle_outline, size: 14, color: theme.btnPrimary),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Aktifkan',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: theme.btnPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerLeft,
                 child: GestureDetector(

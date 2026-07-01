@@ -75,12 +75,54 @@ class NotificationService {
         body: {
           'placeId': placeId,
           'placeName': placeName,
+          'type': 'new_place',
         },
       );
       debugPrint('[NotificationService] edge function OK: ${res.data}');
       return true;
     } catch (e) {
       debugPrint('[NotificationService] edge function error: $e');
+      return false;
+    }
+  }
+
+  /// Notify all admin/superadmin users that a new place needs verification.
+  ///
+  /// Fetches admin user IDs from the `profiles` table, then calls the
+  /// Edge Function with targeted push to those users only.
+  static Future<bool> notifyAdminsNewSubmission({
+    required int placeId,
+    required String placeName,
+  }) async {
+    try {
+      // Fetch all admin & superadmin OneSignal user IDs
+      final adminProfiles = await Supabase.instance.client
+          .from('profiles')
+          .select('id')
+          .inFilter('role', ['admin', 'superadmin']);
+
+      final adminIds = adminProfiles
+          .map<String>((p) => p['id'] as String)
+          .toList();
+
+      if (adminIds.isEmpty) {
+        debugPrint('[NotificationService] no admin found to notify');
+        return false;
+      }
+
+      final res = await Supabase.instance.client.functions.invoke(
+        'send-notification',
+        body: {
+          'placeId': placeId,
+          'placeName': placeName,
+          'targetUserIds': adminIds,
+          'type': 'new_submission',
+        },
+      );
+      debugPrint('[NotificationService] admin notified OK: ${res.data}');
+      return true;
+    } catch (e) {
+      debugPrint('[NotificationService] notify admins error: $e');
       return false;
     }
   }

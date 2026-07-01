@@ -7,6 +7,10 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 interface NotificationPayload {
   placeId: number
   placeName: string
+  /** If provided, push only to these OneSignal user IDs (targeted). Otherwise broadcast to All. */
+  targetUserIds?: string[]
+  /** 'new_place' = broadcast (admin approve), 'new_submission' = notify admins (owner add) */
+  type?: 'new_place' | 'new_submission'
 }
 
 serve(async (req) => {
@@ -39,7 +43,7 @@ serve(async (req) => {
     })
   }
 
-  const { placeId, placeName } = body
+  const { placeId, placeName, targetUserIds, type } = body
   if (!placeId || !placeName) {
     return new Response(JSON.stringify({ error: 'placeId and placeName required' }), {
       status: 400,
@@ -59,6 +63,29 @@ serve(async (req) => {
     })
   }
 
+  const isTargeted = targetUserIds && targetUserIds.length > 0
+
+  const payload: Record<string, unknown> = {
+    app_id: appId,
+    headings: { en: isTargeted ? '📋 Tempat Baru Butuh Verifikasi' : '🏪 Tempat Baru di TenMu!' },
+    contents: {
+      en: isTargeted
+        ? `${placeName} baru saja ditambahkan. Yuk verifikasi sekarang!`
+        : `${placeName} sudah terverifikasi dan siap dikunjungi. Yuk lihat!`,
+    },
+    data: {
+      type: type ?? 'new_place',
+      place_id: placeId,
+    },
+    priority: 10,
+  }
+
+  if (isTargeted) {
+    payload.include_external_user_ids = targetUserIds
+  } else {
+    payload.included_segments = ['All']
+  }
+
   // ── Panggil OneSignal API ────────────────────────────
   const oneSignalRes = await fetch('https://onesignal.com/api/v1/notifications', {
     method: 'POST',
@@ -66,19 +93,7 @@ serve(async (req) => {
       'Content-Type': 'application/json; charset=utf-8',
       Authorization: `Basic ${restApiKey}`,
     },
-    body: JSON.stringify({
-      app_id: appId,
-      included_segments: ['All'],
-      headings: { en: '🏪 Tempat Baru di TenMu!' },
-      contents: {
-        en: `${placeName} sudah terverifikasi dan siap dikunjungi. Yuk lihat!`,
-      },
-      data: {
-        type: 'new_place',
-        place_id: placeId,
-      },
-      priority: 10,
-    }),
+    body: JSON.stringify(payload),
   })
 
   const result = await oneSignalRes.json()

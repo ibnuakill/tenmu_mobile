@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:io';
 import '../../core/theme_provider.dart';
 import '../../core/location_permission_helper.dart';
+import '../../core/notification_service.dart';
 import '../../core/poi_category.dart';
 import '../../core/poi_facility.dart';
 import '../../core/poi_image_helper.dart';
@@ -590,7 +591,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await Supabase.instance.client.from('places').insert({
+      final result = await Supabase.instance.client.from('places').insert({
         'owner_id': Supabase.instance.client.auth.currentUser?.id,
         'nama_tempat': _namaController.text.trim(),
         'alamat': _alamatController.text.trim().isNotEmpty
@@ -613,7 +614,14 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         'category': _selectedCategory,
         'is_featured': false,
         'fasilitas': _selectedFacilities.toList(),
-      });
+      }).select();
+
+      // Kirim notifikasi ke admin untuk verifikasi
+      final insertedId = (result as List).first['id'] as int;
+      NotificationService.notifyAdminsNewSubmission(
+        placeId: insertedId,
+        placeName: _namaController.text.trim(),
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -157,8 +157,8 @@ CREATE POLICY "reviews_delete_own"
   USING (auth.uid() = user_id);
 
 -- ── 7. OTOMATIS SET VERIFICATION STATUS ────────────────────
--- Trigger: user biasa → pending, owner/admin → verified
--- Mencegah user mengaku verified di insert
+-- Trigger: user/owner → pending, superadmin → verified
+-- Owner places must be approved by admin first
 
 CREATE OR REPLACE FUNCTION set_place_verification_status()
 RETURNS TRIGGER AS $$
@@ -166,7 +166,7 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM profiles
     WHERE id = auth.uid()
-      AND role IN ('owner', 'superadmin')
+      AND role IN ('superadmin')
   ) THEN
     NEW.verification_status := 'verified';
     NEW.verified_at := NOW();
