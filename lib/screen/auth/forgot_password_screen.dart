@@ -69,6 +69,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
       return;
     }
 
+    if (!mounted) return;
     FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
     try {

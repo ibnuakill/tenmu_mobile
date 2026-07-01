@@ -98,6 +98,7 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
+    if (!mounted) return;
     FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
     try {
