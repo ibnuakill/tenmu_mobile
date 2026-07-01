@@ -1,8 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service for OneSignal push notifications.
 ///
@@ -13,7 +12,6 @@ class NotificationService {
   NotificationService._();
 
   static final _appId = dotenv.env['ONESIGNAL_APP_ID'] ?? '';
-  static final _restApiKey = dotenv.env['ONESIGNAL_REST_API_KEY'] ?? '';
 
   static bool _sdkInitialized = false;
 
@@ -31,7 +29,22 @@ class NotificationService {
     final result = await OneSignal.Notifications.requestPermission(true);
     debugPrint('[NotificationService] permission: $result');
 
+    // Wajib di v5 — explicit opt-in biar device terdaftar
+    debugPrint('[NotificationService] events registered: $result');
+
+    // Display notifications while app is in foreground
+    OneSignal.Notifications.addForegroundWillDisplayListener((event) {
+      event.notification.display();
+    });
+
     _sdkInitialized = true;
+  }
+
+  /// Register push subscription (panggil manual setelah login).
+  static Future<void> registerPush() async {
+    if (_appId.isEmpty) return;
+    await OneSignal.User.pushSubscription.optIn();
+    debugPrint('[NotificationService] optIn completed');
   }
 
   /// Link device to a Supabase user — call on login / session restore.
@@ -48,48 +61,26 @@ class NotificationService {
     debugPrint('[NotificationService] detached user');
   }
 
-  /// Send push notification to *all* OneSignal subscribers.
+  /// Send push notification via Supabase Edge Function.
   ///
-  /// Called after admin approves a new place.
-  /// Returns `true` if the API call succeeded.
+  /// Calls the `send-notification` Edge Function which proxies to OneSignal API.
+  /// OneSignal REST API key stays on the server — never exposed to client.
   static Future<bool> sendNewPlaceNotification({
     required int placeId,
     required String placeName,
   }) async {
-    if (_appId.isEmpty || _restApiKey.isEmpty) {
-      debugPrint('[NotificationService] OneSignal credentials missing');
-      return false;
-    }
-
-    final url = Uri.parse('https://onesignal.com/api/v1/notifications');
-    final headers = {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Authorization': 'Basic $_restApiKey',
-    };
-    final body = jsonEncode({
-      'app_id': _appId,
-      'included_segments': ['All'],
-      'headings': {'en': '🏪 Tempat Baru di TenMu!'},
-      'contents': {
-        'en': '$placeName sudah terverifikasi dan siap dikunjungi. Yuk lihat!'
-      },
-      'data': {
-        'type': 'new_place',
-        'place_id': placeId,
-      },
-      'priority': 10,
-    });
-
     try {
-      final response = await http.post(url, headers: headers, body: body);
-      final ok = response.statusCode == 200;
-      debugPrint(
-        '[NotificationService] send result: ${ok ? "OK" : response.statusCode}'
-        ' ${response.body}',
+      final res = await Supabase.instance.client.functions.invoke(
+        'send-notification',
+        body: {
+          'placeId': placeId,
+          'placeName': placeName,
+        },
       );
-      return ok;
+      debugPrint('[NotificationService] edge function OK: ${res.data}');
+      return true;
     } catch (e) {
-      debugPrint('[NotificationService] send error: $e');
+      debugPrint('[NotificationService] edge function error: $e');
       return false;
     }
   }

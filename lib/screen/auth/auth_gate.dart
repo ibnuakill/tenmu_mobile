@@ -27,6 +27,7 @@ class _AuthGateState extends State<AuthGate> {
       final session = event.session;
       if (session != null && session.user.emailConfirmedAt != null) {
         NotificationService.attachUser(session.user.id);
+        NotificationService.registerPush();
       } else if (session == null) {
         NotificationService.detachUser();
       }
