@@ -1,10 +1,13 @@
 /// Floating AI Chatbot — bubble pojok kanan + chat bottom sheet
 ///
-/// Search lokal dari [PlacesProvider] — filter nama/deskripsi/kategori tempat.
+/// Menggunakan Google Gemini (RAG) dengan data [PlacesProvider] sebagai konteks.
+/// Fallback ke pencarian lokal jika API key belum diset.
 /// Hasil tappable → navigasi ke [PoiDetailScreen].
 library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../core/theme_provider.dart';
 import '../../../core/places_provider.dart';
 import '../../../core/poi_image_helper.dart' show PoiImageHelper;
@@ -120,13 +123,18 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
   bool _isLoading = false;
   List<Map<String, dynamic>> _searchResults = [];
 
+  // ── Gemini ─────────────────────────────────────────────────────────
+  ChatSession? _chatSession;
+  bool _geminiReady = false;
+
   @override
   void initState() {
     super.initState();
     _messages.add(ChatMessage(
-      text: 'Halo! Saya AI asisten TenMu. Tanya rekomendasi tempat atau info lainnya, ya!',
+      text: 'Halo! Saya TenMu AI 🌟\nTanya rekomendasi cafe, kuliner, wisata, atau tempat lainnya ya!',
       isUser: false,
     ));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initGemini());
   }
 
   @override
@@ -136,50 +144,155 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
     super.dispose();
   }
 
+  // =======================================================================
+  // Gemini AI
+  // =======================================================================
+  Future<void> _initGemini() async {
+    try {
+      final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+      if (apiKey.isEmpty) return;
+
+      final provider = context.read<PlacesProvider>();
+      if (provider.placesList.isEmpty) await provider.fetchPlaces();
+
+      final model = GenerativeModel(
+        model: 'gemini-2.5-flash-lite',
+        apiKey: apiKey,
+        systemInstruction: Content.system(
+          _buildSystemPrompt(provider.placesList),
+        ),
+        generationConfig: GenerationConfig(
+          temperature: 0.7,
+          maxOutputTokens: 600,
+        ),
+      );
+
+      if (mounted) {
+        setState(() {
+          _chatSession = model.startChat();
+          _geminiReady = true;
+        });
+      }
+    } catch (_) {
+      // Gagal init — fallback ke pencarian lokal
+    }
+  }
+
+  String _buildSystemPrompt(List<Map<String, dynamic>> places) {
+    final sb = StringBuffer();
+    sb.writeln('Kamu adalah TenMu AI, asisten cerdas untuk aplikasi TenMu — platform penemuan tempat UMKM, wisata, kuliner, cafe, hotel, dan oleh-oleh di Indonesia.');
+    sb.writeln('Tugas: bantu pengguna menemukan tempat yang sesuai kebutuhan mereka.');
+    sb.writeln('Jawab dalam Bahasa Indonesia yang ramah, singkat (maks 3 paragraf), dan informatif.');
+    sb.writeln('Saat merekomendasikan, WAJIB sebutkan nama PERSIS dari daftar. Jangan mengarang nama tempat.');
+    sb.writeln('Jika tidak ada yang cocok, jujur bilang tidak ada dan sarankan kata kunci lain.');
+    sb.writeln();
+    sb.writeln('=== DAFTAR TEMPAT TERSEDIA (${places.length} lokasi) ===');
+    for (int i = 0; i < places.length && i < 120; i++) {
+      final p = places[i];
+      final nama = p['nama_tempat']?.toString() ?? '';
+      if (nama.isEmpty) continue;
+      final kat = p['category']?.toString() ?? '';
+      final alamat = p['alamat']?.toString() ?? '';
+      final fasilitas = p['fasilitas']?.toString() ?? '';
+      final rating = p['rating']?.toString() ?? '';
+      final desc = (p['deskripsi']?.toString() ?? '').replaceAll('\n', ' ');
+      sb.write('- $nama');
+      if (kat.isNotEmpty) sb.write(' [$kat]');
+      if (alamat.isNotEmpty) sb.write(' • $alamat');
+      if (rating.isNotEmpty) sb.write(' • ⭐$rating');
+      if (fasilitas.isNotEmpty) sb.write(' • Fasilitas: $fasilitas');
+      if (desc.isNotEmpty) sb.write(' • ${desc.substring(0, desc.length.clamp(0, 80))}');
+      sb.writeln();
+    }
+    return sb.toString();
+  }
+
+  /// Cari tempat yang namanya disebutkan dalam teks jawaban Gemini.
+  List<Map<String, dynamic>> _extractMentionedPlaces(
+    String text,
+    List<Map<String, dynamic>> places,
+  ) {
+    final lower = text.toLowerCase();
+    return places.where((p) {
+      final nama = (p['nama_tempat']?.toString() ?? '').toLowerCase();
+      return nama.length > 2 && lower.contains(nama);
+    }).take(5).toList();
+  }
+
+  // =======================================================================
+  // Send Message
+  // =======================================================================
   void _sendMessage(String text) async {
-    if (text.trim().isEmpty) return;
+    if (text.trim().isEmpty || _isLoading) return;
+    final userText = text.trim();
 
     setState(() {
-      _messages.add(ChatMessage(text: text.trim(), isUser: true));
+      _messages.add(ChatMessage(text: userText, isUser: true));
       _isLoading = true;
+      _searchResults = [];
     });
     _inputController.clear();
     _scrollToBottom();
 
-    // Search langsung dari PlacesProvider
-    final provider = context.read<PlacesProvider>();
-    if (provider.placesList.isEmpty) {
-      await provider.fetchPlaces();
-    }
-
-    final query = text.trim().toLowerCase();
-    final results = provider.placesList.where((p) {
-      final nama = (p['nama_tempat']?.toString() ?? '').toLowerCase();
-      final deskripsi = (p['deskripsi']?.toString() ?? '').toLowerCase();
-      final category = (p['category']?.toString() ?? '').toLowerCase();
-      final fasilitas = (p['fasilitas']?.toString() ?? '').toLowerCase();
-      return nama.contains(query) ||
-          deskripsi.contains(query) ||
-          category.contains(query) ||
-          fasilitas.contains(query);
-    }).toList();
-
     String reply;
-    if (results.isEmpty) {
-      reply = 'Maaf, ga nemu tempat yang cocok dengan "$text". Coba keyword lain ya!';
-    } else if (results.length == 1) {
-      final p = results.first;
-      reply = 'Ketemu 1 tempat:\n${p['nama_tempat']}\n📍 ${p['alamat'] ?? ''}';
+
+    if (_geminiReady && _chatSession != null) {
+      // ── Gemini path ──────────────────────────────────────────────────
+      try {
+        String? responseText;
+        int retries = 3;
+        for (int i = 0; i < retries; i++) {
+          try {
+            final response = await _chatSession!.sendMessage(Content.text(userText));
+            responseText = response.text;
+            break; // Berhasil, keluar dari loop
+          } catch (e) {
+            debugPrint('Gemini retry ${i + 1} failed: $e');
+            if (i == retries - 1) rethrow; // Lempar error jika sudah batas maksimal
+            await Future.delayed(const Duration(seconds: 1)); // Tunggu sebentar sebelum coba lagi
+          }
+        }
+        
+        reply = responseText ?? 'Maaf, tidak ada respons. Coba lagi ya!';
+
+        // Tampilkan kartu tempat yang disebutkan Gemini
+        final provider = context.read<PlacesProvider>();
+        final mentioned = _extractMentionedPlaces(reply, provider.placesList);
+        if (mounted && mentioned.isNotEmpty) {
+          setState(() => _searchResults = mentioned);
+        }
+      } catch (e) {
+        debugPrint('Gemini error: $e');
+        reply = 'Koneksi ke AI bermasalah 🙏 Coba lagi sebentar ya!';
+      }
     } else {
-      final sb = StringBuffer('Ketemu ${results.length} tempat:\n');
-      for (var i = 0; i < results.length && i < 5; i++) {
-        sb.writeln('${i + 1}. ${results[i]['nama_tempat']}');
+      // ── Fallback: local keyword search ───────────────────────────────
+      final provider = context.read<PlacesProvider>();
+      if (provider.placesList.isEmpty) await provider.fetchPlaces();
+
+      final query = userText.toLowerCase();
+      final results = provider.placesList.where((p) {
+        final nama = (p['nama_tempat']?.toString() ?? '').toLowerCase();
+        final desc = (p['deskripsi']?.toString() ?? '').toLowerCase();
+        final cat = (p['category']?.toString() ?? '').toLowerCase();
+        final fas = (p['fasilitas']?.toString() ?? '').toLowerCase();
+        return nama.contains(query) || desc.contains(query) ||
+               cat.contains(query) || fas.contains(query);
+      }).take(5).toList();
+
+      if (results.isEmpty) {
+        reply = 'Maaf, ga nemu tempat yang cocok dengan "$userText". Coba keyword lain ya!';
+      } else {
+        final sb = StringBuffer('Ketemu ${results.length} tempat:\n');
+        for (var i = 0; i < results.length; i++) {
+          sb.writeln('${i + 1}. ${results[i]['nama_tempat']}');
+        }
+        sb.write('\nTap pilihan di bawah buat lihat detail!');
+        reply = sb.toString();
       }
-      if (results.length > 5) {
-        sb.writeln('...dan ${results.length - 5} lainnya.');
+      if (mounted && results.isNotEmpty) {
+        setState(() => _searchResults = results);
       }
-      sb.write('\nTap pilihan di bawah buat lihat detail!');
-      reply = sb.toString();
     }
 
     if (mounted) {
@@ -188,13 +301,6 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
         _isLoading = false;
       });
       _scrollToBottom();
-
-      // Kalo ada hasil, tampilin kartu tempat
-      if (results.isNotEmpty) {
-        setState(() {
-          _searchResults = results.take(5).toList();
-        });
-      }
     }
   }
 

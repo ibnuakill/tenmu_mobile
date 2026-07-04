@@ -5,13 +5,21 @@ import 'app_colors_light.dart';
 
 class ThemeProvider extends ChangeNotifier {
   bool _isDarkMode = true;
+  final bool _forceDark;
   static const String _themeKey = 'isDarkMode';
 
-  ThemeProvider() {
-    _loadTheme();
+  /// [forceDarkMode] — jika true, selalu dark mode (abaikan SharedPreferences).
+  /// Dipakai untuk admin section yang tidak boleh light mode.
+  ThemeProvider({bool forceDarkMode = false})
+      : _forceDark = forceDarkMode {
+    if (_forceDark) {
+      _isDarkMode = true;
+    } else {
+      _loadTheme();
+    }
   }
 
-  bool get isDarkMode => _isDarkMode;
+  bool get isDarkMode => _forceDark ? true : _isDarkMode;
 
   // Getter untuk warna yang aktif
   Color get bgBase => _isDarkMode ? AppColors.bgBase : AppColorsLight.bgBase;
@@ -38,6 +46,7 @@ class ThemeProvider extends ChangeNotifier {
   }
 
   Future<void> toggleTheme() async {
+    if (_forceDark) return; // admin: tidak bisa toggle
     _isDarkMode = !_isDarkMode;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_themeKey, _isDarkMode);
@@ -45,6 +54,7 @@ class ThemeProvider extends ChangeNotifier {
   }
 
   Future<void> setTheme(bool isDark) async {
+    if (_forceDark) return; // admin: tidak bisa ganti
     _isDarkMode = isDark;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_themeKey, _isDarkMode);

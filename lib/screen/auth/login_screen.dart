@@ -128,10 +128,7 @@ class _LoginScreenState extends State<LoginScreen>
       final remaining = _maxLoginAttempts - attempts;
       if (!mounted) return;
       if (remaining > 0) {
-        _toast(
-          '${e.message} ($attempts/$_maxLoginAttempts)',
-          isError: true,
-        );
+        _toast('${e.message} ($attempts/$_maxLoginAttempts)', isError: true);
       } else {
         _toast(
           'Terlalu banyak percobaan gagal. Coba lagi setelah 3 jam.',
@@ -185,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen>
             child: IntrinsicHeight(
               child: Column(
                 children: [
-                  const SizedBox(height: 72),
+                  const SizedBox(height: 30),
 
                   // ── LOGO + BRAND ──────────────────────────────────────────
                   FadeTransition(
@@ -193,8 +190,8 @@ class _LoginScreenState extends State<LoginScreen>
                     child: Column(
                       children: [
                         Container(
-                          width: 76,
-                          height: 76,
+                          width: 52,
+                          height: 52,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: AppColors.bgElevated,
@@ -206,24 +203,24 @@ class _LoginScreenState extends State<LoginScreen>
                           child: const Icon(
                             Icons.storefront_rounded,
                             color: AppColors.textPrimary,
-                            size: 38,
+                            size: 26,
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 12),
                         const Text(
                           'TenMu',
                           style: TextStyle(
-                            fontSize: 32,
+                            fontSize: 22,
                             fontWeight: FontWeight.w800,
                             color: AppColors.textPrimary,
                             letterSpacing: 3,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         const Text(
                           'Temukan UMKM Favoritmu',
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             color: AppColors.textSecondary,
                             letterSpacing: 0.3,
                           ),
@@ -232,7 +229,7 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                   ),
 
-                  const SizedBox(height: 52),
+                  const SizedBox(height: 32),
 
                   // ── FORM CARD ─────────────────────────────────────────────
                   SlideTransition(
@@ -298,7 +295,8 @@ class _LoginScreenState extends State<LoginScreen>
                                 onTap: () => Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => const ForgotPasswordScreen(),
+                                    builder: (_) =>
+                                        const ForgotPasswordScreen(),
                                   ),
                                 ),
                                 child: const Text(
@@ -326,9 +324,13 @@ class _LoginScreenState extends State<LoginScreen>
                             // Divider
                             Row(
                               children: [
-                                const Expanded(child: Divider(color: AppColors.border)),
+                                const Expanded(
+                                  child: Divider(color: AppColors.border),
+                                ),
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
                                   child: Text(
                                     'atau',
                                     style: TextStyle(
@@ -337,7 +339,9 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                   ),
                                 ),
-                                const Expanded(child: Divider(color: AppColors.border)),
+                                const Expanded(
+                                  child: Divider(color: AppColors.border),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 20),
@@ -486,7 +490,9 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: AppColors.border, width: 1.5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           padding: const EdgeInsets.symmetric(vertical: 14),
         ),
       ),

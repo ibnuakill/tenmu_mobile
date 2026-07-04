@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../../core/theme_provider.dart';
@@ -73,6 +74,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   double? _destinationLat;
   double? _destinationLng;
   String? _destinationName;
+  String? _destinationCategory;
 
   // --- GPS & route ---
   Position? _currentPosition;
@@ -105,6 +107,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   double get _currentSpeedKmh => _currentSpeedMs * 3.6;
 
   StreamSubscription<Position>? _positionStreamSubscription;
+  StreamSubscription<CompassEvent>? _compassSubscription;
+  double _compassHeading = 0.0;
 
   // Auto-reroute
   DateTime _lastReroute = DateTime(2000);
@@ -113,14 +117,14 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   static const Duration _rerouteCooldown = Duration(seconds: 15);
 
   static const Map<String, Color> _categoryColors = {
-    'Cafe':             Color(0xFF8B4513),
-    'Fashion':          Color(0xFFE91E63),
-    'Wisata':           Color(0xFF2196F3),
-    'Kuliner':          Color(0xFFE74C3C),
-    'Hotel':            Color(0xFF1565C0),
-    'Oleh-Oleh':        Color(0xFFFF6F61),
-    'UMKM':             Color(0xFF4CAF50),
-    'Lainnya':          Color(0xFF95A5A6),
+    'Cafe': Color(0xFF8B4513),
+    'Fashion': Color(0xFFE91E63),
+    'Wisata': Color(0xFF2196F3),
+    'Kuliner': Color(0xFFE74C3C),
+    'Hotel': Color(0xFF1565C0),
+    'Oleh-Oleh': Color(0xFFFF6F61),
+    'UMKM': Color(0xFF4CAF50),
+    'Lainnya': Color(0xFF95A5A6),
   };
 
   // =======================================================================
@@ -137,11 +141,13 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       _isShowingRoute = true;
     }
     _initLocationAndRoute();
+    _startCompass();
   }
 
   @override
   void dispose() {
     _positionStreamSubscription?.cancel();
+    _compassSubscription?.cancel();
     _mapController.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(
@@ -158,6 +164,15 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         systemNavigationBarIconBrightness: Brightness.light,
       ),
     );
+  }
+
+  void _startCompass() {
+    _compassSubscription = FlutterCompass.events?.listen((CompassEvent event) {
+      if (!mounted) return;
+      final heading = event.heading;
+      if (heading == null) return;
+      setState(() => _compassHeading = heading);
+    });
   }
 
   // =======================================================================
@@ -192,6 +207,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         _destinationLat = place['latitude'] as double?;
         _destinationLng = place['longitude'] as double?;
         _destinationName = place['nama_tempat'];
+        _destinationCategory = _resolveCategory(place);
         _isShowingRoute = false;
       });
       _mapController.move(hitLatLng, 16.0);
@@ -204,9 +220,14 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   void _updateMapState() {
     final markers = <Marker>[];
 
-    // Current position marker (arrow panah sesuai bearing HP)
+    // Current position marker (arrow panah sesuai kompas/bearing HP)
     if (_currentPosition != null) {
-      final heading = _currentPosition!.heading;
+      // Gunakan GPS heading saat bergerak (>3 km/h), compass saat diam
+      final speedKmh = _currentSpeedMs * 3.6;
+      final heading = speedKmh > 3.0
+          ? _currentPosition!.heading
+          : _compassHeading;
+      final angleRad = heading * 3.1415927 / 180;
       markers.add(
         Marker(
           point: LatLng(
@@ -218,7 +239,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           child: GestureDetector(
             onTap: _recenterMap,
             child: Transform.rotate(
-              angle: heading * 3.1415927 / 180,
+              angle: angleRad,
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.blue,
@@ -231,7 +252,11 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                     ),
                   ],
                 ),
-                child: const Icon(Icons.navigation, color: Colors.white, size: 16),
+                child: const Icon(
+                  Icons.navigation,
+                  color: Colors.white,
+                  size: 16,
+                ),
               ),
             ),
           ),
@@ -263,6 +288,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                   _destinationLat = lat;
                   _destinationLng = lng;
                   _destinationName = place['nama_tempat'];
+                  _destinationCategory = _resolveCategory(place);
                   _isShowingRoute = false;
                 });
                 _mapController.move(LatLng(lat, lng), 16.0);
@@ -293,24 +319,35 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
     // Destination marker
     if (_destinationLat != null && _destinationLng != null && _isShowingRoute) {
+      final destCat = _destinationCategory ?? PoiCategory.lainnya;
+      final destColor = _categoryColors[destCat] ?? const Color(0xFFFF4444);
       markers.add(
         Marker(
           point: LatLng(_destinationLat!, _destinationLng!),
-          width: 32,
-          height: 32,
+          width: 36,
+          height: 36,
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.red,
+              color: destColor,
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 4),
+              border: Border.all(color: Colors.white, width: 3),
               boxShadow: [
                 BoxShadow(
+                  color: destColor.withValues(alpha: 0.5),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+                BoxShadow(
                   color: Colors.black.withValues(alpha: 0.3),
-                  blurRadius: 8,
+                  blurRadius: 6,
                 ),
               ],
             ),
-            child: const Icon(Icons.flag, color: Colors.white, size: 16),
+            child: Icon(
+              PoiCategory.getCategoryIcon(destCat),
+              color: Colors.white,
+              size: 18,
+            ),
           ),
         ),
       );
@@ -405,6 +442,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       }
 
       _updateMapState();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fitRouteToCamera());
       _startLiveTracking();
     } catch (e) {
       setState(() {
@@ -497,6 +535,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       _isLoading = false;
     });
     _updateMapState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fitRouteToCamera());
   }
 
   // =======================================================================
@@ -643,6 +682,20 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     );
   }
 
+  /// Fit the camera to show the entire route with padding.
+  void _fitRouteToCamera() {
+    if (_routePoints.length < 2) return;
+    try {
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: LatLngBounds.fromPoints(_routePoints),
+          padding: const EdgeInsets.fromLTRB(40, 80, 40, 220),
+          maxZoom: 17.0,
+        ),
+      );
+    } catch (_) {}
+  }
+
   Future<void> _fetchAndSetRoute() async {
     if (_currentPosition == null || _destinationLat == null) return;
     try {
@@ -666,6 +719,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           _hasArrived = false;
         });
         _updateMapState();
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _fitRouteToCamera(),
+        );
       } else if (mounted) {
         _applyFallbackRoute(_currentPosition!);
       }
@@ -814,7 +870,10 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                           borderRadius: BorderRadius.circular(16),
                           side: BorderSide(color: theme.border),
                         ),
-                        child: Icon(Icons.explore_outlined, color: theme.btnPrimary),
+                        child: Icon(
+                          Icons.explore_outlined,
+                          color: theme.btnPrimary,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       // Recenter
@@ -843,7 +902,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                     : Positioned(
                         left: 16,
                         right: 16,
-                        bottom: 30 + bottomPadding + 60,
+                        bottom: 16 + bottomPadding,
                         child: isPreviewing
                             ? _buildUmkmPreview(theme)
                             : _buildBrowseInfo(theme),

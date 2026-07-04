@@ -264,13 +264,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _SettingsCard(
                 theme: theme,
                 children: [
-                  // ── Owner Management (khusus owner) ──
-                  if (_userRole == UserRole.owner) ...[
+                  // ── Owner Management / Admin Testing ──
+                  if (_userRole == UserRole.owner ||
+                      _userRole == UserRole.superadmin) ...[
                     _NavigationTile(
                       icon: Icons.store_rounded,
                       iconColor: const Color(0xFFFF6F00),
-                      title: 'Tambah Tempat',
-                      subtitle: 'Buat data tempat baru',
+                      title: _userRole == UserRole.owner
+                          ? 'Tambah Tempat'
+                          : 'Tambah Tempat (Testing)',
+                      subtitle: _userRole == UserRole.owner
+                          ? 'Buat data tempat baru'
+                          : 'Testing tambah data UMKM',
                       theme: theme,
                       onTap: () {
                         Navigator.push(
@@ -285,14 +290,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _NavigationTile(
                       icon: Icons.edit_location_alt_outlined,
                       iconColor: const Color(0xFFFF6F00),
-                      title: 'Kelola Tempat Saya',
-                      subtitle: 'Edit & kelola tempat milikmu',
+                      title: _userRole == UserRole.owner
+                          ? 'Kelola Tempat Saya'
+                          : 'Kelola Semua Tempat (Testing)',
+                      subtitle: _userRole == UserRole.owner
+                          ? 'Edit & kelola tempat milikmu'
+                          : 'Testing fitur edit & hapus UMKM',
                       theme: theme,
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const ManagePlaceScreen(isOwnerView: true),
+                            builder: (_) => ManagePlaceScreen(
+                              isOwnerView: _userRole == UserRole.owner,
+                            ),
                           ),
                         );
                       },
