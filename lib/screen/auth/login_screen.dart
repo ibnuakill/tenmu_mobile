@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -62,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: 'tenmu://login-callback',
+        redirectTo: kIsWeb ? Uri.base.origin : null,
       );
       // After OAuth, AuthGate stream akan detect session & redirect otomatis
       if (mounted && Navigator.of(context).canPop()) {

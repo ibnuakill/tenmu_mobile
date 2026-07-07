@@ -35,6 +35,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   double _avgRating = 0;
   int _totalReviews = 0;
   int _featuredCount = 0;
+  int _lastSeenPending = 0;
 
   Map<String, int> _categoryCounts = const {};
   List<int> _dailySubmissions = []; // 14 entries
@@ -144,6 +145,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         avgRating: _avgRating,
         totalReviews: _totalReviews,
         featuredCount: _featuredCount,
+        unreadCount: _pendingCount - _lastSeenPending,
         categoryCounts: _categoryCounts,
         dailySubmissions: _dailySubmissions,
         onRetry: _loadDashboard,
@@ -151,10 +153,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           context,
           MaterialPageRoute(builder: (_) => const VerifyPlaceScreen()),
         ),
-        onActivity: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AdminActivityScreen()),
-        ),
+        onActivity: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminActivityScreen()),
+          );
+          if (!mounted) return;
+          setState(() => _lastSeenPending = _pendingCount);
+        },
       ),
       const AdminMapScreen(),
       const ManageUsersScreen(),
@@ -166,26 +172,87 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       child: Consumer<ThemeProvider>(
         builder: (ctx, t, _) => Scaffold(
           backgroundColor: t.bgBase,
-          body: IndexedStack(index: _tabIndex, children: pages),
-          bottomNavigationBar: Container(
-            color: t.bgSurface,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _navItem(t, 0, Icons.home_rounded, 'Home'),
-                    _navItem(t, 1, Icons.map_outlined, 'Map'),
-                    _navItem(t, 2, Icons.people_outline, 'Users'),
-                    _navItem(t, 3, Icons.settings_outlined, 'Settings'),
-                  ],
-                ),
-              ),
-            ),
+          body: LayoutBuilder(
+            builder: (ctx, constraints) {
+              final isWide = constraints.maxWidth >= 600;
+              final body = IndexedStack(index: _tabIndex, children: pages);
+              if (!isWide) {
+                return Scaffold(
+                  backgroundColor: t.bgBase,
+                  body: body,
+                  bottomNavigationBar: _bottomNav(t),
+                );
+              }
+              return Row(
+                children: [
+                  _navRail(t),
+                  VerticalDivider(width: 1, color: t.border),
+                  Expanded(child: body),
+                ],
+              );
+            },
           ),
         ),
       ),
+    );
+  }
+
+  Widget _bottomNav(ThemeProvider t) {
+    return Container(
+      color: t.bgSurface,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _navItem(t, 0, Icons.home_rounded, 'Home'),
+              _navItem(t, 1, Icons.map_outlined, 'Map'),
+              _navItem(t, 2, Icons.people_outline, 'Users'),
+              _navItem(t, 3, Icons.settings_outlined, 'Settings'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _navRail(ThemeProvider t) {
+    return NavigationRail(
+      backgroundColor: t.bgSurface,
+      selectedIndex: _tabIndex,
+      onDestinationSelected: (i) => setState(() => _tabIndex = i),
+      labelType: NavigationRailLabelType.all,
+      selectedIconTheme: IconThemeData(color: t.iconColor),
+      unselectedIconTheme: IconThemeData(color: t.textSecondary),
+      selectedLabelTextStyle: TextStyle(
+        color: t.textPrimary,
+        fontWeight: FontWeight.w700,
+        fontSize: 12,
+      ),
+      unselectedLabelTextStyle: TextStyle(color: t.textSecondary, fontSize: 12),
+      destinations: const [
+        NavigationRailDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home_rounded),
+          label: Text('Home'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.map_outlined),
+          selectedIcon: Icon(Icons.map_rounded),
+          label: Text('Map'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.people_outline),
+          selectedIcon: Icon(Icons.people_rounded),
+          label: Text('Users'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.settings_outlined),
+          selectedIcon: Icon(Icons.settings_rounded),
+          label: Text('Settings'),
+        ),
+      ],
     );
   }
 
@@ -233,6 +300,7 @@ class _DashboardPage extends StatelessWidget {
   final double avgRating;
   final int totalReviews;
   final int featuredCount;
+  final int unreadCount;
   final Map<String, int> categoryCounts;
   final List<int> dailySubmissions;
   final VoidCallback onRetry;
@@ -249,6 +317,7 @@ class _DashboardPage extends StatelessWidget {
     required this.avgRating,
     required this.totalReviews,
     required this.featuredCount,
+    required this.unreadCount,
     required this.categoryCounts,
     required this.dailySubmissions,
     required this.onRetry,
@@ -258,169 +327,213 @@ class _DashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maxContentWidth = MediaQuery.of(context).size.width > 800
+        ? 900.0
+        : double.infinity;
     return SafeArea(
-      child: RefreshIndicator(
-        onRefresh: () async => onRetry(),
-        color: theme.iconColor,
-        backgroundColor: theme.bgSurface,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            // ── TOP HEADER ──
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxContentWidth),
+          child: RefreshIndicator(
+            onRefresh: () async => onRetry(),
+            color: theme.iconColor,
+            backgroundColor: theme.bgSurface,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                // ── TOP HEADER ──
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Admin Dashboard',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: theme.textPrimary,
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Admin Dashboard',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: theme.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              'Ringkasan & Analitik Aplikasi',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: theme.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          'Ringkasan & Analitik Aplikasi',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: theme.textSecondary,
+                        GestureDetector(
+                          onTap: onActivity,
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: theme.bgElevated,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(
+                                  Icons.notifications_outlined,
+                                  color: theme.textSecondary,
+                                  size: 20,
+                                ),
+                                if (unreadCount > 0)
+                                  Positioned(
+                                    right: -4,
+                                    top: -4,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 1,
+                                      ),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 16,
+                                        minHeight: 16,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEF4444),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: theme.bgBase,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        unreadCount > 99 ? '99+' : '$unreadCount',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    GestureDetector(
-                      onTap: onActivity,
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: theme.bgElevated,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.notifications_outlined,
-                          color: theme.textSecondary,
-                          size: 20,
+                  ),
+                ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+                // ── BODY ──
+                if (isLoading)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: CircularProgressIndicator(color: theme.iconColor),
+                    ),
+                  )
+                else if (error != null)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.cloud_off_rounded,
+                              size: 48,
+                              color: theme.textHint,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Gagal memuat data.',
+                              style: TextStyle(color: theme.textSecondary),
+                            ),
+                            const SizedBox(height: 12),
+                            TextButton.icon(
+                              onPressed: onRetry,
+                              icon: const Icon(Icons.refresh, size: 16),
+                              label: const Text('Muat Ulang'),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 20)),
-
-            // ── BODY ──
-            if (isLoading)
-              SliverFillRemaining(
-                child: Center(
-                  child: CircularProgressIndicator(color: theme.iconColor),
-                ),
-              )
-            else if (error != null)
-              SliverFillRemaining(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.cloud_off_rounded,
-                          size: 48,
-                          color: theme.textHint,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Gagal memuat data.',
-                          style: TextStyle(color: theme.textSecondary),
-                        ),
-                        const SizedBox(height: 12),
-                        TextButton.icon(
-                          onPressed: onRetry,
-                          icon: const Icon(Icons.refresh, size: 16),
-                          label: const Text('Muat Ulang'),
-                        ),
-                      ],
+                  )
+                else ...[
+                  // ── KPI STAT CARDS ──
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _kpiGrid(context),
                     ),
                   ),
-                ),
-              )
-            else ...[
-              // ── KPI STAT CARDS ──
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _kpiGrid(context),
-                ),
-              ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-              // ── QUICK ACTIONS ──
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _quickActions(context),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 20)),
-
-              // ── CATEGORY PIE CHART ──
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _sectionCard(
-                    title: 'Distribusi Kategori',
-                    child: categoryCounts.isEmpty
-                        ? _emptyPlaceholder('Belum ada data kategori.')
-                        : SizedBox(
-                            height: 260,
-                            child: _CategoryPieChart(
-                              theme: theme,
-                              data: categoryCounts,
-                            ),
-                          ),
+                  // ── QUICK ACTIONS ──
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _quickActions(context),
+                    ),
                   ),
-                ),
-              ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-              // ── SUBMISSION LINE CHART ──
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _sectionCard(
-                    title: 'Tren Pendaftaran (14 hari)',
-                    child: dailySubmissions.every((v) => v == 0)
-                        ? _emptyPlaceholder('Belum ada UMKM baru.')
-                        : SizedBox(
-                            height: 220,
-                            child: _SubmissionLineChart(
-                              theme: theme,
-                              data: dailySubmissions,
-                            ),
-                          ),
+                  // ── CATEGORY PIE CHART ──
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _sectionCard(
+                        title: 'Distribusi Kategori',
+                        child: categoryCounts.isEmpty
+                            ? _emptyPlaceholder('Belum ada data kategori.')
+                            : SizedBox(
+                                height: 260,
+                                child: _CategoryPieChart(
+                                  theme: theme,
+                                  data: categoryCounts,
+                                ),
+                              ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-            ],
-          ],
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                  // ── SUBMISSION LINE CHART ──
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _sectionCard(
+                        title: 'Tren Pendaftaran (14 hari)',
+                        child: dailySubmissions.every((v) => v == 0)
+                            ? _emptyPlaceholder('Belum ada UMKM baru.')
+                            : SizedBox(
+                                height: 220,
+                                child: _SubmissionLineChart(
+                                  theme: theme,
+                                  data: dailySubmissions,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+
+                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  // ── 6-cell KPI grid ──
   Widget _kpiGrid(BuildContext context) {
     final items = [
       _KpiItem(
@@ -442,34 +555,37 @@ class _DashboardPage extends StatelessWidget {
         const Color(0xFFF59E0B),
       ),
       _KpiItem(
-        Icons.star_border,
-        avgRating.toStringAsFixed(1),
-        'Avg Rating',
-        const Color(0xFF10B981),
-      ),
-      _KpiItem(
         Icons.rate_review_outlined,
         '$totalReviews',
         'Ulasan',
         const Color(0xFF3B82F6),
       ),
-      _KpiItem(
-        Icons.bookmark_outlined,
-        '$featuredCount',
-        'Unggulan',
-        const Color(0xFFEC4899),
-      ),
     ];
+
+    // Responsive crossAxisCount: mobile 2, tablet 3, desktop 6
+    final width = MediaQuery.of(context).size.width;
+    int crossAxisCount;
+    double childAspectRatio;
+    if (width < 600) {
+      crossAxisCount = 2;
+      childAspectRatio = 1.1;
+    } else if (width < 1000) {
+      crossAxisCount = 3;
+      childAspectRatio = 1.1;
+    } else {
+      crossAxisCount = 6;
+      childAspectRatio = 1.2;
+    }
 
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: items.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 1.0,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: childAspectRatio,
       ),
       itemBuilder: (_, i) => _kpiCard(items[i]),
     );
@@ -634,9 +750,15 @@ class _CategoryPieChart extends StatelessWidget {
     // getCategoryColor return abu-abu default jika tidak ditemukan
     // fallback rainbow jika tetap default
     const fallback = [
-      Color(0xFF4CAF50), Color(0xFFFFA726), Color(0xFF42A5F5),
-      Color(0xFFEF5350), Color(0xFFAB47BC), Color(0xFF26C6DA),
-      Color(0xFF8D6E63), Color(0xFFFF7043), Color(0xFF66BB6A),
+      Color(0xFF4CAF50),
+      Color(0xFFFFA726),
+      Color(0xFF42A5F5),
+      Color(0xFFEF5350),
+      Color(0xFFAB47BC),
+      Color(0xFF26C6DA),
+      Color(0xFF8D6E63),
+      Color(0xFFFF7043),
+      Color(0xFF66BB6A),
     ];
     return (direct == const Color(0xFF90A4AE))
         ? fallback[index % fallback.length]

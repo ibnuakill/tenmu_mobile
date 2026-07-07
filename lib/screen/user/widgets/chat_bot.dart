@@ -181,12 +181,17 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
   String _buildSystemPrompt(List<Map<String, dynamic>> places) {
     final sb = StringBuffer();
     sb.writeln('Kamu adalah TenMu AI, asisten cerdas untuk aplikasi TenMu — platform penemuan tempat UMKM, wisata, kuliner, cafe, hotel, dan oleh-oleh di Indonesia.');
-    sb.writeln('Tugas: bantu pengguna menemukan tempat yang sesuai kebutuhan mereka.');
-    sb.writeln('Jawab dalam Bahasa Indonesia yang ramah, singkat (maks 3 paragraf), dan informatif.');
-    sb.writeln('Saat merekomendasikan, WAJIB sebutkan nama PERSIS dari daftar. Jangan mengarang nama tempat.');
-    sb.writeln('Jika tidak ada yang cocok, jujur bilang tidak ada dan sarankan kata kunci lain.');
-    sb.writeln();
-    sb.writeln('=== DAFTAR TEMPAT TERSEDIA (${places.length} lokasi) ===');
+    sb.writeln('Tugas UTAMA: bantu pengguna menemukan tempat yang sesuai kebutuhan mereka dari daftar yang diberikan.');
+    sb.writeln('Jawab dalam Bahasa Indonesia yang ramah, santai, dan informatif.');
+    
+    // ATURAN KETAT (STRICT CONSTRAINTS)
+    sb.writeln('ATURAN KETAT:');
+    sb.writeln('1. Kamu HANYA BOLEH menjawab pertanyaan seputar rekomendasi tempat, pariwisata, kuliner, jam operasional, rute, atau fasilitas dari tempat di dalam daftar.');
+    sb.writeln('2. Jika pengguna bertanya hal di luar konteks aplikasi (seperti matematika, sains, pelajaran sekolah, coding, politik, atau pengetahuan umum lainnya), TOLAK DENGAN HALUS dan ingatkan bahwa kamu hanya asisten rekomendasi tempat.');
+    sb.writeln('3. Saat merekomendasikan, WAJIB sebutkan nama PERSIS dari daftar. Jangan mengarang/halusinasi nama tempat yang tidak ada di daftar.');
+    sb.writeln('4. Jika tidak ada tempat yang cocok dengan kriteria, jujur bilang tidak ada dan sarankan kata kunci lain.');
+    
+    sb.writeln('\n=== DAFTAR TEMPAT TERSEDIA (${places.length} lokasi) ===');
     for (int i = 0; i < places.length && i < 120; i++) {
       final p = places[i];
       final nama = p['nama_tempat']?.toString() ?? '';
@@ -256,9 +261,10 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
         reply = responseText ?? 'Maaf, tidak ada respons. Coba lagi ya!';
 
         // Tampilkan kartu tempat yang disebutkan Gemini
+        if (!mounted) return;
         final provider = context.read<PlacesProvider>();
         final mentioned = _extractMentionedPlaces(reply, provider.placesList);
-        if (mounted && mentioned.isNotEmpty) {
+        if (mentioned.isNotEmpty) {
           setState(() => _searchResults = mentioned);
         }
       } catch (e) {

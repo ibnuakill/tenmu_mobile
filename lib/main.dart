@@ -20,6 +20,9 @@ Future<void> main() async {
   await Supabase.initialize(
     url: dotenv.env['SUPABASE_URL']!,
     publishableKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    authOptions: FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.pkce,
+    ),
   );
 
   // Init OneSignal (tanpa externalUserId dulu — SDK login menyusul setelah auth)
