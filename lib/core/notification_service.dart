@@ -2,63 +2,90 @@ import 'package:flutter/material.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io' show Platform;
 
 /// Service for OneSignal push notifications.
 ///
 /// - `init()` — call once after Supabase init (auto-attach).
 /// - `attachUser(userId)` / `detachUser()` — call when auth state changes.
 /// - `sendNewPlaceNotification(placeId, placeName)` — call from admin after approving.
+///
+/// Note: OneSignal only supports Android & iOS. On Windows/macOS/Linux,
+/// all methods are no-ops.
 class NotificationService {
   NotificationService._();
 
   static final _appId = dotenv.env['ONESIGNAL_APP_ID'] ?? '';
 
   static bool _sdkInitialized = false;
+  static bool get _isSupported => Platform.isAndroid || Platform.isIOS;
 
   /// Initialize OneSignal SDK (one-time). Safe to call multiple times.
   static Future<void> init() async {
     if (_sdkInitialized) return;
+    if (!_isSupported) {
+      debugPrint('[NotificationService] OneSignal not supported on ${Platform.operatingSystem}');
+      _sdkInitialized = true; // mark initialized to avoid retry
+      return;
+    }
     if (_appId.isEmpty) {
       debugPrint('[NotificationService] ONESIGNAL_APP_ID not set in .env');
       return;
     }
 
-    OneSignal.initialize(_appId);
+    try {
+      OneSignal.initialize(_appId);
 
-    // Request notification permission
-    final result = await OneSignal.Notifications.requestPermission(true);
-    debugPrint('[NotificationService] permission: $result');
+      // Request notification permission
+      final result = await OneSignal.Notifications.requestPermission(true);
+      debugPrint('[NotificationService] permission: $result');
 
-    // Wajib di v5 — explicit opt-in biar device terdaftar
-    debugPrint('[NotificationService] events registered: $result');
+      // Wajib di v5 — explicit opt-in biar device terdaftar
+      debugPrint('[NotificationService] events registered: $result');
 
-    // Display notifications while app is in foreground
-    OneSignal.Notifications.addForegroundWillDisplayListener((event) {
-      event.notification.display();
-    });
+      // Display notifications while app is in foreground
+      OneSignal.Notifications.addForegroundWillDisplayListener((event) {
+        event.notification.display();
+      });
 
-    _sdkInitialized = true;
+      _sdkInitialized = true;
+    } catch (e) {
+      debugPrint('[NotificationService] init error (likely unsupported platform): $e');
+      _sdkInitialized = true;
+    }
   }
 
   /// Register push subscription (panggil manual setelah login).
   static Future<void> registerPush() async {
-    if (_appId.isEmpty) return;
-    await OneSignal.User.pushSubscription.optIn();
-    debugPrint('[NotificationService] optIn completed');
+    if (!_isSupported || _appId.isEmpty) return;
+    try {
+      await OneSignal.User.pushSubscription.optIn();
+      debugPrint('[NotificationService] optIn completed');
+    } catch (e) {
+      debugPrint('[NotificationService] registerPush error: $e');
+    }
   }
 
   /// Link device to a Supabase user — call on login / session restore.
   static Future<void> attachUser(String userId) async {
-    if (_appId.isEmpty) return;
-    await OneSignal.login(userId);
-    debugPrint('[NotificationService] attached user: $userId');
+    if (!_isSupported || _appId.isEmpty) return;
+    try {
+      await OneSignal.login(userId);
+      debugPrint('[NotificationService] attached user: $userId');
+    } catch (e) {
+      debugPrint('[NotificationService] attachUser error: $e');
+    }
   }
 
   /// Unlink device — call on logout.
   static Future<void> detachUser() async {
-    if (_appId.isEmpty) return;
-    await OneSignal.logout();
-    debugPrint('[NotificationService] detached user');
+    if (!_isSupported || _appId.isEmpty) return;
+    try {
+      await OneSignal.logout();
+      debugPrint('[NotificationService] detached user');
+    } catch (e) {
+      debugPrint('[NotificationService] detachUser error: $e');
+    }
   }
 
   /// Send push notification via Supabase Edge Function.

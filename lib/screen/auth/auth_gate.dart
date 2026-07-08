@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io' show Platform;
 import 'login_screen.dart';
 import 'role_checker.dart';
 import 'email_verification_screen.dart';
@@ -22,13 +23,15 @@ class _AuthGateState extends State<AuthGate> {
     super.initState();
     _checkOnboardingStatus();
 
-    // Sync OneSignal login/logout with auth state changes
+    // Sync OneSignal login/logout with auth state changes (Android/iOS only)
     Supabase.instance.client.auth.onAuthStateChange.listen((event) {
       final session = event.session;
-      if (session != null && session.user.emailConfirmedAt != null) {
+      if (session != null &&
+          session.user.emailConfirmedAt != null &&
+          (Platform.isAndroid || Platform.isIOS)) {
         NotificationService.attachUser(session.user.id);
         NotificationService.registerPush();
-      } else if (session == null) {
+      } else if (session == null && (Platform.isAndroid || Platform.isIOS)) {
         NotificationService.detachUser();
       }
     });
