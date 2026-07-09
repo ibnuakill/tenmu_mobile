@@ -39,12 +39,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     _logoScaleAnimation = Tween<double>(
       begin: 0.8,
       end: 1.0,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutBack,
-      ),
-    );
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
     _logoVerticalOffsetAnimation = TweenSequence<double>([
       TweenSequenceItem(
         tween: Tween<double>(
@@ -104,10 +99,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(34),
-          child: Image.asset(
-            'assets/branding/app_icon.png',
-            fit: BoxFit.cover,
-          ),
+          child: Image.asset('assets/branding/app_icon.png', fit: BoxFit.cover),
         ),
       ),
       builder: (context, child) {
@@ -115,10 +107,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
           offset: Offset(0, _logoVerticalOffsetAnimation.value),
           child: FadeTransition(
             opacity: _logoFadeAnimation,
-            child: ScaleTransition(
-              scale: _logoScaleAnimation,
-              child: child,
-            ),
+            child: ScaleTransition(scale: _logoScaleAnimation, child: child),
           ),
         );
       },
@@ -134,10 +123,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0D121F),
-              Color(0xFF134C57),
-            ],
+            colors: [Color(0xFF0D121F), Color(0xFF134C57)],
           ),
         ),
         child: Stack(
@@ -186,7 +172,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                           ),
                           SizedBox(height: 8),
                           Text(
-                            'Temukan tempat nongkrong favoritmu',
+                            'Temukan Tempat Belanja favoritmu',
                             style: TextStyle(
                               color: Color(0xB3EAF5F7),
                               fontSize: 13,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +11,7 @@ import 'package:tenmu/core/notification_service.dart';
 import 'package:tenmu/screen/auth/auth_gate.dart';
 import 'package:tenmu/screen/auth/forgot_password_screen.dart';
 import 'package:tenmu/screen/splash/animated_splash_screen.dart';
+import 'package:window_manager/window_manager.dart';
 
 // Fungsi main() adalah titik awal berjalannya aplikasi Flutter
 Future<void> main() async {
@@ -27,6 +30,23 @@ Future<void> main() async {
 
   // Init OneSignal (tanpa externalUserId dulu — SDK login menyusul setelah auth)
   NotificationService.init();
+
+  // Init window manager (untuk fullscreen di desktop)
+  await WindowManager.instance.ensureInitialized();
+
+  // Global keyboard listener: Esc / F11 → toggle fullscreen
+  // HardwareKeyEventListener nangkep event meski window lagi di fullscreen OS layer
+  HardwareKeyboard.instance.addHandler((event) {
+    if (event is KeyDownEvent &&
+        (event.logicalKey == LogicalKeyboardKey.escape ||
+            event.logicalKey == LogicalKeyboardKey.f11)) {
+      unawaited(() async {
+        final isFull = await WindowManager.instance.isFullScreen();
+        await WindowManager.instance.setFullScreen(!isFull);
+      }());
+    }
+    return false;
+  });
 
   // Menjalankan aplikasi
   runApp(

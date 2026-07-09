@@ -11,6 +11,7 @@ import 'admin_map_screen.dart';
 import 'admin_activity_screen.dart';
 import 'manage_users_screen.dart';
 import 'manage_kategori_screen.dart';
+import 'package:window_manager/window_manager.dart';
 
 /// Provider khusus admin — selalu dark mode, tidak terpengaruh toggle user.
 final adminThemeProvider = ThemeProvider(forceDarkMode: true);
@@ -63,6 +64,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   @override
   void initState() {
     super.initState();
+    // True fullscreen: taskbar & titlebar hilang.
+    // Esc / Alt+F4 / klik kanan taskbar icon → keluar normal (window_manager + Win hooks).
+    WindowManager.instance.setFullScreen(true);
     _loadDashboard();
   }
 
@@ -79,10 +83,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       final todayStart = DateTime(now.year, now.month, now.day);
 
       final results = await Future.wait([
-        _client.from('places').select('id, category, is_featured, verification_status, nama_tempat, created_at'),
+        _client
+            .from('places')
+            .select(
+              'id, category, is_featured, verification_status, nama_tempat, created_at',
+            ),
         _client.from('profiles').select('id, created_at'),
         _client.from('reviews').select('rating, created_at'),
-        _client.from('places').select('created_at').gte('created_at', fourteenDaysAgo.toIso8601String()).order('created_at', ascending: true),
+        _client
+            .from('places')
+            .select('created_at')
+            .gte('created_at', fourteenDaysAgo.toIso8601String())
+            .order('created_at', ascending: true),
       ]).timeout(const Duration(seconds: 15));
 
       final placeList = results[0] as List;
@@ -107,9 +119,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         final dt = DateTime.tryParse(p['created_at'] as String? ?? '');
         if (dt == null) continue;
         if (!dt.isBefore(thisMonthStart)) placesThisMonth++;
-        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart)) placesLast++;
+        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart))
+          placesLast++;
       }
-      _placesLastMonth = placesLast == 0 ? placesThisMonth * 5 : placesLast; // fallback agar growth terlihat
+      _placesLastMonth = placesLast == 0
+          ? placesThisMonth * 5
+          : placesLast; // fallback agar growth terlihat
 
       // Growth: users
       int usersThisMonth = 0, usersLast = 0;
@@ -117,7 +132,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         final dt = DateTime.tryParse(u['created_at'] as String? ?? '');
         if (dt == null) continue;
         if (!dt.isBefore(thisMonthStart)) usersThisMonth++;
-        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart)) usersLast++;
+        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart))
+          usersLast++;
       }
       _usersLastMonth = usersLast == 0 ? usersThisMonth * 4 : usersLast;
 
@@ -127,7 +143,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         final dt = DateTime.tryParse(r['created_at'] as String? ?? '');
         if (dt == null) continue;
         if (!dt.isBefore(thisMonthStart)) reviewsThisMonth++;
-        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart)) reviewsLast++;
+        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart))
+          reviewsLast++;
       }
       _reviewsLastMonth = reviewsLast == 0 ? reviewsThisMonth * 1 : reviewsLast;
 
@@ -170,8 +187,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       // Recent activities — latest 10 places as activity feed
       final sorted = List<Map<String, dynamic>>.from(placeList)
         ..sort((a, b) {
-          final ta = DateTime.tryParse(a['created_at'] as String? ?? '') ?? DateTime(2000);
-          final tb = DateTime.tryParse(b['created_at'] as String? ?? '') ?? DateTime(2000);
+          final ta =
+              DateTime.tryParse(a['created_at'] as String? ?? '') ??
+              DateTime(2000);
+          final tb =
+              DateTime.tryParse(b['created_at'] as String? ?? '') ??
+              DateTime(2000);
           return tb.compareTo(ta);
         });
       _recentActivities = sorted.take(10).toList();
@@ -293,7 +314,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 22, color: active ? Colors.white : theme.textSecondary),
+            Icon(
+              icon,
+              size: 22,
+              color: active ? Colors.white : theme.textSecondary,
+            ),
             const SizedBox(height: 2),
             Text(
               label,
@@ -349,11 +374,19 @@ class _Sidebar extends StatelessWidget {
                     color: _kAccentPurple,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.near_me_rounded, color: Colors.white, size: 16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      'assets/branding/app_icon.png',
+                      width: 30,
+                      height: 30,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 const Text(
-                  'tenmu',
+                  'Tenmu',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -366,19 +399,44 @@ class _Sidebar extends StatelessWidget {
           ),
 
           // Nav items
-          _sidebarItem(0, Icons.dashboard_rounded, Icons.dashboard_outlined, 'Dashboard'),
+          _sidebarItem(
+            0,
+            Icons.dashboard_rounded,
+            Icons.dashboard_outlined,
+            'Dashboard',
+          ),
           _sidebarItem(1, Icons.map_rounded, Icons.map_outlined, 'Map'),
           _sidebarItem(2, Icons.people_rounded, Icons.people_outline, 'Users'),
-          _sidebarItem(3, Icons.category_rounded, Icons.category_outlined, 'Kategori'),
-          _sidebarItem(4, Icons.verified_rounded, Icons.verified_outlined, 'Verifikasi Tempat'),
-          _sidebarItem(5, Icons.notifications_rounded, Icons.notifications_outlined, 'Aktivitas Admin'),
+          _sidebarItem(
+            3,
+            Icons.category_rounded,
+            Icons.category_outlined,
+            'Kategori',
+          ),
+          _sidebarItem(
+            4,
+            Icons.verified_rounded,
+            Icons.verified_outlined,
+            'Verifikasi Tempat',
+          ),
+          _sidebarItem(
+            5,
+            Icons.notifications_rounded,
+            Icons.notifications_outlined,
+            'Aktivitas Admin',
+          ),
 
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Divider(color: _kBorderColor, height: 1),
           ),
 
-          _sidebarItem(6, Icons.settings_rounded, Icons.settings_outlined, 'Settings'),
+          _sidebarItem(
+            6,
+            Icons.settings_rounded,
+            Icons.settings_outlined,
+            'Settings',
+          ),
 
           const Spacer(),
 
@@ -396,7 +454,11 @@ class _Sidebar extends StatelessWidget {
                 CircleAvatar(
                   radius: 16,
                   backgroundColor: _kAccentPurple.withValues(alpha: 0.3),
-                  child: const Icon(Icons.person, color: _kAccentPurple, size: 16),
+                  child: const Icon(
+                    Icons.person,
+                    color: _kAccentPurple,
+                    size: 16,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -421,7 +483,11 @@ class _Sidebar extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.expand_more, color: Color(0xFF6B7280), size: 16),
+                const Icon(
+                  Icons.expand_more,
+                  color: Color(0xFF6B7280),
+                  size: 16,
+                ),
               ],
             ),
           ),
@@ -431,7 +497,12 @@ class _Sidebar extends StatelessWidget {
     );
   }
 
-  Widget _sidebarItem(int idx, IconData activeIcon, IconData inactiveIcon, String label) {
+  Widget _sidebarItem(
+    int idx,
+    IconData activeIcon,
+    IconData inactiveIcon,
+    String label,
+  ) {
     final active = selectedIndex == idx;
     return GestureDetector(
       onTap: () => onSelect(idx),
@@ -535,8 +606,19 @@ class _DashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     const bulan = [
-      '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      '',
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
     ];
     final dateStr = '${now.day} ${bulan[now.month]} ${now.year}';
 
@@ -557,95 +639,123 @@ class _DashboardPage extends StatelessWidget {
                   child: LayoutBuilder(
                     builder: (ctx, bc) {
                       final isNarrow = bc.maxWidth < 400;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      // Date + Bell widgets (reusable di kanan)
+                      final dateBell = Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Greeting row
-                          Text(
-                            'Selamat datang, Admin! 👋',
-                            style: TextStyle(
-                              fontSize: isNarrow ? 18 : 22,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: -0.3,
+                          // Date pill
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 7,
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Ringkasan & analitik aplikasi tenmu',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white.withValues(alpha: 0.5),
+                            decoration: BoxDecoration(
+                              color: _kCardBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: _kBorderColor),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          // Date + Bell row
-                          Row(
-                            children: [
-                              const Spacer(),
-                              // Date pill
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                                decoration: BoxDecoration(
-                                  color: _kCardBg,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: _kBorderColor),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.calendar_today_outlined,
+                                  size: 13,
+                                  color: Colors.white.withValues(alpha: 0.6),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.calendar_today_outlined, size: 13, color: Colors.white.withValues(alpha: 0.6)),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      dateStr,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.white.withValues(alpha: 0.8),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Icon(Icons.keyboard_arrow_down, size: 14, color: Colors.white.withValues(alpha: 0.6)),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Notification bell
-                              GestureDetector(
-                                onTap: onActivity,
-                                child: Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: _kCardBg,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: _kBorderColor),
+                                const SizedBox(width: 5),
+                                Text(
+                                  dateStr,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                  child: Stack(
-                                    clipBehavior: Clip.none,
-                                    alignment: Alignment.center,
-                                    children: [
-                                      Icon(Icons.notifications_outlined, size: 17, color: Colors.white.withValues(alpha: 0.7)),
-                                      if (unreadCount > 0)
-                                        Positioned(
-                                          right: 4,
-                                          top: 4,
-                                          child: Container(
-                                            width: 9,
-                                            height: 9,
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFEF4444),
-                                              shape: BoxShape.circle,
-                                              border: Border.all(color: const Color(0xFF111111), width: 1.5),
-                                            ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.keyboard_arrow_down,
+                                  size: 14,
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Notification bell
+                          GestureDetector(
+                            onTap: onActivity,
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: _kCardBg,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: _kBorderColor),
+                              ),
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                alignment: Alignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.notifications_outlined,
+                                    size: 17,
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                  ),
+                                  if (unreadCount > 0)
+                                    Positioned(
+                                      right: 4,
+                                      top: 4,
+                                      child: Container(
+                                        width: 9,
+                                        height: 9,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFEF4444),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: const Color(0xFF111111),
+                                            width: 1.5,
                                           ),
                                         ),
-                                    ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Kiri: greeting + subtitle
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Selamat datang, Admin! 👋',
+                                  style: TextStyle(
+                                    fontSize: isNarrow ? 16 : 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: -0.3,
                                   ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Ringkasan & analitik aplikasi tenmu',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
+                          // Kanan: date pill + bell
+                          dateBell,
                         ],
                       );
                     },
@@ -658,7 +768,9 @@ class _DashboardPage extends StatelessWidget {
               // ── BODY ──
               if (isLoading)
                 SliverFillRemaining(
-                  child: Center(child: CircularProgressIndicator(color: _kAccentGreen)),
+                  child: Center(
+                    child: CircularProgressIndicator(color: _kAccentGreen),
+                  ),
                 )
               else if (error != null)
                 SliverFillRemaining(
@@ -666,9 +778,16 @@ class _DashboardPage extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.cloud_off_rounded, size: 48, color: Color(0xFF4B5563)),
+                        const Icon(
+                          Icons.cloud_off_rounded,
+                          size: 48,
+                          color: Color(0xFF4B5563),
+                        ),
                         const SizedBox(height: 12),
-                        const Text('Gagal memuat data.', style: TextStyle(color: Color(0xFF9CA3AF))),
+                        const Text(
+                          'Gagal memuat data.',
+                          style: TextStyle(color: Color(0xFF9CA3AF)),
+                        ),
                         const SizedBox(height: 12),
                         TextButton.icon(
                           onPressed: onRetry,
@@ -771,8 +890,12 @@ class _DashboardPage extends StatelessWidget {
         iconBg: _kAccentAmber,
         label: 'Menunggu Verifikasi',
         value: '$pendingCount',
-        growthText: pendingCount == 0 ? 'Tidak ada perubahan' : '+$pendingCount menunggu',
-        growthColor: pendingCount == 0 ? const Color(0xFF6B7280) : _kAccentAmber,
+        growthText: pendingCount == 0
+            ? 'Tidak ada perubahan'
+            : '+$pendingCount menunggu',
+        growthColor: pendingCount == 0
+            ? const Color(0xFF6B7280)
+            : _kAccentAmber,
       ),
       _KpiData(
         icon: Icons.chat_bubble_outline,
@@ -795,7 +918,7 @@ class _DashboardPage extends StatelessWidget {
             crossAxisCount: crossAxis,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: crossAxis == 4 ? 1.7 : 1.5,
+            childAspectRatio: crossAxis == 4 ? 1.7 : 1.15,
           ),
           itemBuilder: (_, i) => _KpiCard(data: items[i]),
         );
@@ -828,7 +951,11 @@ class _DashboardPage extends StatelessWidget {
                       color: _kAccentGreen.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.verified_outlined, color: _kAccentGreen, size: 18),
+                    child: const Icon(
+                      Icons.verified_outlined,
+                      color: _kAccentGreen,
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -863,7 +990,9 @@ class _DashboardPage extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      isVerified ? Icons.check : Icons.arrow_forward_ios_rounded,
+                      isVerified
+                          ? Icons.check
+                          : Icons.arrow_forward_ios_rounded,
                       color: _kAccentGreen,
                       size: 12,
                     ),
@@ -882,7 +1011,9 @@ class _DashboardPage extends StatelessWidget {
               decoration: BoxDecoration(
                 color: _kAccentPurple.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _kAccentPurple.withValues(alpha: 0.2)),
+                border: Border.all(
+                  color: _kAccentPurple.withValues(alpha: 0.2),
+                ),
               ),
               child: Row(
                 children: [
@@ -892,7 +1023,11 @@ class _DashboardPage extends StatelessWidget {
                       color: _kAccentPurple.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.trending_up_rounded, color: _kAccentPurple, size: 18),
+                    child: const Icon(
+                      Icons.trending_up_rounded,
+                      color: _kAccentPurple,
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -924,7 +1059,11 @@ class _DashboardPage extends StatelessWidget {
                       color: _kAccentPurple.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.chevron_right_rounded, color: _kAccentPurple, size: 16),
+                    child: const Icon(
+                      Icons.chevron_right_rounded,
+                      color: _kAccentPurple,
+                      size: 16,
+                    ),
                   ),
                 ],
               ),
@@ -959,7 +1098,12 @@ class _DashboardPage extends StatelessWidget {
           categoryCounts.isEmpty
               ? const SizedBox(
                   height: 180,
-                  child: Center(child: Text('Belum ada data kategori.', style: TextStyle(color: Color(0xFF6B7280)))),
+                  child: Center(
+                    child: Text(
+                      'Belum ada data kategori.',
+                      style: TextStyle(color: Color(0xFF6B7280)),
+                    ),
+                  ),
                 )
               : _CategoryDonutChart(data: categoryCounts),
         ],
@@ -992,7 +1136,10 @@ class _DashboardPage extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF1F1F1F),
                   borderRadius: BorderRadius.circular(8),
@@ -1006,7 +1153,11 @@ class _DashboardPage extends StatelessWidget {
                       style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.keyboard_arrow_down, color: Color(0xFF9CA3AF), size: 14),
+                    const Icon(
+                      Icons.keyboard_arrow_down,
+                      color: Color(0xFF9CA3AF),
+                      size: 14,
+                    ),
                   ],
                 ),
               ),
@@ -1016,7 +1167,12 @@ class _DashboardPage extends StatelessWidget {
           dailySubmissions.every((v) => v == 0)
               ? const SizedBox(
                   height: 180,
-                  child: Center(child: Text('Belum ada data pendaftaran.', style: TextStyle(color: Color(0xFF6B7280)))),
+                  child: Center(
+                    child: Text(
+                      'Belum ada data pendaftaran.',
+                      style: TextStyle(color: Color(0xFF6B7280)),
+                    ),
+                  ),
                 )
               : SizedBox(
                   height: 180,
@@ -1054,15 +1210,24 @@ class _DashboardPage extends StatelessWidget {
               GestureDetector(
                 onTap: onActivity,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: _kAccentBlue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: _kAccentBlue.withValues(alpha: 0.25)),
+                    border: Border.all(
+                      color: _kAccentBlue.withValues(alpha: 0.25),
+                    ),
                   ),
                   child: const Text(
                     'Lihat Semua',
-                    style: TextStyle(color: _kAccentBlue, fontSize: 12, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                      color: _kAccentBlue,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
@@ -1072,14 +1237,24 @@ class _DashboardPage extends StatelessWidget {
           if (recentActivities.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: Text('Belum ada aktivitas.', style: TextStyle(color: Color(0xFF6B7280)))),
+              child: Center(
+                child: Text(
+                  'Belum ada aktivitas.',
+                  style: TextStyle(color: Color(0xFF6B7280)),
+                ),
+              ),
             )
           else
             Column(
-              children: recentActivities.take(5).toList().asMap().entries.map((entry) {
+              children: recentActivities.take(5).toList().asMap().entries.map((
+                entry,
+              ) {
                 final idx = entry.key;
                 final a = entry.value;
-                return _ActivityRow(activity: a, isLast: idx == recentActivities.take(5).length - 1);
+                return _ActivityRow(
+                  activity: a,
+                  isLast: idx == recentActivities.take(5).length - 1,
+                );
               }).toList(),
             ),
         ],
@@ -1192,12 +1367,15 @@ class _CategoryDonutChart extends StatelessWidget {
       Color(0xFFAB47BC),
       Color(0xFF26C6DA),
     ];
-    return (direct == const Color(0xFF90A4AE)) ? fallback[index % fallback.length] : direct;
+    return (direct == const Color(0xFF90A4AE))
+        ? fallback[index % fallback.length]
+        : direct;
   }
 
   @override
   Widget build(BuildContext context) {
-    final entries = data.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final entries = data.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     final total = entries.fold(0, (sum, e) => sum + e.value);
 
     final sections = entries.asMap().entries.map((e) {
@@ -1207,7 +1385,11 @@ class _CategoryDonutChart extends StatelessWidget {
         color: color,
         radius: 55,
         title: '${e.value.value}',
-        titleStyle: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+        titleStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+        ),
       );
     }).toList();
 
@@ -1234,23 +1416,38 @@ class _CategoryDonutChart extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: entries.asMap().entries.map((e) {
               final color = _colorFor(e.value.key, e.key);
-              final pct = total > 0 ? ((e.value.value / total) * 100).round() : 0;
+              final pct = total > 0
+                  ? ((e.value.value / total) * 100).round()
+                  : 0;
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 5),
                 child: Row(
                   children: [
-                    Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         e.value.key,
-                        style: const TextStyle(color: Color(0xFFD1D5DB), fontSize: 12),
+                        style: const TextStyle(
+                          color: Color(0xFFD1D5DB),
+                          fontSize: 12,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Text(
                       '${e.value.value} ($pct%)',
-                      style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 11),
+                      style: const TextStyle(
+                        color: Color(0xFF9CA3AF),
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -1279,7 +1476,11 @@ class _SubmissionLineChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spots = data.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.toDouble())).toList();
+    final spots = data
+        .asMap()
+        .entries
+        .map((e) => FlSpot(e.key.toDouble(), e.value.toDouble()))
+        .toList();
 
     return LineChart(
       LineChartData(
@@ -1325,7 +1526,10 @@ class _SubmissionLineChart extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     _dayLabel(daysAgo),
-                    style: const TextStyle(fontSize: 9, color: Color(0xFF6B7280)),
+                    style: const TextStyle(
+                      fontSize: 9,
+                      color: Color(0xFF6B7280),
+                    ),
                   ),
                 );
               },
@@ -1350,7 +1554,8 @@ class _SubmissionLineChart extends StatelessWidget {
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
-          getDrawingHorizontalLine: (value) => FlLine(color: _kBorderColor, strokeWidth: 0.5),
+          getDrawingHorizontalLine: (value) =>
+              FlLine(color: _kBorderColor, strokeWidth: 0.5),
         ),
         borderData: FlBorderData(show: false),
         minY: 0,
@@ -1360,7 +1565,11 @@ class _SubmissionLineChart extends StatelessWidget {
               final daysAgo = 13 - s.spotIndex;
               return LineTooltipItem(
                 '${_dayLabel(daysAgo)}: ${s.y.toInt()}',
-                const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
+                const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
               );
             }).toList(),
           ),
@@ -1449,7 +1658,10 @@ class _ActivityRow extends StatelessWidget {
                 flex: 3,
                 child: Text(
                   actionLabel,
-                  style: const TextStyle(color: Color(0xFFD1D5DB), fontSize: 11),
+                  style: const TextStyle(
+                    color: Color(0xFFD1D5DB),
+                    fontSize: 11,
+                  ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
@@ -1460,7 +1672,10 @@ class _ActivityRow extends StatelessWidget {
                 flex: 3,
                 child: Text(
                   name,
-                  style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 11),
+                  style: const TextStyle(
+                    color: Color(0xFF9CA3AF),
+                    fontSize: 11,
+                  ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
@@ -1476,7 +1691,11 @@ class _ActivityRow extends StatelessWidget {
                 ),
                 child: Text(
                   badgeText,
-                  style: TextStyle(color: badgeColor, fontSize: 9, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: badgeColor,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               const SizedBox(width: 6),
@@ -1485,7 +1704,10 @@ class _ActivityRow extends StatelessWidget {
                 flex: 3,
                 child: Text(
                   timeAgo,
-                  style: const TextStyle(color: Color(0xFF6B7280), fontSize: 10),
+                  style: const TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontSize: 10,
+                  ),
                   textAlign: TextAlign.right,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
