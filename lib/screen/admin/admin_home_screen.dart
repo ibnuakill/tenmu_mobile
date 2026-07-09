@@ -119,8 +119,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         final dt = DateTime.tryParse(p['created_at'] as String? ?? '');
         if (dt == null) continue;
         if (!dt.isBefore(thisMonthStart)) placesThisMonth++;
-        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart))
+        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart)) {
           placesLast++;
+        }
       }
       _placesLastMonth = placesLast == 0
           ? placesThisMonth * 5
@@ -132,8 +133,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         final dt = DateTime.tryParse(u['created_at'] as String? ?? '');
         if (dt == null) continue;
         if (!dt.isBefore(thisMonthStart)) usersThisMonth++;
-        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart))
+        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart)) {
           usersLast++;
+        }
       }
       _usersLastMonth = usersLast == 0 ? usersThisMonth * 4 : usersLast;
 
@@ -143,8 +145,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         final dt = DateTime.tryParse(r['created_at'] as String? ?? '');
         if (dt == null) continue;
         if (!dt.isBefore(thisMonthStart)) reviewsThisMonth++;
-        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart))
+        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart)) {
           reviewsLast++;
+        }
       }
       _reviewsLastMonth = reviewsLast == 0 ? reviewsThisMonth * 1 : reviewsLast;
 

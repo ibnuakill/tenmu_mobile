@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -14,98 +16,50 @@ class EmailVerificationScreen extends StatefulWidget {
 
 class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   bool _isLoading = false;
-  bool _isCheckingVerification = false;
   late String _displayEmail;
+  late final StreamSubscription<AuthState> _authSub;
 
   @override
   void initState() {
     super.initState();
     _displayEmail = widget.email ?? Supabase.instance.client.auth.currentUser?.email ?? '';
-    _startVerificationCheck();
-  }
-
-  void _startVerificationCheck() {
-    // Check every 3 seconds if email has been verified
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        _checkEmailVerification();
+    // Auto-redirect kalau session diupdate dari tempat lain (deep link, app lain)
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+      if (event.session?.user.emailConfirmedAt != null && mounted) {
+        // AuthGate stream akan handle — gak perlu push manual
       }
     });
   }
 
-  Future<void> _checkEmailVerification() async {
-    if (!mounted) return;
-
-    setState(() => _isCheckingVerification = true);
-
-    try {
-      // Refresh the session to get updated user data
-      await Supabase.instance.client.auth.refreshSession();
-
-      final user = Supabase.instance.client.auth.currentUser;
-
-      if (user != null && user.emailConfirmedAt != null) {
-        // Email is verified, navigate to appropriate screen
-        if (mounted) {
-          Navigator.of(context).pushReplacementNamed('/home');
-        }
-      } else {
-        // Still not verified, check again after delay
-        if (mounted) {
-          setState(() => _isCheckingVerification = false);
-          _startVerificationCheck();
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isCheckingVerification = false);
-        _showErrorSnackbar('Error checking verification: $e');
-        _startVerificationCheck();
-      }
-    }
+  @override
+  void dispose() {
+    _authSub.cancel();
+    super.dispose();
   }
 
-  Future<void> _resendVerificationEmail() async {
+  Future<void> _checkVerification() async {
+    if (_isLoading) return;
     setState(() => _isLoading = true);
-
     try {
-      // Supabase automatically sends verification email on signup
-      // For resend, we show instruction to user to check email
-      if (mounted) {
-        _showSuccessSnackbar('Instruksi verifikasi telah dikirim. Silakan periksa email Anda.');
-      }
+      // refreshSession() trigger onAuthStateChange di AuthGate
+      // → rebuild → detect emailConfirmedAt != null → auto-redirect ke RoleChecker
+      await Supabase.instance.client.auth.refreshSession();
     } catch (e) {
-      if (mounted) {
-        _showErrorSnackbar('Error: $e');
-      }
+      if (mounted) _showErrorSnackbar('Error: $e');
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _logout() async {
     try {
       await Supabase.instance.client.auth.signOut();
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/login');
-      }
+      // AuthGate stream akan redirect ke LoginScreen otomatis
     } catch (e) {
       if (mounted) {
         _showErrorSnackbar('Error logging out: $e');
       }
     }
-  }
-
-  void _showSuccessSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green.shade700,
-        duration: const Duration(seconds: 3),
-      ),
-    );
   }
 
   void _showErrorSnackbar(String message) {
@@ -237,48 +191,30 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                // Checking status
-                if (_isCheckingVerification)
-                  Column(
-                    children: [
-                      SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation(theme.btnPrimary),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Memeriksa verifikasi email...',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: theme.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                const SizedBox(height: 32),
-
-                // Resend button
+                // Cek status tombol
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _resendVerificationEmail,
-                    icon: Icon(
-                      Icons.mail_outline,
-                      color: _isLoading ? theme.textSecondary : theme.btnLabel,
-                    ),
+                    onPressed: _isLoading ? null : _checkVerification,
+                    icon: _isLoading
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(theme.btnLabel),
+                            ),
+                          )
+                        : Icon(Icons.refresh, color: theme.btnLabel),
                     label: Text(
-                      _isLoading ? 'Mengirim...' : 'Kirim Ulang Email',
+                      _isLoading ? 'Mengecek...' : 'Saya Sudah Verifikasi',
                       style: TextStyle(
-                        color: _isLoading ? theme.textSecondary : theme.btnLabel,
+                        color: theme.btnLabel,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _isLoading ? theme.bgElevated : theme.btnPrimary,
+                      backgroundColor: theme.btnPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

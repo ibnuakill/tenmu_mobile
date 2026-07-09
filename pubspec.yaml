@@ -51,6 +51,7 @@ dependencies:
   fl_chart: ^0.70.2
   google_generative_ai: ^0.4.6
   window_manager: ^0.4.3
+  desktop_webview_window: ^0.2.0
 
 dev_dependencies:
   flutter_test:

@@ -171,15 +171,17 @@ class _LoginScreenState extends State<LoginScreen>
     return Scaffold(
       backgroundColor: AppColors.bgBase,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Center(
           child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight:
-                  MediaQuery.of(context).size.height -
-                  MediaQuery.of(context).padding.top -
-                  MediaQuery.of(context).padding.bottom,
-            ),
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height -
+                      MediaQuery.of(context).padding.top -
+                      MediaQuery.of(context).padding.bottom,
+                ),
             child: IntrinsicHeight(
               child: Column(
                 children: [
@@ -400,7 +402,9 @@ class _LoginScreenState extends State<LoginScreen>
           ),
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 
   // ── Helper Widgets ────────────────────────────────────────────────────────
