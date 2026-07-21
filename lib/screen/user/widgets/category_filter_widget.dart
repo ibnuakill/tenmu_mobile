@@ -58,10 +58,8 @@ class _CategoryFilterWidgetState extends State<CategoryFilterWidget> {
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -155,7 +153,6 @@ class _CategoryFilterWidgetState extends State<CategoryFilterWidget> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }

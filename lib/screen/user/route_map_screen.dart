@@ -1,17 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:http/http.dart' as http;
+import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme_provider.dart';
 import '../../core/location_permission_helper.dart';
 import '../../core/poi_category.dart';
 import '../../core/poi_image_helper.dart';
+import '../../core/maptiler_style.dart';
 
 // ---------------------------------------------------------------------------
 // TravelMode
@@ -22,28 +25,28 @@ enum TravelMode {
   car;
 
   String get osrmProfile => switch (this) {
-    TravelMode.walking => 'walking',
-    TravelMode.motorcycle => 'driving',
-    TravelMode.car => 'driving',
-  };
+        TravelMode.walking => 'walking',
+        TravelMode.motorcycle => 'driving',
+        TravelMode.car => 'driving',
+      };
 
   double get speedKmh => switch (this) {
-    TravelMode.walking => 5,
-    TravelMode.motorcycle => 40,
-    TravelMode.car => 30,
-  };
+        TravelMode.walking => 5,
+        TravelMode.motorcycle => 40,
+        TravelMode.car => 30,
+      };
 
   String get label => switch (this) {
-    TravelMode.walking => 'Jalan Kaki',
-    TravelMode.motorcycle => 'Motor',
-    TravelMode.car => 'Mobil',
-  };
+        TravelMode.walking => 'Jalan Kaki',
+        TravelMode.motorcycle => 'Motor',
+        TravelMode.car => 'Mobil',
+      };
 
   String get iconLabel => switch (this) {
-    TravelMode.walking => '🚶',
-    TravelMode.motorcycle => '🏍️',
-    TravelMode.car => '🚗',
-  };
+        TravelMode.walking => '🚶',
+        TravelMode.motorcycle => '🏍️',
+        TravelMode.car => '🚗',
+      };
 }
 
 class RouteMapScreen extends StatefulWidget {
@@ -66,15 +69,10 @@ class RouteMapScreen extends StatefulWidget {
 
 class _RouteMapScreenState extends State<RouteMapScreen> {
   // --- Map ---
-  final MapController _mapController = MapController();
-
-  // --- Annotations ---
-  List<Marker> _currentMarkers = [];
-  List<Polyline> _currentPolylines = [];
-  double? _destinationLat;
-  double? _destinationLng;
-  String? _destinationName;
-  String? _destinationCategory;
+  MapLibreMapController? _mapController;
+  final Completer<MapLibreMapController> _mapReady =
+      Completer<MapLibreMapController>();
+  bool _mapStyleLoaded = false;
 
   // --- GPS & route ---
   Position? _currentPosition;
@@ -99,10 +97,10 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   int _totalTripMinutes = 0;
 
   Color get _routeColor => switch (_travelMode) {
-    TravelMode.walking => Colors.green,
-    TravelMode.motorcycle => Colors.blue,
-    TravelMode.car => Colors.orange,
-  };
+        TravelMode.walking => Colors.green,
+        TravelMode.motorcycle => Colors.blue,
+        TravelMode.car => Colors.orange,
+      };
 
   double get _currentSpeedKmh => _currentSpeedMs * 3.6;
 
@@ -116,16 +114,14 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   static const double _rerouteThresholdM = 60.0;
   static const Duration _rerouteCooldown = Duration(seconds: 15);
 
-  static const Map<String, Color> _categoryColors = {
-    'Cafe': Color(0xFF8B4513),
-    'Fashion': Color(0xFFE91E63),
-    'Wisata': Color(0xFF2196F3),
-    'Kuliner': Color(0xFFE74C3C),
-    'Hotel': Color(0xFF1565C0),
-    'Oleh-Oleh': Color(0xFFFF6F61),
-    'UMKM': Color(0xFF4CAF50),
-    'Lainnya': Color(0xFF95A5A6),
-  };
+  // --- Native Symbol tracking ---
+  final List<Symbol> _placeSymbols = [];
+  Symbol? _currentPosSymbol;
+  Symbol? _destinationSymbol;
+  Line? _routeLine;
+  bool _isUpdatingMarker = false;
+
+
 
   // =======================================================================
   // Lifecycle
@@ -144,16 +140,21 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     _startCompass();
   }
 
+  double? _destinationLat;
+  double? _destinationLng;
+  String? _destinationName;
+  String? _destinationCategory;
+
   @override
   void dispose() {
     _positionStreamSubscription?.cancel();
     _compassSubscription?.cancel();
-    _mapController.dispose();
+    super.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(systemNavigationBarColor: Colors.transparent),
+      const SystemUiOverlayStyle(
+          systemNavigationBarColor: Colors.transparent),
     );
-    super.dispose();
   }
 
   void _setSystemUI() {
@@ -167,210 +168,426 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   }
 
   void _startCompass() {
-    _compassSubscription = FlutterCompass.events?.listen((CompassEvent event) {
+    _compassSubscription =
+        FlutterCompass.events?.listen((CompassEvent event) {
       if (!mounted) return;
       final heading = event.heading;
       if (heading == null) return;
-      setState(() => _compassHeading = heading);
+
+      // Hitung perbedaan sudut terpendek (shortest angular distance)
+      double diff = (heading - _compassHeading) % 360;
+      if (diff > 180) {
+        diff -= 360;
+      } else if (diff < -180) {
+        diff += 360;
+      }
+
+      // Abaikan noise yang sangat kecil
+      if (diff.abs() < 1.0) return;
+
+      // Low-pass filter (smoothing) agar rotasi tidak patah-patah/jumping
+      _compassHeading = (_compassHeading + diff * 0.15) % 360;
+      if (_compassHeading < 0) _compassHeading += 360;
+
+      // Hindari memanggil setState setiap kali compass update (bisa sampai 60Hz),
+      // cukup update marker nativenya saja agar tidak lag UI-nya.
+      _drawCurrentPositionMarker();
     });
   }
 
   // =======================================================================
-  // Tap handler
+  // Map callbacks
   // =======================================================================
-  void _onMapTap(TapPosition tapPos, LatLng latlng) {
-    if (_isShowingRoute) return;
-    if (widget.placesList == null) return;
-    final tapX = tapPos.global.dx;
-    final tapY = tapPos.global.dy;
-    Map<String, dynamic>? hitPlace;
-    LatLng? hitLatLng;
+  void _onMapCreated(MapLibreMapController controller) {
+    _mapController = controller;
+    if (!_mapReady.isCompleted) _mapReady.complete(controller);
+    // Listen to symbol taps via controller stream
+    controller.onSymbolTapped.add(_onSymbolTapped);
+  }
+
+  Future<void> _onStyleLoaded() async {
+    _mapStyleLoaded = true;
+    await _registerMarkerImages();
+    await _drawAllOverlays();
+  }
+
+  // =======================================================================
+  // Marker image registration
+  // =======================================================================
+
+  Future<Uint8List> _buildCircleMarkerImage({
+    required Color bgColor,
+    required String emoji,
+    int size = 64,
+  }) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final paint = Paint()..color = bgColor;
+    final center = Offset(size / 2, size / 2);
+    final radius = size / 2 - 3.0;
+
+    // Drop shadow
+    final shadowPaint = Paint()
+      ..color = Colors.black.withAlpha(80)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawCircle(Offset(center.dx, center.dy + 2), radius, shadowPaint);
+
+    // Filled circle
+    canvas.drawCircle(center, radius, paint);
+
+    // White border
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.5;
+    canvas.drawCircle(center, radius, borderPaint);
+
+    // Emoji label
+    final tp = TextPainter(
+      text: TextSpan(
+        text: emoji,
+        style: TextStyle(
+          fontSize: size * 0.35,
+          color: Colors.white,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    tp.layout();
+    tp.paint(
+      canvas,
+      Offset(
+        center.dx - tp.width / 2,
+        center.dy - tp.height / 2,
+      ),
+    );
+
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(size, size);
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  Future<Uint8List> _buildNavArrowImage({
+    required Color color,
+    int size = 76,
+  }) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final center = Offset(size / 2, size / 2);
+    final radius = size / 2.0 - 6;
+
+    final path = Path();
+    // Gambar panah gaya navigasi
+    path.moveTo(center.dx, center.dy - radius); // Puncak
+    path.lineTo(center.dx + radius * 0.7, center.dy + radius * 0.8); // Kanan
+    path.lineTo(center.dx, center.dy + radius * 0.3); // Indent tengah bawah
+    path.lineTo(center.dx - radius * 0.7, center.dy + radius * 0.8); // Kiri
+    path.close();
+
+    // Drop shadow
+    final dropShadowPaint = Paint()
+      ..color = Colors.black.withAlpha(80)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+    canvas.drawPath(path.shift(const Offset(0, 4)), dropShadowPaint);
+
+    // Stroke putih tebal (Outline)
+    final outlinePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = 6.0;
+    canvas.drawPath(path, outlinePaint);
+
+    // Fill warna utama
+    final fillPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(path, fillPaint);
+
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(size, size);
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  Future<void> _registerMarkerImages() async {
+    final c = _mapController;
+    if (c == null) return;
+
+    // Current position marker (Gmaps style arrow)
+    final currentPosImg = await _buildNavArrowImage(
+      color: const Color(0xFF4285F4),
+      size: 76,
+    );
+    await c.addImage('marker_current', currentPosImg);
+
+    // Per-category place markers
+    for (final cat in PoiCategory.allCategories) {
+      final color = PoiCategory.getCategoryColor(cat);
+      final emoji = PoiCategory.getCategoryEmoji(cat);
+      final img = await _buildCircleMarkerImage(
+        bgColor: color,
+        emoji: emoji,
+        size: 60,
+      );
+      await c.addImage('marker_$cat', img);
+    }
+
+    // Selected marker
+    final selectedImg = await _buildCircleMarkerImage(
+      bgColor: const Color(0xFF3366FF),
+      emoji: '★',
+      size: 70,
+    );
+    await c.addImage('marker_selected', selectedImg);
+
+    // Destination marker
+    final destImg = await _buildCircleMarkerImage(
+      bgColor: const Color(0xFFFF4444),
+      emoji: '📍',
+      size: 70,
+    );
+    await c.addImage('marker_destination', destImg);
+  }
+
+  // =======================================================================
+  // Draw / update all native overlays
+  // =======================================================================
+
+  Future<void> _drawAllOverlays() async {
+    await _drawRoute();
+    await _drawPlaceMarkers();
+    await _drawCurrentPositionMarker();
+    if (_destinationLat != null &&
+        _destinationLng != null &&
+        _isShowingRoute) {
+      await _drawDestinationMarker();
+    }
+  }
+
+  Future<void> _drawRoute() async {
+    final c = _mapController;
+    if (c == null || !_mapStyleLoaded) return;
+
+    if (_routeLine != null) {
+      try {
+        await c.removeLine(_routeLine!);
+      } catch (_) {}
+      _routeLine = null;
+    }
+
+    if (_routePoints.length < 2) return;
+
+    final c32 = _routeColor.toARGB32();
+    final colorHex =
+        '#${c32.toRadixString(16).padLeft(8, '0').substring(2)}';
+
+    try {
+      _routeLine = await c.addLine(
+        LineOptions(
+          geometry: _routePoints,
+          lineColor: _useFallback ? '#888888' : colorHex,
+          lineWidth: _useFallback ? 3.0 : 5.0,
+          lineOpacity: 0.9,
+        ),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _drawPlaceMarkers() async {
+    final c = _mapController;
+    if (c == null || !_mapStyleLoaded) return;
+
+    for (final sym in _placeSymbols) {
+      try {
+        await c.removeSymbol(sym);
+      } catch (_) {}
+    }
+    _placeSymbols.clear();
+
+    if (widget.placesList == null || _isShowingRoute) return;
 
     for (final place in widget.placesList!) {
       if (place['latitude'] == null || place['longitude'] == null) continue;
-      final pLat = place['latitude'] as double;
-      final pLng = place['longitude'] as double;
-      final screenPoint = _mapController.camera.project(LatLng(pLat, pLng));
-      final dx = tapX - screenPoint.x;
-      final dy = tapY - screenPoint.y;
-      if (dx * dx + dy * dy < 30 * 30) {
-        hitLatLng = LatLng(pLat, pLng);
-        hitPlace = place;
-        break;
-      }
-    }
+      final lat = place['latitude'] as double;
+      final lng = place['longitude'] as double;
+      final cat = _resolveCategory(place);
+      final isSelected = _selectedPlace?['id'] == place['id'];
+      final imageId = isSelected ? 'marker_selected' : 'marker_$cat';
 
-    if (hitPlace != null && hitLatLng != null) {
-      final place = hitPlace;
-      setState(() {
-        _selectedPlace = place;
-        _destinationLat = place['latitude'] as double?;
-        _destinationLng = place['longitude'] as double?;
-        _destinationName = place['nama_tempat'];
-        _destinationCategory = _resolveCategory(place);
-        _isShowingRoute = false;
-      });
-      _mapController.move(hitLatLng, 16.0);
+      try {
+        final sym = await c.addSymbol(
+          SymbolOptions(
+            geometry: LatLng(lat, lng),
+            iconImage: imageId,
+            iconSize: isSelected ? 1.4 : 1.0,
+            iconAnchor: 'center',
+            zIndex: isSelected ? 2 : 1,
+          ),
+          {'placeId': place['id']?.toString() ?? ''},
+        );
+        _placeSymbols.add(sym);
+      } catch (_) {}
     }
   }
 
-  // =======================================================================
-  // Build markers & polylines
-  // =======================================================================
-  void _updateMapState() {
-    final markers = <Marker>[];
+  Future<void> _drawCurrentPositionMarker() async {
+    final c = _mapController;
+    if (c == null || !_mapStyleLoaded || _currentPosition == null) return;
+    if (_isUpdatingMarker) return;
 
-    // Current position marker (arrow panah sesuai kompas/bearing HP)
-    if (_currentPosition != null) {
-      // Gunakan GPS heading saat bergerak (>3 km/h), compass saat diam
-      final speedKmh = _currentSpeedMs * 3.6;
-      final heading = speedKmh > 3.0
+    _isUpdatingMarker = true;
+    try {
+      final heading = _currentSpeedKmh > 3.0
           ? _currentPosition!.heading
           : _compassHeading;
-      final angleRad = heading * 3.1415927 / 180;
-      markers.add(
-        Marker(
-          point: LatLng(
-            _currentPosition!.latitude,
-            _currentPosition!.longitude,
-          ),
-          width: 28,
-          height: 28,
-          child: GestureDetector(
-            onTap: _recenterMap,
-            child: Transform.rotate(
-              angle: angleRad,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.blue,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 3),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 6,
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.navigation,
-                  color: Colors.white,
-                  size: 16,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
 
-    // Place markers (browse mode)
-    if (widget.placesList != null && !_isShowingRoute) {
-      for (final place in widget.placesList!) {
-        if (place['latitude'] == null || place['longitude'] == null) continue;
-        final lat = place['latitude'] as double;
-        final lng = place['longitude'] as double;
-        final cat = _resolveCategory(place);
-        final isSelected = _selectedPlace?['id'] == place['id'];
-        final color = isSelected
-            ? const Color(0xFF3366FF)
-            : (_categoryColors[cat] ?? const Color(0xFFFF4444));
-
-        markers.add(
-          Marker(
-            point: LatLng(lat, lng),
-            width: isSelected ? 28 : 24,
-            height: isSelected ? 28 : 24,
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedPlace = place;
-                  _destinationLat = lat;
-                  _destinationLng = lng;
-                  _destinationName = place['nama_tempat'];
-                  _destinationCategory = _resolveCategory(place);
-                  _isShowingRoute = false;
-                });
-                _mapController.move(LatLng(lat, lng), 16.0);
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 3),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 6,
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  PoiCategory.getCategoryIcon(cat),
-                  color: Colors.white,
-                  size: isSelected ? 16 : 14,
-                ),
-              ),
+      if (_currentPosSymbol != null) {
+        // Hanya update field yang berubah untuk efisiensi
+        await c.updateSymbol(
+          _currentPosSymbol!,
+          SymbolOptions(
+            geometry: LatLng(
+              _currentPosition!.latitude,
+              _currentPosition!.longitude,
             ),
+            iconRotate: heading,
+          ),
+        );
+      } else {
+        _currentPosSymbol = await c.addSymbol(
+          SymbolOptions(
+            geometry: LatLng(
+              _currentPosition!.latitude,
+              _currentPosition!.longitude,
+            ),
+            iconImage: 'marker_current',
+            iconSize: 1.1,
+            iconAnchor: 'center',
+            iconRotate: heading,
+            zIndex: 10,
           ),
         );
       }
+    } catch (_) {
+    } finally {
+      _isUpdatingMarker = false;
+    }
+  }
+
+  Future<void> _drawDestinationMarker() async {
+    final c = _mapController;
+    if (c == null || !_mapStyleLoaded) return;
+
+    if (_destinationSymbol != null) {
+      try {
+        await c.removeSymbol(_destinationSymbol!);
+      } catch (_) {}
+      _destinationSymbol = null;
     }
 
-    // Destination marker
-    if (_destinationLat != null && _destinationLng != null && _isShowingRoute) {
-      final destCat = _destinationCategory ?? PoiCategory.lainnya;
-      final destColor = _categoryColors[destCat] ?? const Color(0xFFFF4444);
-      markers.add(
-        Marker(
-          point: LatLng(_destinationLat!, _destinationLng!),
-          width: 36,
-          height: 36,
-          child: Container(
-            decoration: BoxDecoration(
-              color: destColor,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 3),
-              boxShadow: [
-                BoxShadow(
-                  color: destColor.withValues(alpha: 0.5),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  blurRadius: 6,
-                ),
-              ],
-            ),
-            child: Icon(
-              PoiCategory.getCategoryIcon(destCat),
-              color: Colors.white,
-              size: 18,
-            ),
-          ),
-        ),
-      );
-    }
+    if (_destinationLat == null || _destinationLng == null) return;
 
-    final polylines = <Polyline>[];
-    if (_routePoints.isNotEmpty && _isShowingRoute) {
-      polylines.add(
-        Polyline(
-          points: _routePoints,
-          color: _useFallback ? const Color(0xFF888888) : _routeColor,
-          strokeWidth: _useFallback ? 3.0 : 5.0,
-          pattern: _useFallback
-              ? StrokePattern.dotted()
-              : const StrokePattern.solid(),
+    final cat = _destinationCategory ?? PoiCategory.lainnya;
+    // Use category image if available, otherwise destination
+    final imageId = PoiCategory.allCategories.contains(cat)
+        ? 'marker_$cat'
+        : 'marker_destination';
+
+    try {
+      _destinationSymbol = await c.addSymbol(
+        SymbolOptions(
+          geometry: LatLng(_destinationLat!, _destinationLng!),
+          iconImage: imageId,
+          iconSize: 1.4,
+          iconAnchor: 'center',
+          zIndex: 5,
         ),
       );
-    }
+    } catch (_) {}
+  }
+
+  // =======================================================================
+  // Symbol tap handler
+  // =======================================================================
+  void _onSymbolTapped(Symbol symbol) {
+    if (_isShowingRoute) return;
+    final placeId = symbol.data?['placeId'] as String?;
+    if (placeId == null || placeId.isEmpty) return;
+    if (widget.placesList == null) return;
+
+    final place = widget.placesList!.firstWhere(
+      (p) => p['id']?.toString() == placeId,
+      orElse: () => {},
+    );
+    if (place.isEmpty) return;
 
     setState(() {
-      _currentMarkers = markers;
-      _currentPolylines = polylines;
+      _selectedPlace = place;
+      _destinationLat = place['latitude'] as double?;
+      _destinationLng = place['longitude'] as double?;
+      _destinationName = place['nama_tempat'];
+      _destinationCategory = _resolveCategory(place);
+      _isShowingRoute = false;
     });
+    _moveCamera(
+      LatLng(place['latitude'] as double, place['longitude'] as double),
+      16.0,
+    );
+    _drawPlaceMarkers();
+  }
+
+  Future<void> _onMapTap(math.Point<double> point, LatLng latlng) async {
+    // Symbol taps handled via onSymbolTapped
+  }
+
+  // =======================================================================
+  // Camera helpers
+  // =======================================================================
+  Future<void> _moveCamera(LatLng target, double zoom) async {
+    final c = _mapController;
+    if (c == null) return;
+    try {
+      await c.animateCamera(
+        CameraUpdate.newLatLngZoom(target, zoom),
+      );
+    } catch (_) {}
+  }
+
+  void _recenterMap() {
+    if (_currentPosition == null) return;
+    _moveCamera(
+      LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+      16.0,
+    );
+  }
+
+  Future<void> _fitRouteToCamera() async {
+    if (_routePoints.length < 2) return;
+    final c = _mapController;
+    if (c == null) return;
+    try {
+      const padding = EdgeInsets.fromLTRB(40, 80, 40, 220);
+      await c.animateCamera(
+        CameraUpdate.newLatLngBounds(
+          LatLngBounds(
+            southwest: _routePoints.first,
+            northeast: _routePoints.last,
+          ),
+          left: padding.left,
+          top: padding.top,
+          right: padding.right,
+          bottom: padding.bottom,
+        ),
+      );
+    } catch (_) {
+      try {
+        await c.animateCamera(
+          CameraUpdate.newLatLngZoom(_routePoints.first, 14.0),
+        );
+      } catch (_) {}
+    }
   }
 
   // =======================================================================
@@ -441,8 +658,14 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         setState(() => _isLoading = false);
       }
 
-      _updateMapState();
-      WidgetsBinding.instance.addPostFrameCallback((_) => _fitRouteToCamera());
+      try {
+        await _mapReady.future.timeout(const Duration(seconds: 3));
+      } catch (_) {}
+
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await _drawAllOverlays();
+        _fitRouteToCamera();
+      });
       _startLiveTracking();
     } catch (e) {
       setState(() {
@@ -453,9 +676,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     }
   }
 
-  /// Fetch OSRM route — returns points, distance, duration.
   Future<(List<LatLng> points, double distanceM, double durationS)?>
-  _fetchRoute(Position position, {int retry = 1}) async {
+      _fetchRoute(Position position, {int retry = 1}) async {
     if (_destinationLat == null || _destinationLng == null) return null;
 
     String profileUrl(String baseUrl) {
@@ -476,11 +698,14 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       return '$baseUrl/$profile';
     }
 
-    const servers = <String>['https://router.project-osrm.org/route/v1', ''];
+    const servers = <String>[
+      'https://router.project-osrm.org/route/v1',
+      '',
+    ];
 
     for (int i = 0; i < servers.length; i++) {
-      final baseUrl = i == 1 ? 'https://routing.openstreetmap.de' : servers[i];
-
+      final baseUrl =
+          i == 1 ? 'https://routing.openstreetmap.de' : servers[i];
       for (int attempt = 0; attempt <= retry; attempt++) {
         try {
           final url = Uri.parse(
@@ -489,9 +714,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
             '$_destinationLng,$_destinationLat'
             '?geometries=geojson&overview=full',
           );
-          final response = await http
-              .get(url)
-              .timeout(const Duration(seconds: 6));
+          final response =
+              await http.get(url).timeout(const Duration(seconds: 6));
           if (response.statusCode == 200) {
             final data = json.decode(response.body);
             final code = data['code'] as String?;
@@ -530,12 +754,15 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       _osrmTotalDistance = m;
       _originalStraightDistance = m;
       _distanceInKm = m / 1000;
-      _estimatedTimeInMins = ((m / 1000) / _travelMode.speedKmh * 60).round();
+      _estimatedTimeInMins =
+          ((m / 1000) / _travelMode.speedKmh * 60).round();
       _useFallback = true;
       _isLoading = false;
     });
-    _updateMapState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fitRouteToCamera());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _drawAllOverlays();
+      _fitRouteToCamera();
+    });
   }
 
   // =======================================================================
@@ -544,63 +771,61 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   void _startLiveTracking() {
     const settings = LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 5, // lebih responsif buat rotasi panah
+      distanceFilter: 5,
     );
     _positionStreamSubscription =
-        Geolocator.getPositionStream(locationSettings: settings).listen((
-          Position? p,
-        ) {
-          if (p == null || !mounted) return;
-          setState(() {
-            _currentPosition = p;
-            _currentSpeedMs = p.speed;
-          });
-          _updateMapState();
-
-          if (_destinationLat == null ||
-              _destinationLng == null ||
-              _isRerouting) {
-            return;
-          }
-
-          final remaining = Geolocator.distanceBetween(
-            p.latitude,
-            p.longitude,
-            _destinationLat!,
-            _destinationLng!,
-          );
-
-          // --- Arrival check ---
-          if (!_hasArrived && remaining < 50) {
-            _onArrival();
-            return;
-          }
-
-          // --- Estimate ---
-          final ratio = _osrmTotalDistance > 0 && _originalStraightDistance > 0
-              ? _osrmTotalDistance / _originalStraightDistance
-              : 1.0;
-          final road = remaining * ratio;
-          setState(() {
-            _distanceInKm = road / 1000;
-            _estimatedTimeInMins = ((road / _travelMode.speedKmh) / 1000 * 60)
-                .round();
-          });
-
-          // --- Auto-reroute ---
-          if (!_useFallback && _routePoints.length > 1) {
-            final deviation = _distanceToRoute(
-              LatLng(p.latitude, p.longitude),
-              _routePoints,
-            );
-            final now = DateTime.now();
-            if (deviation > _rerouteThresholdM &&
-                now.difference(_lastReroute) > _rerouteCooldown) {
-              _lastReroute = now;
-              _doReroute(p);
-            }
-          }
+        Geolocator.getPositionStream(locationSettings: settings).listen(
+      (Position? p) {
+        if (p == null || !mounted) return;
+        setState(() {
+          _currentPosition = p;
+          _currentSpeedMs = p.speed;
         });
+        _drawCurrentPositionMarker();
+
+        if (_destinationLat == null ||
+            _destinationLng == null ||
+            _isRerouting) {
+          return;
+        }
+
+        final remaining = Geolocator.distanceBetween(
+          p.latitude,
+          p.longitude,
+          _destinationLat!,
+          _destinationLng!,
+        );
+
+        if (!_hasArrived && remaining < 50) {
+          _onArrival();
+          return;
+        }
+
+        final ratio =
+            _osrmTotalDistance > 0 && _originalStraightDistance > 0
+                ? _osrmTotalDistance / _originalStraightDistance
+                : 1.0;
+        final road = remaining * ratio;
+        setState(() {
+          _distanceInKm = road / 1000;
+          _estimatedTimeInMins =
+              ((road / _travelMode.speedKmh) / 1000 * 60).round();
+        });
+
+        if (!_useFallback && _routePoints.length > 1) {
+          final deviation = _distanceToRoute(
+            LatLng(p.latitude, p.longitude),
+            _routePoints,
+          );
+          final now = DateTime.now();
+          if (deviation > _rerouteThresholdM &&
+              now.difference(_lastReroute) > _rerouteCooldown) {
+            _lastReroute = now;
+            _doReroute(p);
+          }
+        }
+      },
+    );
   }
 
   void _onArrival() {
@@ -662,73 +887,13 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           _estimatedTimeInMins = (durationSeconds / 60).round();
           _hasArrived = false;
         });
-        _updateMapState();
+        await _drawRoute();
         _isRerouting = false;
         return;
       }
     }
     _applyFallbackRoute(p);
     _isRerouting = false;
-  }
-
-  // =======================================================================
-  // Camera
-  // =======================================================================
-  void _recenterMap() {
-    if (_currentPosition == null) return;
-    _mapController.move(
-      LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-      16.0,
-    );
-  }
-
-  /// Fit the camera to show the entire route with padding.
-  void _fitRouteToCamera() {
-    if (_routePoints.length < 2) return;
-    try {
-      _mapController.fitCamera(
-        CameraFit.bounds(
-          bounds: LatLngBounds.fromPoints(_routePoints),
-          padding: const EdgeInsets.fromLTRB(40, 80, 40, 220),
-          maxZoom: 17.0,
-        ),
-      );
-    } catch (_) {}
-  }
-
-  Future<void> _fetchAndSetRoute() async {
-    if (_currentPosition == null || _destinationLat == null) return;
-    try {
-      final result = await _fetchRoute(_currentPosition!);
-      if (result != null && mounted) {
-        final (points, distanceMeters, durationSeconds) = result;
-        setState(() {
-          _routePoints = points;
-          _osrmTotalDistance = distanceMeters;
-          _originalStraightDistance = Geolocator.distanceBetween(
-            _currentPosition!.latitude,
-            _currentPosition!.longitude,
-            _destinationLat!,
-            _destinationLng!,
-          );
-          _distanceInKm = distanceMeters / 1000;
-          _estimatedTimeInMins =
-              ((distanceMeters / 1000) / _travelMode.speedKmh * 60).round();
-          _useFallback = false;
-          _isLoading = false;
-          _hasArrived = false;
-        });
-        _updateMapState();
-        WidgetsBinding.instance.addPostFrameCallback(
-          (_) => _fitRouteToCamera(),
-        );
-      } else if (mounted) {
-        _applyFallbackRoute(_currentPosition!);
-      }
-    } catch (_) {
-      if (mounted) _applyFallbackRoute(_currentPosition!);
-    }
-    _updateMapState();
   }
 
   // =======================================================================
@@ -741,9 +906,12 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
     final isPreviewing = _selectedPlace != null && !_isShowingRoute;
     final isNavigating = _isShowingRoute;
-    final title = isNavigating
-        ? 'Rute ke $_destinationName'
-        : 'Peta Lokasi UMKM';
+    final title =
+        isNavigating ? 'Rute ke $_destinationName' : 'Peta Lokasi UMKM';
+
+    final initialTarget = _currentPosition != null
+        ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
+        : const LatLng(-6.2088, 106.8456);
 
     return Scaffold(
       backgroundColor: theme.bgBase,
@@ -770,148 +938,138 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                   _routePoints = [];
                   _hasArrived = false;
                 });
-                _updateMapState();
+                _drawAllOverlays();
                 _recenterMap();
               },
             ),
         ],
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: theme.iconColor))
+          ? Center(
+              child: CircularProgressIndicator(color: theme.iconColor))
           : _errorMessage != null || _currentPosition == null
-          ? _buildErrorView(theme)
-          : Stack(
-              children: [
-                // --- Map ---
-                FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: LatLng(
-                      _currentPosition!.latitude,
-                      _currentPosition!.longitude,
-                    ),
-                    initialZoom: 15.0,
-                    minZoom: 4,
-                    maxZoom: 22,
-                    onTap: _onMapTap,
-                    interactionOptions: const InteractionOptions(
-                      flags: InteractiveFlag.all,
-                    ),
-                    cameraConstraint: CameraConstraint.contain(
-                      bounds: LatLngBounds(
-                        const LatLng(-11.0, 94.0),
-                        const LatLng(6.0, 142.0),
-                      ),
-                    ),
-                  ),
+              ? _buildErrorView(theme)
+              : Stack(
                   children: [
-                    TileLayer(
-                      urlTemplate:
-                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.tenmu.app',
+                    // --- Base map ---
+                    MapLibreMap(
+                      styleString: MapTilerStyle.hasKey
+                          ? MapTilerStyle.url(MapTilerStyle.streets)
+                          : 'https://demotiles.maplibre.org/style.json',
+                      initialCameraPosition: CameraPosition(
+                        target: initialTarget,
+                        zoom: 15.0,
+                      ),
+                      minMaxZoomPreference:
+                          const MinMaxZoomPreference(4, 22),
+                      myLocationEnabled: false,
+                      onMapCreated: _onMapCreated,
+                      onStyleLoadedCallback: _onStyleLoaded,
+                      onMapClick: _onMapTap,
                     ),
-                    PolylineLayer(polylines: _currentPolylines),
-                    MarkerLayer(markers: _currentMarkers),
-                  ],
-                ),
 
-                // --- Fallback indicator ---
-                if (_useFallback)
-                  Positioned(
-                    top: 12,
-                    left: 16,
-                    right: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.orange.shade300),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            size: 16,
-                            color: Colors.orange.shade800,
+                    // --- Fallback indicator ---
+                    if (_useFallback)
+                      Positioned(
+                        top: 12,
+                        left: 16,
+                        right: 16,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Rute offline — perkiraan jarak lurus',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.orange.shade900,
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Colors.orange.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline,
+                                  size: 16,
+                                  color: Colors.orange.shade800),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Rute offline — perkiraan jarak lurus',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.orange.shade900,
+                                  ),
+                                ),
                               ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                    // --- Compass + Recenter buttons ---
+                    Positioned(
+                      right: 16,
+                      bottom: 200 + bottomPadding,
+                      child: Column(
+                        children: [
+                          FloatingActionButton(
+                            heroTag: 'compass',
+                            onPressed: () async {
+                              try {
+                                await _mapController?.animateCamera(
+                                  CameraUpdate.bearingTo(0),
+                                );
+                              } catch (_) {}
+                            },
+                            backgroundColor: theme.bgSurface,
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(color: theme.border),
                             ),
+                            child: Icon(Icons.explore_outlined,
+                                color: theme.btnPrimary),
+                          ),
+                          const SizedBox(height: 12),
+                          FloatingActionButton(
+                            heroTag: 'recenter',
+                            onPressed: _recenterMap,
+                            backgroundColor: theme.bgSurface,
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(color: theme.border),
+                            ),
+                            child: Icon(Icons.my_location,
+                                color: theme.iconColor),
                           ),
                         ],
                       ),
                     ),
-                  ),
 
-                // --- Compass + Recenter buttons ---
-                Positioned(
-                  right: 16,
-                  bottom: 200 + bottomPadding,
-                  child: Column(
-                    children: [
-                      // Compass
-                      FloatingActionButton(
-                        onPressed: () {
-                          _mapController.rotate(0); // reset north up
-                        },
-                        backgroundColor: theme.bgSurface,
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: theme.border),
-                        ),
-                        child: Icon(
-                          Icons.explore_outlined,
-                          color: theme.btnPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // Recenter
-                      FloatingActionButton(
-                        onPressed: _recenterMap,
-                        backgroundColor: theme.bgSurface,
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: theme.border),
-                        ),
-                        child: Icon(Icons.my_location, color: theme.iconColor),
-                      ),
-                    ],
-                  ),
+                    // --- Bottom sheet / panel ---
+                    isNavigating
+                        ? Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: _buildNavSheet(theme),
+                          )
+                        : Positioned(
+                            left: 16,
+                            right: 16,
+                            bottom: 16 + bottomPadding,
+                            child: isPreviewing
+                                ? _buildUmkmPreview(theme)
+                                : _buildBrowseInfo(theme),
+                          ),
+                  ],
                 ),
-
-                // --- Bottom sheet / panel ---
-                isNavigating
-                    ? Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        child: _buildNavSheet(theme),
-                      )
-                    : Positioned(
-                        left: 16,
-                        right: 16,
-                        bottom: 16 + bottomPadding,
-                        child: isPreviewing
-                            ? _buildUmkmPreview(theme)
-                            : _buildBrowseInfo(theme),
-                      ),
-              ],
-            ),
     );
   }
 
+  // =======================================================================
+  // UI builder helpers
+  // =======================================================================
   Widget _buildErrorView(ThemeProvider theme) {
     return Center(
       child: Padding(
@@ -919,7 +1077,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.location_off_outlined, size: 64, color: theme.textHint),
+            Icon(Icons.location_off_outlined,
+                size: 64, color: theme.textHint),
             const SizedBox(height: 16),
             Text(
               _errorMessage ?? 'Lokasi tidak tersedia.',
@@ -960,14 +1119,12 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     );
   }
 
-  // =======================================================================
-  // Navigation bottom sheet (fixed — no scroll)
-  // =======================================================================
   Widget _buildNavSheet(ThemeProvider theme) {
     return Container(
       decoration: BoxDecoration(
         color: theme.bgSurface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(24)),
         border: Border(top: BorderSide(color: theme.border)),
         boxShadow: [
           BoxShadow(
@@ -982,7 +1139,6 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Drag handle
             Center(
               child: Container(
                 margin: const EdgeInsets.only(top: 6, bottom: 4),
@@ -994,16 +1150,11 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                 ),
               ),
             ),
-
-            // Arrival card
             if (_hasArrived)
               _buildArrivalCard(theme)
-            // Navigation info
             else ...[
               _buildNavInfoCard(theme),
               Divider(color: theme.border, height: 1),
-
-              // Travel mode selector
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -1029,19 +1180,21 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: isActive ? theme.btnPrimary : theme.bgElevated,
+                          color: isActive
+                              ? theme.btnPrimary
+                              : theme.bgElevated,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isActive ? theme.btnPrimary : theme.border,
+                            color: isActive
+                                ? theme.btnPrimary
+                                : theme.border,
                           ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              mode.iconLabel,
-                              style: const TextStyle(fontSize: 16),
-                            ),
+                            Text(mode.iconLabel,
+                                style: const TextStyle(fontSize: 16)),
                             const SizedBox(width: 6),
                             Text(
                               mode.label,
@@ -1101,9 +1254,6 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     );
   }
 
-  // =======================================================================
-  // Arrival summary
-  // =======================================================================
   Widget _buildArrivalCard(ThemeProvider theme) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -1125,11 +1275,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.check_circle_outline,
-              color: Colors.white,
-              size: 48,
-            ),
+            const Icon(Icons.check_circle_outline,
+                color: Colors.white, size: 48),
             const SizedBox(height: 12),
             const Text(
               'Anda Telah Tiba!',
@@ -1142,7 +1289,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
             const SizedBox(height: 4),
             Text(
               _destinationName ?? 'Tujuan',
-              style: const TextStyle(color: Colors.white70, fontSize: 14),
+              style:
+                  const TextStyle(color: Colors.white70, fontSize: 14),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -1174,7 +1322,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                     _routePoints = [];
                     _hasArrived = false;
                   });
-                  _updateMapState();
+                  _drawAllOverlays();
                   _recenterMap();
                 },
                 icon: const Icon(Icons.close, color: Colors.white),
@@ -1200,7 +1348,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     );
   }
 
-  Widget _arrivalStat(IconData icon, String value, String label, Color color) {
+  Widget _arrivalStat(
+      IconData icon, String value, String label, Color color) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1209,22 +1358,15 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         Text(
           value,
           style: TextStyle(
-            color: color,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+              color: color, fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        Text(
-          label,
-          style: TextStyle(color: color.withAlpha(180), fontSize: 11),
-        ),
+        Text(label,
+            style: TextStyle(
+                color: color.withAlpha(180), fontSize: 11)),
       ],
     );
   }
 
-  // =======================================================================
-  // UMKM Preview
-  // =======================================================================
   Widget _buildUmkmPreview(ThemeProvider theme) {
     final imageUrl = PoiImageHelper.primaryImageUrl(_selectedPlace!);
     return Container(
@@ -1256,7 +1398,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                           width: 60,
                           height: 60,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => _placeholderImage(theme),
+                          errorBuilder: (_, _, _) =>
+                              _placeholderImage(theme),
                         )
                       : _placeholderImage(theme),
                 ),
@@ -1279,9 +1422,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                       Text(
                         _selectedPlace!['alamat'] ?? '-',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: theme.textSecondary,
-                        ),
+                            fontSize: 12, color: theme.textSecondary),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1297,7 +1438,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                       _destinationLng = null;
                       _destinationName = null;
                     });
-                    _updateMapState();
+                    _drawPlaceMarkers();
                   },
                 ),
               ],
@@ -1320,7 +1461,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.directions, color: theme.btnLabel, size: 20),
+                  Icon(Icons.directions,
+                      color: theme.btnLabel, size: 20),
                   const SizedBox(width: 8),
                   Text(
                     'Mulai Rute',
@@ -1348,9 +1490,6 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     );
   }
 
-  // =======================================================================
-  // Browse info
-  // =======================================================================
   Widget _buildBrowseInfo(ThemeProvider theme) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
@@ -1385,14 +1524,12 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     );
   }
 
-  // =======================================================================
-  // Helpers
-  // =======================================================================
   Widget _infoColumn(String label, String value, ThemeProvider theme) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: TextStyle(color: theme.textSecondary, fontSize: 12)),
+        Text(label,
+            style: TextStyle(color: theme.textSecondary, fontSize: 12)),
         Text(
           value,
           style: TextStyle(
@@ -1411,5 +1548,39 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     final h = mins ~/ 60;
     final m = mins % 60;
     return m > 0 ? '${h}j ${m}mnt' : '$h jam';
+  }
+
+  Future<void> _fetchAndSetRoute() async {
+    if (_currentPosition == null || _destinationLat == null) return;
+    try {
+      final result = await _fetchRoute(_currentPosition!);
+      if (result != null && mounted) {
+        final (points, distanceMeters, durationSeconds) = result;
+        setState(() {
+          _routePoints = points;
+          _osrmTotalDistance = distanceMeters;
+          _originalStraightDistance = Geolocator.distanceBetween(
+            _currentPosition!.latitude,
+            _currentPosition!.longitude,
+            _destinationLat!,
+            _destinationLng!,
+          );
+          _distanceInKm = distanceMeters / 1000;
+          _estimatedTimeInMins =
+              ((distanceMeters / 1000) / _travelMode.speedKmh * 60)
+                  .round();
+          _useFallback = false;
+          _isLoading = false;
+          _hasArrived = false;
+        });
+        await _drawRoute();
+        WidgetsBinding.instance
+            .addPostFrameCallback((_) => _fitRouteToCamera());
+      } else if (mounted) {
+        _applyFallbackRoute(_currentPosition!);
+      }
+    } catch (_) {
+      if (mounted) _applyFallbackRoute(_currentPosition!);
+    }
   }
 }

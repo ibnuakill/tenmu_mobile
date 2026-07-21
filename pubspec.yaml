@@ -52,6 +52,7 @@ dependencies:
   google_generative_ai: ^0.4.6
   window_manager: ^0.4.3
   desktop_webview_window: ^0.2.0
+  maplibre_gl: ^0.26.2
 
 dev_dependencies:
   flutter_test:

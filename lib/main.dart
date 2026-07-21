@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,21 +34,23 @@ Future<void> main() async {
   NotificationService.init();
 
   // Init window manager (untuk fullscreen di desktop)
-  await WindowManager.instance.ensureInitialized();
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+    await WindowManager.instance.ensureInitialized();
 
-  // Global keyboard listener: Esc / F11 → toggle fullscreen
-  // HardwareKeyEventListener nangkep event meski window lagi di fullscreen OS layer
-  HardwareKeyboard.instance.addHandler((event) {
-    if (event is KeyDownEvent &&
-        (event.logicalKey == LogicalKeyboardKey.escape ||
-            event.logicalKey == LogicalKeyboardKey.f11)) {
-      unawaited(() async {
-        final isFull = await WindowManager.instance.isFullScreen();
-        await WindowManager.instance.setFullScreen(!isFull);
-      }());
-    }
-    return false;
-  });
+    // Global keyboard listener: Esc / F11 → toggle fullscreen
+    // HardwareKeyEventListener nangkep event meski window lagi di fullscreen OS layer
+    HardwareKeyboard.instance.addHandler((event) {
+      if (event is KeyDownEvent &&
+          (event.logicalKey == LogicalKeyboardKey.escape ||
+              event.logicalKey == LogicalKeyboardKey.f11)) {
+        unawaited(() async {
+          final isFull = await WindowManager.instance.isFullScreen();
+          await WindowManager.instance.setFullScreen(!isFull);
+        }());
+      }
+      return false;
+    });
+  }
 
   // Menjalankan aplikasi
   runApp(
