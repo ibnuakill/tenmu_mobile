@@ -63,7 +63,8 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: kIsWeb ? Uri.base.origin : null,
+        // Mobile wajib pakai deep link agar token dikembalikan ke app setelah OAuth
+        redirectTo: kIsWeb ? Uri.base.origin : 'tenmu://login-callback',
       );
       // After OAuth, AuthGate stream akan detect session & redirect otomatis
       if (mounted && Navigator.of(context).canPop()) {

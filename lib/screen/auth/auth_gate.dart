@@ -84,8 +84,10 @@ class _AuthGateState extends State<AuthGate> {
 
         final user = Supabase.instance.client.auth.currentUser;
 
-        // Email belum diverifikasi
-        if (user != null && user.emailConfirmedAt == null) {
+        // Email belum diverifikasi — skip untuk user OAuth (Google, dll.)
+        final isOAuthUser = user?.appMetadata['provider'] != null &&
+            user!.appMetadata['provider'] != 'email';
+        if (user != null && user.emailConfirmedAt == null && !isOAuthUser) {
           return EmailVerificationScreen(email: user.email);
         }
 
