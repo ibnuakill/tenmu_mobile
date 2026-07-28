@@ -12,7 +12,6 @@ import '../../core/location_permission_helper.dart';
 import '../../core/user_role.dart';
 import 'poi_detail_screen.dart';
 import 'route_map_screen.dart';
-
 import '../owner/add_place_screen.dart';
 import 'widgets/category_filter_widget.dart';
 import 'widgets/sort_filter_widget.dart';
@@ -79,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOutCubic),
         );
 
-    _carouselCtrl = PageController(viewportFraction: 0.88, initialPage: 0);
+    _carouselCtrl = PageController(viewportFraction: 0.98, initialPage: 0);
     _carouselCtrl.addListener(() {
       final page = _carouselCtrl.page?.round() ?? 0;
       if (page != _currentCardPage) {
@@ -400,7 +399,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String _resolveCategory(Map<String, dynamic> place) {
     final c = place['category']?.toString().trim();
     if (c == null || c.isEmpty) return PoiCategory.lainnya;
-    return PoiCategory.isValidCategory(c) ? c : PoiCategory.lainnya;
+    return PoiCategory.normalizeCategory(c);
   }
 
   void _showFilterSheet(
@@ -612,6 +611,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         return Scaffold(
           backgroundColor: theme.bgBase,
+          extendBody: true,
           body: FadeTransition(
             opacity: _fadeAnim,
             child: SlideTransition(
@@ -1073,8 +1073,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 8,
+                    horizontal: 4,
+                    vertical: 6,
                   ),
                   child: _buildFeaturedCardItem(
                     displayCards[index],
@@ -1655,35 +1655,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ── Pill Bottom Nav ──
   Widget _buildPillBottomNav(ThemeProvider theme, Color accent) {
     final isDark = theme.isDarkMode;
-    return Container(
-      color: theme.bgBase,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
-          child: Container(
-            height: 64,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFF1A1A1A),
-              borderRadius: BorderRadius.circular(32),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.25),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _pillNavItem(Icons.home_rounded, 0, accent),
-                _pillNavItem(Icons.map_rounded, 1, accent),
-                if (_isOwner) _pillNavAdd(accent),
-                _pillNavItem(Icons.auto_awesome_rounded, 3, accent),
-                _pillNavItem(Icons.person_rounded, 4, accent),
-              ],
-            ),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+        child: Container(
+          height: 64,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _pillNavItem(Icons.home_rounded, 0, accent),
+              _pillNavItem(Icons.map_rounded, 1, accent),
+              if (_isOwner) _pillNavAdd(accent),
+              _pillNavItem(Icons.auto_awesome_rounded, 3, accent),
+              _pillNavItem(Icons.person_rounded, 4, accent),
+            ],
           ),
         ),
       ),

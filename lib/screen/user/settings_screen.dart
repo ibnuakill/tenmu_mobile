@@ -179,16 +179,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── TAMPILAN ────────────────────────────────────────────────
-              _SectionHeader(title: 'Tampilan', theme: theme),
-              const SizedBox(height: 8),
-              _SettingsCard(
-                theme: theme,
-                children: [_ThemeModeTile(theme: theme)],
-              ),
-
-              const SizedBox(height: 24),
-
               // ── NOTIFIKASI ──────────────────────────────────────────────
               _SectionHeader(title: 'Notifikasi', theme: theme),
               const SizedBox(height: 8),
@@ -529,114 +519,6 @@ class _SettingsCard extends StatelessWidget {
         ],
       ),
       child: Column(children: children),
-    );
-  }
-}
-
-class _ThemeModeTile extends StatelessWidget {
-  final ThemeProvider theme;
-
-  const _ThemeModeTile({required this.theme});
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<ThemeProvider>(
-      builder: (context, themeProvider, _) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFC107).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  themeProvider.isDarkMode
-                      ? Icons.dark_mode_rounded
-                      : Icons.light_mode_rounded,
-                  color: const Color(0xFFFFC107),
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Mode Tampilan',
-                      style: TextStyle(
-                        color: theme.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      themeProvider.isDarkMode ? 'Mode Gelap' : 'Mode Terang',
-                      style: TextStyle(
-                        color: theme.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Animated toggle
-              GestureDetector(
-                onTap: () => themeProvider.toggleTheme(),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                  width: 56,
-                  height: 30,
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    color: themeProvider.isDarkMode
-                        ? theme.btnPrimary.withValues(alpha: 0.3)
-                        : theme.btnPrimary,
-                  ),
-                  child: AnimatedAlign(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                    alignment: themeProvider.isDarkMode
-                        ? Alignment.centerLeft
-                        : Alignment.centerRight,
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color.fromRGBO(0, 0, 0, 0.2),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        themeProvider.isDarkMode
-                            ? Icons.nightlight_round
-                            : Icons.wb_sunny_rounded,
-                        size: 14,
-                        color: themeProvider.isDarkMode
-                            ? const Color(0xFF5C6BC0)
-                            : const Color(0xFFFFA726),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

@@ -106,6 +106,19 @@ class PoiCategory {
     }
   }
 
+  /// Path SVG custom icon untuk tiap kategori (jika tersedia)
+  static String? getCategorySvgPath(String category) {
+    final cat = normalizeCategory(category);
+    switch (cat) {
+      case kulinerCafe:
+        return 'assets/icons/categories/ios-cafe.svg';
+      case pertokoanUmkm:
+        return 'assets/icons/categories/shop.svg';
+      default:
+        return null;
+    }
+  }
+
   /// Warna representasi tiap kategori (untuk pie chart & marker)
   static Color getCategoryColor(String category) {
     final cat = normalizeCategory(category);

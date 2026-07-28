@@ -48,7 +48,7 @@ class _PoiDetailScreenState extends State<PoiDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _checkFavoriteStatus();
     _scrollController.addListener(_onScroll);
     _fetchDistance();
@@ -383,6 +383,7 @@ class _PoiDetailScreenState extends State<PoiDetailScreen>
 
     void goToRoute() {
       if (!hasLocation) return;
+      final categoryStr = (widget.place['kategori'] ?? widget.place['category'])?.toString();
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -390,6 +391,7 @@ class _PoiDetailScreenState extends State<PoiDetailScreen>
             destinationLat: lat,
             destinationLng: lng,
             destinationName: widget.place['nama_tempat'] ?? '',
+            destinationCategory: categoryStr,
           ),
         ),
       );
@@ -650,7 +652,7 @@ class _PoiDetailScreenState extends State<PoiDetailScreen>
                           child: _PillTabBar(
                             controller: _tabController,
                             theme: theme,
-                            tabs: const ['Detail', 'Rute', 'Ulasan'],
+                            tabs: const ['Detail', 'Ulasan'],
                           ),
                         ),
 
@@ -1004,8 +1006,6 @@ class _TabContent extends StatelessWidget {
               onShowImage: onShowImage,
             );
           case 1:
-            return _RouteTab(theme: theme, hasLocation: hasLocation);
-          case 2:
             return _ReviewsTab(theme: theme, placeId: placeId);
           default:
             return const SizedBox.shrink();
@@ -1185,63 +1185,6 @@ class _DetailsTab extends StatelessWidget {
   }
 }
 
-// ─── Route Tab ─────────────────────────────────────────────────────────────────
-
-class _RouteTab extends StatelessWidget {
-  final ThemeProvider theme;
-  final bool hasLocation;
-
-  const _RouteTab({required this.theme, required this.hasLocation});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: theme.bgSurface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.border),
-        ),
-        child: hasLocation
-            ? Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.map_outlined, size: 40, color: theme.btnPrimary),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Tekan "Mulai Perjalanan" di bawah untuk\nmembuka navigasi ke tempat ini.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: theme.textSecondary,
-                      height: 1.6,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              )
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.location_off_outlined,
-                    size: 40,
-                    color: theme.textHint,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Koordinat lokasi belum tersedia.',
-                    style: TextStyle(fontSize: 14, color: theme.textHint),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-      ),
-    );
-  }
-}
 
 // ─── Reviews Tab ───────────────────────────────────────────────────────────────
 

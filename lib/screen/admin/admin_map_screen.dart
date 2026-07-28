@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/theme_provider.dart';
 import '../../core/poi_category.dart';
 import '../../core/location_permission_helper.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class AdminMapScreen extends StatefulWidget {
   const AdminMapScreen({super.key});
@@ -184,10 +185,27 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
               ),
             ],
           ),
-          child: Icon(
-            PoiCategory.getCategoryIcon(cat),
-            size: isSelected ? 18 : 14,
-            color: Colors.white,
+          child: Builder(
+            builder: (context) {
+              final svgPath = PoiCategory.getCategorySvgPath(cat);
+              if (svgPath != null) {
+                return Padding(
+                  padding: EdgeInsets.all(isSelected ? 6.0 : 4.0),
+                  child: SvgPicture.asset(
+                    svgPath,
+                    colorFilter: const ColorFilter.mode(
+                      Colors.white,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                );
+              }
+              return Icon(
+                PoiCategory.getCategoryIcon(cat),
+                size: isSelected ? 18 : 14,
+                color: Colors.white,
+              );
+            },
           ),
         ),
       ),
