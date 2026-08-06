@@ -1,8 +1,10 @@
 # Miscellaneous
 .claude/
+graphify-out/
 CLAUDE.md
 AGENTS.md
 DESIGN.md
+
 scripts/
 *.class
 *.log
@@ -36,7 +38,9 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+android/build/
 /coverage/
+
 
 # Symbolication related
 app.*.symbols

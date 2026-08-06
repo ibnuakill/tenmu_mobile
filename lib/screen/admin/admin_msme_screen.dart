@@ -70,8 +70,10 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
     if (_scrollCtrl.position.pixels >=
         _scrollCtrl.position.maxScrollExtent - 200) {
       setState(() {
-        _visibleCount =
-            (_visibleCount + _pageSize).clamp(0, _filteredPlaces.length);
+        _visibleCount = (_visibleCount + _pageSize).clamp(
+          0,
+          _filteredPlaces.length,
+        );
       });
     }
   }
@@ -90,9 +92,11 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
     // Status filter
     if (_statusFilter != 'all') {
       list = list
-          .where((p) =>
-              (p['verification_status'] as String? ?? 'pending') ==
-              _statusFilter)
+          .where(
+            (p) =>
+                (p['verification_status'] as String? ?? 'pending') ==
+                _statusFilter,
+          )
           .toList();
     }
     setState(() {
@@ -114,17 +118,17 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
     final theme = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0EFF9),
+      backgroundColor: theme.bgBase,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.bgBase,
         elevation: 0,
-        iconTheme: IconThemeData(color: theme.btnPrimary),
+        iconTheme: IconThemeData(color: theme.textPrimary),
         title: Text(
           'Manage MSME',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: theme.btnPrimary,
+            color: theme.textPrimary,
           ),
         ),
         actions: [
@@ -135,29 +139,30 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
               color: theme.bgElevated,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(Icons.notifications_outlined,
-                color: theme.textSecondary, size: 18),
+            child: Icon(
+              Icons.notifications_outlined,
+              color: theme.textSecondary,
+              size: 18,
+            ),
           ),
         ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _errorView()
-              : Column(
-                  children: [
-                    // ── SEARCH + ACTION BAR ──
-                    _searchBar(theme),
-                    const SizedBox(height: 12),
-                    // ── STATUS FILTER CHIPS ──
-                    _statusChips(theme),
-                    const SizedBox(height: 8),
-                    // ── DATA TABLE / LIST ──
-                    Expanded(
-                      child: _dataView(theme),
-                    ),
-                  ],
-                ),
+          ? _errorView()
+          : Column(
+              children: [
+                // ── SEARCH + ACTION BAR ──
+                _searchBar(theme),
+                const SizedBox(height: 12),
+                // ── STATUS FILTER CHIPS ──
+                _statusChips(theme),
+                const SizedBox(height: 8),
+                // ── DATA TABLE / LIST ──
+                Expanded(child: _dataView(theme)),
+              ],
+            ),
     );
   }
 
@@ -171,8 +176,10 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
           children: [
             Icon(Icons.cloud_off_rounded, size: 40, color: theme.textHint),
             const SizedBox(height: 12),
-            Text('Failed to load MSME data.',
-                style: TextStyle(color: theme.textSecondary)),
+            Text(
+              'Failed to load MSME data.',
+              style: TextStyle(color: theme.textSecondary),
+            ),
             const SizedBox(height: 12),
             TextButton.icon(
               onPressed: _loadPlaces,
@@ -190,15 +197,9 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.bgSurface,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: theme.border),
       ),
       child: Row(
         children: [
@@ -225,7 +226,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0EFF9),
+              color: theme.bgElevated,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -233,11 +234,14 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
               children: [
                 Icon(Icons.filter_list, size: 16, color: theme.btnPrimary),
                 const SizedBox(width: 4),
-                Text('Filter',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: theme.btnPrimary)),
+                Text(
+                  'Filter',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: theme.btnPrimary,
+                  ),
+                ),
               ],
             ),
           ),
@@ -254,11 +258,14 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
               children: [
                 Icon(Icons.add, size: 16, color: theme.btnLabel),
                 const SizedBox(width: 4),
-                Text('Add MSME',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: theme.btnLabel)),
+                Text(
+                  'Add MSME',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: theme.btnLabel,
+                  ),
+                ),
               ],
             ),
           ),
@@ -291,7 +298,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
               decoration: BoxDecoration(
                 color: isActive
                     ? (c.$3 ?? theme.btnPrimary).withValues(alpha: 0.15)
-                    : const Color(0xFFF0EFF9),
+                    : theme.bgElevated,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -299,7 +306,9 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                  color: isActive ? (c.$3 ?? theme.btnPrimary) : theme.textSecondary,
+                  color: isActive
+                      ? (c.$3 ?? theme.btnPrimary)
+                      : theme.textSecondary,
                 ),
               ),
             ),
@@ -317,15 +326,16 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
           children: [
             Icon(Icons.inbox_outlined, size: 48, color: theme.textHint),
             const SizedBox(height: 12),
-            Text('No MSME data found.',
-                style: TextStyle(color: theme.textSecondary)),
+            Text(
+              'No MSME data found.',
+              style: TextStyle(color: theme.textSecondary),
+            ),
           ],
         ),
       );
     }
 
-    final displayList =
-        _filteredPlaces.take(_visibleCount).toList();
+    final displayList = _filteredPlaces.take(_visibleCount).toList();
 
     return ListView.builder(
       controller: _scrollCtrl,
@@ -343,13 +353,16 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
               child: TextButton(
                 onPressed: () {
                   setState(() {
-                    _visibleCount =
-                        (_visibleCount + _pageSize).clamp(0, _filteredPlaces.length);
+                    _visibleCount = (_visibleCount + _pageSize).clamp(
+                      0,
+                      _filteredPlaces.length,
+                    );
                   });
                 },
-                child: Text('Load More Data',
-                    style: TextStyle(
-                        fontSize: 12, color: theme.btnPrimary)),
+                child: Text(
+                  'Load More Data',
+                  style: TextStyle(fontSize: 12, color: theme.btnPrimary),
+                ),
               ),
             ),
           );
@@ -365,9 +378,9 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: theme.bgSurface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE3DFFE)),
+            border: Border.all(color: theme.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -520,14 +533,19 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
     );
   }
 
-  Widget _actionBtn(IconData icon, String label, Color color, ThemeProvider theme,
-      {VoidCallback? onTap}) {
+  Widget _actionBtn(
+    IconData icon,
+    String label,
+    Color color,
+    ThemeProvider theme, {
+    VoidCallback? onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFFF0EFF9),
+          color: theme.bgElevated,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(

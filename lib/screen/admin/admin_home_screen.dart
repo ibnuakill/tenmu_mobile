@@ -11,21 +11,109 @@ import 'admin_map_screen.dart';
 import 'admin_activity_screen.dart';
 import 'manage_users_screen.dart';
 import 'manage_kategori_screen.dart';
+import 'admin_profile_screen.dart';
+import '../owner/manage_place_screen.dart';
 import 'package:window_manager/window_manager.dart';
 
 /// Provider khusus admin — selalu dark mode, tidak terpengaruh toggle user.
 final adminThemeProvider = ThemeProvider(forceDarkMode: true);
 
-// ── Warna konstanta dashboard ──
-const _kAccentGreen = Color(0xFF10B981);
-const _kAccentPurple = Color(0xFF8B5CF6);
-const _kAccentBlue = Color(0xFF3B82F6);
-const _kAccentAmber = Color(0xFFF59E0B);
-const _kAccentTeal = Color(0xFF14B8A6);
-const _kSidebarBg = Color(0xFF0F0F0F);
-const _kCardBg = Color(0xFF1A1A1A);
-const _kBorderColor = Color(0xFF2A2A2A);
-const _kActiveNavBg = Color(0xFF6D28D9);
+// ── Warna konstanta dashboard — tema single primary blue (gaya template admin) ──
+const _kPrimary = Color(
+  0xFF2697FF,
+); // satu-satunya accent color, dipakai di semua elemen
+const _kAccentGreen = _kPrimary;
+const _kAccentPurple = _kPrimary;
+const _kAccentBlue = _kPrimary;
+const _kAccentAmber = Color(
+  0xFFF59E0B,
+); // dipertahankan hanya untuk status "pending" (semantik, bukan dekoratif)
+const _kAccentTeal = _kPrimary;
+const _kSidebarBg = Color(0xFF212332); // bgColor template
+const _kCardBg = Color(0xFF2A2D3E); // secondaryColor template
+const _kBorderColor = Color(0xFF3A3F55);
+const _kActiveNavBg = _kPrimary;
+
+// ── AKUN: dropdown Logout / Ubah Sandi & Email (dipakai di header & sidebar) ──
+Future<void> _confirmLogout(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Logout'),
+      content: const Text('Yakin ingin logout dari akun admin?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Batal'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: TextButton.styleFrom(foregroundColor: Colors.red),
+          child: const Text('Logout'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) {
+    await Supabase.instance.client.auth.signOut();
+    if (context.mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+  }
+}
+
+void _openAdminProfile(BuildContext context) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const AdminProfileScreen()),
+  );
+}
+
+/// PopupMenuButton berisi "Ubah Profil (Email/Sandi)" dan "Logout".
+/// [child] adalah tampilan pill/avatar yang jadi trigger-nya.
+class _AccountMenu extends StatelessWidget {
+  final Widget child;
+  const _AccountMenu({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      color: _kCardBg,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: _kBorderColor),
+      ),
+      offset: const Offset(0, 40),
+      onSelected: (value) {
+        if (value == 'profile') _openAdminProfile(context);
+        if (value == 'logout') _confirmLogout(context);
+      },
+      itemBuilder: (ctx) => [
+        const PopupMenuItem(
+          value: 'profile',
+          child: Row(
+            children: [
+              Icon(Icons.lock_reset, size: 18, color: Colors.white70),
+              SizedBox(width: 10),
+              Text('Ubah Sandi / Email', style: TextStyle(color: Colors.white)),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'logout',
+          child: Row(
+            children: [
+              Icon(Icons.logout, size: 18, color: Colors.redAccent),
+              SizedBox(width: 10),
+              Text('Logout', style: TextStyle(color: Colors.redAccent)),
+            ],
+          ),
+        ),
+      ],
+      child: child,
+    );
+  }
+}
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -251,6 +339,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       const ManageKategoriScreen(),
       const VerifyPlaceScreen(),
       const AdminActivityScreen(),
+      const ManagePlaceScreen(isOwnerView: false), // reuse dari folder owner
       const SettingsScreen(),
     ];
 
@@ -299,8 +388,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               _navItem(t, 0, Icons.home_rounded, 'Home'),
               _navItem(t, 1, Icons.map_outlined, 'Map'),
               _navItem(t, 2, Icons.people_outline, 'Users'),
-              _navItem(t, 3, Icons.category_outlined, 'Kategori'),
-              _navItem(t, 6, Icons.settings_outlined, 'Settings'),
+              _navItem(t, 6, Icons.storefront_outlined, 'Tempat'),
+              _navItem(t, 7, Icons.settings_outlined, 'Settings'),
             ],
           ),
         ),
@@ -374,7 +463,7 @@ class _Sidebar extends StatelessWidget {
                   width: 30,
                   height: 30,
                   decoration: BoxDecoration(
-                    color: _kAccentPurple,
+                    color: _kPrimary,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: ClipRRect(
@@ -428,6 +517,12 @@ class _Sidebar extends StatelessWidget {
             Icons.notifications_outlined,
             'Aktivitas Admin',
           ),
+          _sidebarItem(
+            6,
+            Icons.storefront_rounded,
+            Icons.storefront_outlined,
+            'Kelola Tempat',
+          ),
 
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -435,7 +530,7 @@ class _Sidebar extends StatelessWidget {
           ),
 
           _sidebarItem(
-            6,
+            7,
             Icons.settings_rounded,
             Icons.settings_outlined,
             'Settings',
@@ -444,54 +539,56 @@ class _Sidebar extends StatelessWidget {
           const Spacer(),
 
           // Admin profile at bottom
-          Container(
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: _kCardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _kBorderColor),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: _kAccentPurple.withValues(alpha: 0.3),
-                  child: const Icon(
-                    Icons.person,
-                    color: _kAccentPurple,
+          _AccountMenu(
+            child: Container(
+              margin: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: _kCardBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _kBorderColor),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: _kAccentPurple.withValues(alpha: 0.3),
+                    child: const Icon(
+                      Icons.person,
+                      color: _kAccentPurple,
+                      size: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name.length > 10 ? '${name.substring(0, 10)}…' : name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Text(
+                          'Super Admin',
+                          style: TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.expand_more,
+                    color: Color(0xFF6B7280),
                     size: 16,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name.length > 10 ? '${name.substring(0, 10)}…' : name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const Text(
-                        'Super Admin',
-                        style: TextStyle(
-                          color: Color(0xFF6B7280),
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.expand_more,
-                  color: Color(0xFF6B7280),
-                  size: 16,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -635,6 +732,117 @@ class _DashboardPage extends StatelessWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
+              // ── SEARCH + PROFILE BAR (gaya template) ──
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Cari tempat, user, atau kategori...',
+                            hintStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.4),
+                              fontSize: 13,
+                            ),
+                            fillColor: _kCardBg,
+                            filled: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            border: OutlineInputBorder(
+                              borderSide: BorderSide.none,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            suffixIcon: Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: _kPrimary,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.search,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Builder(
+                        builder: (ctx) {
+                          final email =
+                              Supabase
+                                  .instance
+                                  .client
+                                  .auth
+                                  .currentUser
+                                  ?.email ??
+                              'admin@tenmu.app';
+                          final name = email.split('@').first;
+                          return _AccountMenu(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _kCardBg,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.white10),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 14,
+                                    backgroundColor: _kPrimary.withValues(
+                                      alpha: 0.3,
+                                    ),
+                                    child: const Icon(
+                                      Icons.person,
+                                      size: 14,
+                                      color: _kPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    name.length > 14
+                                        ? '${name.substring(0, 14)}…'
+                                        : name,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.keyboard_arrow_down,
+                                    color: Colors.white54,
+                                    size: 16,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
               // ── HEADER ──
               SliverToBoxAdapter(
                 child: Padding(
@@ -1297,22 +1505,28 @@ class _KpiCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _kCardBg,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kBorderColor),
+        border: Border.all(width: 2, color: _kPrimary.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: data.iconBg.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(data.icon, color: data.iconBg, size: 18),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: data.iconBg.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(data.icon, color: data.iconBg, size: 18),
+              ),
+              const Icon(Icons.more_vert, color: Colors.white24, size: 16),
+            ],
           ),
           const SizedBox(height: 10),
           Text(
@@ -1383,32 +1597,55 @@ class _CategoryDonutChart extends StatelessWidget {
 
     final sections = entries.asMap().entries.map((e) {
       final color = _colorFor(e.value.key, e.key);
+      // radius menyempit tiap segmen — persis pola di template (25, 22, 19, 16, 13...)
+      final radius = (25.0 - (e.key * 3)).clamp(10.0, 25.0);
       return PieChartSectionData(
         value: e.value.value.toDouble(),
         color: color,
-        radius: 55,
-        title: '${e.value.value}',
-        titleStyle: const TextStyle(
-          color: Colors.white,
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-        ),
+        showTitle: false, // gaya template: tanpa label di slice
+        radius: radius,
       );
     }).toList();
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Donut
+        // Donut — persis konfigurasi template (Stack + teks total di tengah)
         SizedBox(
-          width: 160,
           height: 180,
-          child: PieChart(
-            PieChartData(
-              sections: sections,
-              centerSpaceRadius: 40,
-              sectionsSpace: 2,
-            ),
+          width: 160,
+          child: Stack(
+            children: [
+              PieChart(
+                PieChartData(
+                  sectionsSpace: 0,
+                  centerSpaceRadius: 55,
+                  startDegreeOffset: -90,
+                  sections: sections,
+                ),
+              ),
+              Positioned.fill(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '$total',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        height: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'total tempat',
+                      style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(width: 16),
