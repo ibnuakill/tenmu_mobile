@@ -56,5 +56,7 @@ app.*.map.json
 # Env (API keys & secrets)
 .env
 
-# Google services (Firebase API keys)
+# Google services (Firebase API keys & config)
 android/app/google-services.json
+firebase.json
+
