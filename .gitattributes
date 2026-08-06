@@ -1,0 +1,4 @@
+# Ignore Supabase, Windows desktop boilerplate, and Web files from GitHub Linguist language statistics
+supabase/** linguist-documentation
+windows/** linguist-vendored
+web/** linguist-vendored
