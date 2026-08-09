@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
@@ -41,12 +42,6 @@ enum TravelMode {
     TravelMode.walking => 'Jalan Kaki',
     TravelMode.motorcycle => 'Motor',
     TravelMode.car => 'Mobil',
-  };
-
-  String get iconLabel => switch (this) {
-    TravelMode.walking => '🚶',
-    TravelMode.motorcycle => '🏍️',
-    TravelMode.car => '🚗',
   };
 }
 
@@ -514,19 +509,32 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           ? _currentPosition!.heading
           : _compassHeading;
 
+      final geometry = LatLng(
+        _currentPosition!.latitude,
+        _currentPosition!.longitude,
+      );
+
       if (_currentPosSymbol != null) {
+        // Update posisi & rotasi TANPA hapus symbol → tidak ada frame kosong → tidak kedip
         try {
-          await c.removeSymbol(_currentPosSymbol!);
-        } catch (_) {}
-        _currentPosSymbol = null;
+          await c.updateSymbol(
+            _currentPosSymbol!,
+            SymbolOptions(
+              geometry: geometry,
+              iconRotate: heading,
+            ),
+          );
+          return; // sukses update, tidak perlu buat ulang
+        } catch (_) {
+          // Jika symbol sudah tidak valid (misal setelah style reload), hapus ref-nya
+          _currentPosSymbol = null;
+        }
       }
 
+      // Buat symbol baru hanya jika belum ada / habis dihapus
       _currentPosSymbol = await c.addSymbol(
         SymbolOptions(
-          geometry: LatLng(
-            _currentPosition!.latitude,
-            _currentPosition!.longitude,
-          ),
+          geometry: geometry,
           iconImage: 'marker_current',
           iconSize: 1.2,
           iconAnchor: 'center',
@@ -539,6 +547,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       _isUpdatingMarker = false;
     }
   }
+
 
   Future<void> _drawDestinationMarker() async {
     final c = _mapController;
@@ -563,7 +572,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         ? _catKey(cat)
         : 'marker_destination';
 
-    debugPrint('[MAP] _drawDestinationMarker: rawCat="$rawCat" cat="$cat" imageId="$imageId"');
+    debugPrint(
+      '[MAP] _drawDestinationMarker: rawCat="$rawCat" cat="$cat" imageId="$imageId"',
+    );
 
     try {
       _destinationSymbol = await c.addSymbol(
@@ -1257,9 +1268,13 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              mode.iconLabel,
-                              style: const TextStyle(fontSize: 16),
+                            Icon(
+                              switch (mode) {
+                                TravelMode.walking => Icons.directions_walk_rounded,
+                                TravelMode.motorcycle => Icons.two_wheeler_rounded,
+                                TravelMode.car => Icons.directions_car_rounded,
+                              },
+                              size: 16,
                             ),
                             const SizedBox(width: 6),
                             Text(
@@ -1464,12 +1479,12 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: imageUrl != null
-                      ? Image.network(
-                          imageUrl,
+                      ? CachedNetworkImage(
+                          imageUrl: imageUrl,
                           width: 60,
                           height: 60,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => _placeholderImage(theme),
+                          errorWidget: (_, _, _) => _placeholderImage(theme),
                         )
                       : _placeholderImage(theme),
                 ),

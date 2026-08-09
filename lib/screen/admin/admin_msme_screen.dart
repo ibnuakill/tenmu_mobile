@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -392,12 +393,12 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: imageUrl != null
-                        ? Image.network(
-                            imageUrl,
+                        ? CachedNetworkImage(
+                            imageUrl: imageUrl,
                             width: 40,
                             height: 40,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => _avatar(theme, name),
+                            errorWidget: (_, _, _) => _avatar(theme, name),
                           )
                         : _avatar(theme, name),
                   ),

@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
 import '../../core/poi_category.dart';
-import '../user/settings_screen.dart';
+import 'admin_settings_screen.dart';
 import 'verify_place_screen.dart';
 import 'admin_map_screen.dart';
 import 'admin_activity_screen.dart';
@@ -340,7 +340,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       const VerifyPlaceScreen(),
       const AdminActivityScreen(),
       const ManagePlaceScreen(isOwnerView: false), // reuse dari folder owner
-      const SettingsScreen(),
+      const AdminSettingsScreen(),
     ];
 
     return ChangeNotifierProvider<ThemeProvider>.value(

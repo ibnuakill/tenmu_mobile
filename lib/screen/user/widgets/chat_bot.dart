@@ -4,10 +4,11 @@
 /// Fallback ke pencarian lokal jika API key belum diset.
 /// Hasil tappable → navigasi ke [PoiDetailScreen].
 library;
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme_provider.dart';
 import '../../../core/places_provider.dart';
 import '../../../core/poi_image_helper.dart' show PoiImageHelper;
@@ -27,7 +28,7 @@ class ChatMessage {
   final DateTime time;
 
   ChatMessage({required this.text, required this.isUser, DateTime? time})
-      : time = time ?? DateTime.now();
+    : time = time ?? DateTime.now();
 }
 
 // ── Floating Bubble ────────────────────────────────────────────────
@@ -74,7 +75,10 @@ class ChatBotBubble extends StatelessWidget {
                 bottom: 4,
                 right: 4,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.bgBase,
                     borderRadius: BorderRadius.circular(6),
@@ -123,18 +127,22 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
   bool _isLoading = false;
   List<Map<String, dynamic>> _searchResults = [];
 
-  // ── Gemini ─────────────────────────────────────────────────────────
-  ChatSession? _chatSession;
-  bool _geminiReady = false;
+  // ── Edge Function (server-side AI) ────────────────────────────────────
+  // GEMINI_API_KEY disimpan sebagai secret di Supabase Edge Function
+  // (`supabase/functions/chat-bot`). Client TIDAK lagi membawa API key.
+  bool _aiReady = false;
 
   @override
   void initState() {
     super.initState();
-    _messages.add(ChatMessage(
-      text: 'Halo! Saya TenMu AI 🌟\nTanya rekomendasi cafe, kuliner, wisata, atau tempat lainnya ya!',
-      isUser: false,
-    ));
-    WidgetsBinding.instance.addPostFrameCallback((_) => _initGemini());
+    _messages.add(
+      ChatMessage(
+        text:
+            'Halo! Saya TenMu AI 🌟\nTanya rekomendasi cafe, kuliner, wisata, atau tempat lainnya ya!',
+        isUser: false,
+      ),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _pingAi());
   }
 
   @override
@@ -145,83 +153,48 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
   }
 
   // =======================================================================
-  // Gemini AI
+  // AI Edge Function
   // =======================================================================
-  Future<void> _initGemini() async {
+
+  /// Cek ringan apakah fungsi AI tersedia (tanpa membebani token Gemini).
+  Future<void> _pingAi() async {
     try {
-      final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-      if (apiKey.isEmpty) return;
-
-      final provider = context.read<PlacesProvider>();
-      if (provider.placesList.isEmpty) await provider.fetchPlaces();
-
-      final model = GenerativeModel(
-        model: 'gemini-2.5-flash-lite',
-        apiKey: apiKey,
-        systemInstruction: Content.system(
-          _buildSystemPrompt(provider.placesList),
-        ),
-        generationConfig: GenerationConfig(
-          temperature: 0.7,
-          maxOutputTokens: 600,
-        ),
-      );
-
-      if (mounted) {
-        setState(() {
-          _chatSession = model.startChat();
-          _geminiReady = true;
-        });
-      }
+      await Supabase.instance.client.functions.invoke('chat-bot', body: {
+        'message': 'ping',
+      });
+      if (mounted) setState(() => _aiReady = true);
     } catch (_) {
-      // Gagal init — fallback ke pencarian lokal
+      debugPrint('chat-bot ping failed — pakai fallback lokal');
     }
   }
 
-  String _buildSystemPrompt(List<Map<String, dynamic>> places) {
-    final sb = StringBuffer();
-    sb.writeln('Kamu adalah TenMu AI, asisten cerdas untuk aplikasi TenMu — platform penemuan tempat UMKM, wisata, kuliner, cafe, hotel, dan oleh-oleh di Indonesia.');
-    sb.writeln('Tugas UTAMA: bantu pengguna menemukan tempat yang sesuai kebutuhan mereka dari daftar yang diberikan.');
-    sb.writeln('Jawab dalam Bahasa Indonesia yang ramah, santai, dan informatif.');
-    
-    // ATURAN KETAT (STRICT CONSTRAINTS)
-    sb.writeln('ATURAN KETAT:');
-    sb.writeln('1. Kamu HANYA BOLEH menjawab pertanyaan seputar rekomendasi tempat, pariwisata, kuliner, jam operasional, rute, atau fasilitas dari tempat di dalam daftar.');
-    sb.writeln('2. Jika pengguna bertanya hal di luar konteks aplikasi (seperti matematika, sains, pelajaran sekolah, coding, politik, atau pengetahuan umum lainnya), TOLAK DENGAN HALUS dan ingatkan bahwa kamu hanya asisten rekomendasi tempat.');
-    sb.writeln('3. Saat merekomendasikan, WAJIB sebutkan nama PERSIS dari daftar. Jangan mengarang/halusinasi nama tempat yang tidak ada di daftar.');
-    sb.writeln('4. Jika tidak ada tempat yang cocok dengan kriteria, jujur bilang tidak ada dan sarankan kata kunci lain.');
-    
-    sb.writeln('\n=== DAFTAR TEMPAT TERSEDIA (${places.length} lokasi) ===');
-    for (int i = 0; i < places.length && i < 120; i++) {
-      final p = places[i];
-      final nama = p['nama_tempat']?.toString() ?? '';
-      if (nama.isEmpty) continue;
-      final kat = p['category']?.toString() ?? '';
-      final alamat = p['alamat']?.toString() ?? '';
-      final fasilitas = p['fasilitas']?.toString() ?? '';
-      final rating = p['rating']?.toString() ?? '';
-      final desc = (p['deskripsi']?.toString() ?? '').replaceAll('\n', ' ');
-      sb.write('- $nama');
-      if (kat.isNotEmpty) sb.write(' [$kat]');
-      if (alamat.isNotEmpty) sb.write(' • $alamat');
-      if (rating.isNotEmpty) sb.write(' • ⭐$rating');
-      if (fasilitas.isNotEmpty) sb.write(' • Fasilitas: $fasilitas');
-      if (desc.isNotEmpty) sb.write(' • ${desc.substring(0, desc.length.clamp(0, 80))}');
-      sb.writeln();
-    }
-    return sb.toString();
-  }
-
-  /// Cari tempat yang namanya disebutkan dalam teks jawaban Gemini.
-  List<Map<String, dynamic>> _extractMentionedPlaces(
-    String text,
-    List<Map<String, dynamic>> places,
-  ) {
-    final lower = text.toLowerCase();
-    return places.where((p) {
-      final nama = (p['nama_tempat']?.toString() ?? '').toLowerCase();
-      return nama.length > 2 && lower.contains(nama);
-    }).take(5).toList();
+  /// Panggil Edge Function 'chat-bot'. Throws bila gagal (5xx/network);
+  /// caller akan fallback ke pencarian lokal.
+  Future<({String reply, List<Map<String, dynamic>> mentioned})>
+      _callEdgeAi(String userText) async {
+    final preview = _messages.length > 6
+        ? _messages.sublist(_messages.length - 6)
+        : _messages;
+    final res = await Supabase.instance.client.functions.invoke(
+      'chat-bot',
+      body: {
+        'message': userText,
+        'history': preview
+            .map((m) => {
+                  'role': m.isUser ? 'user' : 'model',
+                  'parts': [m.text],
+                })
+            .toList(),
+      },
+    );
+    if (res.status >= 400) throw Exception('AI tidak tersedia (${res.status})');
+    final data = (res.data as Map?) ?? const {};
+    final reply = (data['reply'] as String?) ?? '';
+    final mentioned = (data['mentioned'] as List?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList() ??
+        <Map<String, dynamic>>[];
+    return (reply: reply, mentioned: mentioned);
   }
 
   // =======================================================================
@@ -241,64 +214,28 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
 
     String reply;
 
-    if (_geminiReady && _chatSession != null) {
-      // ── Gemini path ──────────────────────────────────────────────────
+    if (_aiReady) {
+      // ── Edge Function path (server-side Gemini) ──────────────────────
       try {
-        String? responseText;
-        int retries = 3;
-        for (int i = 0; i < retries; i++) {
-          try {
-            final response = await _chatSession!.sendMessage(Content.text(userText));
-            responseText = response.text;
-            break; // Berhasil, keluar dari loop
-          } catch (e) {
-            debugPrint('Gemini retry ${i + 1} failed: $e');
-            if (i == retries - 1) rethrow; // Lempar error jika sudah batas maksimal
-            await Future.delayed(const Duration(seconds: 1)); // Tunggu sebentar sebelum coba lagi
-          }
-        }
-        
-        reply = responseText ?? 'Maaf, tidak ada respons. Coba lagi ya!';
-
-        // Tampilkan kartu tempat yang disebutkan Gemini
+        final result = await _callEdgeAi(userText);
+        reply = result.reply;
         if (!mounted) return;
-        final provider = context.read<PlacesProvider>();
-        final mentioned = _extractMentionedPlaces(reply, provider.placesList);
-        if (mentioned.isNotEmpty) {
-          setState(() => _searchResults = mentioned);
+        if (result.mentioned.isNotEmpty) {
+          setState(() => _searchResults = result.mentioned);
         }
       } catch (e) {
-        debugPrint('Gemini error: $e');
-        reply = 'Koneksi ke AI bermasalah 🙏 Coba lagi sebentar ya!';
+        debugPrint('Edge AI error: $e');
+        // Transisi: gagal → fallback lokal.
+        _aiReady = false;
+        if (mounted) {
+          reply = _localSearch(userText);
+        } else {
+          return;
+        }
       }
     } else {
       // ── Fallback: local keyword search ───────────────────────────────
-      final provider = context.read<PlacesProvider>();
-      if (provider.placesList.isEmpty) await provider.fetchPlaces();
-
-      final query = userText.toLowerCase();
-      final results = provider.placesList.where((p) {
-        final nama = (p['nama_tempat']?.toString() ?? '').toLowerCase();
-        final desc = (p['deskripsi']?.toString() ?? '').toLowerCase();
-        final cat = (p['category']?.toString() ?? '').toLowerCase();
-        final fas = (p['fasilitas']?.toString() ?? '').toLowerCase();
-        return nama.contains(query) || desc.contains(query) ||
-               cat.contains(query) || fas.contains(query);
-      }).take(5).toList();
-
-      if (results.isEmpty) {
-        reply = 'Maaf, ga nemu tempat yang cocok dengan "$userText". Coba keyword lain ya!';
-      } else {
-        final sb = StringBuffer('Ketemu ${results.length} tempat:\n');
-        for (var i = 0; i < results.length; i++) {
-          sb.writeln('${i + 1}. ${results[i]['nama_tempat']}');
-        }
-        sb.write('\nTap pilihan di bawah buat lihat detail!');
-        reply = sb.toString();
-      }
-      if (mounted && results.isNotEmpty) {
-        setState(() => _searchResults = results);
-      }
+      reply = _localSearch(userText);
     }
 
     if (mounted) {
@@ -308,6 +245,47 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
       });
       _scrollToBottom();
     }
+  }
+
+  /// Fallback: pencarian kata kunci lokal (tanpa API). Mengembalikan teks
+  /// balasan & (dengan efek samping) mengisi `_searchResults` bila ada hasil.
+  String _localSearch(String userText) {
+    final provider = context.read<PlacesProvider>();
+    if (provider.placesList.isEmpty) {
+      provider.fetchPlaces(); // pemicu async, hasil bisa langsung tampil
+    }
+
+    final query = userText.toLowerCase();
+    final results = provider.placesList
+        .where((p) {
+          final nama = (p['nama_tempat']?.toString() ?? '').toLowerCase();
+          final desc = (p['deskripsi']?.toString() ?? '').toLowerCase();
+          final cat = (p['category']?.toString() ?? '').toLowerCase();
+          final fas = (p['fasilitas']?.toString() ?? '').toLowerCase();
+          return nama.contains(query) ||
+              desc.contains(query) ||
+              cat.contains(query) ||
+              fas.contains(query);
+        })
+        .take(5)
+        .toList();
+
+    String reply;
+    if (results.isEmpty) {
+      reply =
+          'Maaf, ga nemu tempat yang cocok dengan "$userText". Coba keyword lain ya!';
+    } else {
+      final sb = StringBuffer('Ketemu ${results.length} tempat:\n');
+      for (var i = 0; i < results.length; i++) {
+        sb.writeln('${i + 1}. ${results[i]['nama_tempat']}');
+      }
+      sb.write('\nTap pilihan di bawah buat lihat detail!');
+      reply = sb.toString();
+    }
+    if (mounted && results.isNotEmpty) {
+      setState(() => _searchResults = results);
+    }
+    return reply;
   }
 
   void _scrollToBottom() {
@@ -397,7 +375,11 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
                       color: theme.bgElevated,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.close_rounded, color: theme.textSecondary, size: 18),
+                    child: Icon(
+                      Icons.close_rounded,
+                      color: theme.textSecondary,
+                      size: 18,
+                    ),
                   ),
                 ),
               ],
@@ -448,9 +430,15 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
               ),
               child: ListView.separated(
                 shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 itemCount: _searchResults.length,
-                separatorBuilder: (_, _) => Divider(height: 1, color: theme.border.withValues(alpha: 0.3)),
+                separatorBuilder: (_, _) => Divider(
+                  height: 1,
+                  color: theme.border.withValues(alpha: 0.3),
+                ),
                 itemBuilder: (context, i) {
                   final place = _searchResults[i];
                   final name = place['nama_tempat'] ?? '';
@@ -470,11 +458,21 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(10),
                             child: imgUrl != null
-                                ? Image.network(imgUrl, width: 48, height: 48, fit: BoxFit.cover)
+                                ? CachedNetworkImage(
+                                    imageUrl: imgUrl,
+                                    width: 48,
+                                    height: 48,
+                                    fit: BoxFit.cover,
+                                  )
                                 : Container(
-                                    width: 48, height: 48,
+                                    width: 48,
+                                    height: 48,
                                     color: theme.bgElevated,
-                                    child: Icon(Icons.image_outlined, color: theme.textHint, size: 20),
+                                    child: Icon(
+                                      Icons.image_outlined,
+                                      color: theme.textHint,
+                                      size: 20,
+                                    ),
                                   ),
                           ),
                           const SizedBox(width: 12),
@@ -482,19 +480,34 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(name, style: TextStyle(
-                                  color: theme.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
-                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                Text(
+                                  name,
+                                  style: TextStyle(
+                                    color: theme.textPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 2),
-                                Text(alamat, style: TextStyle(
-                                  color: theme.textSecondary, fontSize: 11),
-                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                Text(
+                                  alamat,
+                                  style: TextStyle(
+                                    color: theme.textSecondary,
+                                    fontSize: 11,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
                           ),
-                          Icon(Icons.chevron_right_rounded, color: theme.textHint, size: 18),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: theme.textHint,
+                            size: 18,
+                          ),
                         ],
                       ),
                     ),
@@ -505,7 +518,12 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
 
           // ── Input ───────────────────────────────────────────
           Container(
-            padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + bottomInset + (bottomPad > 0 ? bottomPad : 12)),
+            padding: EdgeInsets.fromLTRB(
+              12,
+              8,
+              12,
+              8 + bottomInset + (bottomPad > 0 ? bottomPad : 12),
+            ),
             decoration: BoxDecoration(
               color: theme.bgSurface,
               border: Border(top: BorderSide(color: theme.border)),
@@ -530,7 +548,10 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
                       onSubmitted: (_isLoading ? null : _sendMessage),
                       decoration: InputDecoration(
                         hintText: 'Tanya rekomendasi tempat...',
-                        hintStyle: TextStyle(color: theme.textHint, fontSize: 13),
+                        hintStyle: TextStyle(
+                          color: theme.textHint,
+                          fontSize: 13,
+                        ),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -590,8 +611,9 @@ class _MessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
-        mainAxisAlignment:
-            message.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: message.isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!message.isUser) ...[
@@ -603,7 +625,10 @@ class _MessageBubble extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
-                child: Text(ChatBotConfig.botAvatar, style: TextStyle(fontSize: 14)),
+                child: Text(
+                  ChatBotConfig.botAvatar,
+                  style: TextStyle(fontSize: 14),
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -643,7 +668,10 @@ class _MessageBubble extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
-                child: Text(ChatBotConfig.userAvatar, style: TextStyle(fontSize: 14)),
+                child: Text(
+                  ChatBotConfig.userAvatar,
+                  style: TextStyle(fontSize: 14),
+                ),
               ),
             ),
         ],
@@ -671,7 +699,10 @@ class _TypingIndicator extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
-              child: Text(ChatBotConfig.botAvatar, style: TextStyle(fontSize: 14)),
+              child: Text(
+                ChatBotConfig.botAvatar,
+                style: TextStyle(fontSize: 14),
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -702,10 +733,7 @@ class _TypingIndicator extends StatelessWidget {
     return Container(
       width: 6,
       height: 6,
-      decoration: BoxDecoration(
-        color: theme.textHint,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: theme.textHint, shape: BoxShape.circle),
     );
   }
 }

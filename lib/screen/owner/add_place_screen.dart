@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -727,8 +728,8 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
             borderRadius: BorderRadius.circular(8),
             child: Stack(
               children: [
-                Image.network(
-                  previewUrl,
+                CachedNetworkImage(
+                  imageUrl: previewUrl,
                   height: 180,
                   width: double.infinity,
                   fit: BoxFit.cover,
@@ -803,8 +804,8 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                           ),
                         ),
                         clipBehavior: Clip.antiAlias,
-                        child: Image.network(
-                          _imageUrls[index],
+                        child: CachedNetworkImage(
+                          imageUrl: _imageUrls[index],
                           fit: BoxFit.cover,
                         ),
                       ),
@@ -929,11 +930,20 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                             child: SizedBox(
                               height: 42,
                               child: ElevatedButton.icon(
-                                onPressed: _isLoading ? null : _getCurrentLocation,
-                                icon: Icon(Icons.my_location, size: 16, color: theme.btnLabel),
+                                onPressed: _isLoading
+                                    ? null
+                                    : _getCurrentLocation,
+                                icon: Icon(
+                                  Icons.my_location,
+                                  size: 16,
+                                  color: theme.btnLabel,
+                                ),
                                 label: Text(
                                   'GPS',
-                                  style: TextStyle(color: theme.btnLabel, fontSize: 13),
+                                  style: TextStyle(
+                                    color: theme.btnLabel,
+                                    fontSize: 13,
+                                  ),
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: theme.btnPrimary,
@@ -950,11 +960,20 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                             child: SizedBox(
                               height: 42,
                               child: OutlinedButton.icon(
-                                onPressed: _isLoading ? null : _bukaPetaPilihLokasi,
-                                icon: Icon(Icons.map_outlined, size: 16, color: theme.iconColor),
+                                onPressed: _isLoading
+                                    ? null
+                                    : _bukaPetaPilihLokasi,
+                                icon: Icon(
+                                  Icons.map_outlined,
+                                  size: 16,
+                                  color: theme.iconColor,
+                                ),
                                 label: Text(
                                   'Peta Manual',
-                                  style: TextStyle(color: theme.textSecondary, fontSize: 13),
+                                  style: TextStyle(
+                                    color: theme.textSecondary,
+                                    fontSize: 13,
+                                  ),
                                 ),
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(color: theme.border),
@@ -976,10 +995,11 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                               label: 'Latitude',
                               hint: '-6.917464',
                               icon: Icons.my_location,
-                              keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true,
-                                signed: true,
-                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                    signed: true,
+                                  ),
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -989,10 +1009,11 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                               label: 'Longitude',
                               hint: '107.619123',
                               icon: Icons.my_location,
-                              keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true,
-                                signed: true,
-                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                    signed: true,
+                                  ),
                             ),
                           ),
                         ],

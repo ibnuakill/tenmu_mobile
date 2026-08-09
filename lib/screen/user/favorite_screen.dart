@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -24,7 +25,9 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
         .eq('user_id', user!.id)
         .order('created_at', ascending: false);
 
-    return (response as List).map((fav) => fav['places'] as Map<String, dynamic>).toList();
+    return (response as List)
+        .map((fav) => fav['places'] as Map<String, dynamic>)
+        .toList();
   }
 
   @override
@@ -34,22 +37,40 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     return Scaffold(
       backgroundColor: theme.bgBase,
       appBar: AppBar(
-        title: Text('Favorit Saya', style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.bold)),
+        title: Text(
+          'Favorit Saya',
+          style: TextStyle(
+            color: theme.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         backgroundColor: theme.bgBase,
         elevation: 0,
         iconTheme: IconThemeData(color: theme.textPrimary),
       ),
       body: user == null
-          ? Center(child: Text('Silakan login untuk melihat favorit.', style: TextStyle(color: theme.textSecondary)))
+          ? Center(
+              child: Text(
+                'Silakan login untuk melihat favorit.',
+                style: TextStyle(color: theme.textSecondary),
+              ),
+            )
           : FutureBuilder<List<Map<String, dynamic>>>(
               future: _fetchFavorites(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator(color: theme.iconColor));
+                  return Center(
+                    child: CircularProgressIndicator(color: theme.iconColor),
+                  );
                 }
-                
+
                 if (snapshot.hasError) {
-                  return Center(child: Text('Gagal memuat favorit.', style: TextStyle(color: theme.snackError)));
+                  return Center(
+                    child: Text(
+                      'Gagal memuat favorit.',
+                      style: TextStyle(color: theme.snackError),
+                    ),
+                  );
                 }
 
                 final favorites = snapshot.data ?? [];
@@ -59,9 +80,16 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.bookmark_border, size: 64, color: theme.textHint),
+                        Icon(
+                          Icons.bookmark_border,
+                          size: 64,
+                          color: theme.textHint,
+                        ),
                         const SizedBox(height: 16),
-                        Text('Belum ada tempat favorit.', style: TextStyle(color: theme.textSecondary)),
+                        Text(
+                          'Belum ada tempat favorit.',
+                          style: TextStyle(color: theme.textSecondary),
+                        ),
                       ],
                     ),
                   );
@@ -77,9 +105,13 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => PoiDetailScreen(place: place)),
-                        ).then((_) => setState(() {})); // Refresh if un-favorited
-                      }
+                          MaterialPageRoute(
+                            builder: (_) => PoiDetailScreen(place: place),
+                          ),
+                        ).then(
+                          (_) => setState(() {}),
+                        ); // Refresh if un-favorited
+                      },
                     );
                   },
                 );
@@ -112,42 +144,66 @@ class _FavoriteCard extends StatelessWidget {
         child: Row(
           children: [
             if (imageUrl != null)
-              Image.network(
-                imageUrl,
+              CachedNetworkImage(
+                imageUrl: imageUrl,
                 width: 100,
                 height: 100,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(width: 100, height: 100, color: theme.bgElevated, child: Icon(Icons.broken_image, color: theme.textHint)),
+                errorWidget: (_, _, _) => Container(
+                  width: 100,
+                  height: 100,
+                  color: theme.bgElevated,
+                  child: Icon(Icons.broken_image, color: theme.textHint),
+                ),
               )
             else
-              Container(width: 100, height: 100, color: theme.bgElevated, child: Icon(Icons.storefront, color: theme.textHint)),
-            
+              Container(
+                width: 100,
+                height: 100,
+                color: theme.bgElevated,
+                child: Icon(Icons.storefront, color: theme.textHint),
+              ),
+
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(place['nama_tempat'] ?? 'Tanpa Nama', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.textPrimary)),
+                    Text(
+                      place['nama_tempat'] ?? 'Tanpa Nama',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: theme.textPrimary,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Icon(Icons.location_on, size: 14, color: theme.iconColor),
+                        Icon(
+                          Icons.location_on,
+                          size: 14,
+                          color: theme.iconColor,
+                        ),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             place['alamat'] ?? '-',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12, color: theme.textSecondary),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: theme.textSecondary,
+                            ),
                           ),
                         ),
                       ],
-                    )
+                    ),
                   ],
                 ),
               ),
-            )
+            ),
           ],
         ),
       ),

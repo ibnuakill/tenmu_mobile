@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme_provider.dart';
@@ -195,10 +196,10 @@ class _PoiDetailScreenState extends State<PoiDetailScreen>
                     minScale: 1.0,
                     maxScale: 5.0,
                     child: Center(
-                      child: Image.network(
-                        imageUrls[index],
+                      child: CachedNetworkImage(
+                        imageUrl: imageUrls[index],
                         fit: BoxFit.contain,
-                        errorBuilder: (_, _, _) => const Icon(
+                        errorWidget: (_, _, _) => const Icon(
                           Icons.broken_image_outlined,
                           color: Colors.white38,
                           size: 48,
@@ -422,10 +423,10 @@ class _PoiDetailScreenState extends State<PoiDetailScreen>
                                 itemCount: imageUrls.length,
                                 onPageChanged: (i) =>
                                     setState(() => _currentImageIndex = i),
-                                itemBuilder: (_, index) => Image.network(
-                                  imageUrls[index],
+                                itemBuilder: (_, index) => CachedNetworkImage(
+                                  imageUrl: imageUrls[index],
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => Container(
+                                  errorWidget: (_, _, _) => Container(
                                     color: theme.bgSurface,
                                     child: Center(
                                       child: Icon(
@@ -1160,12 +1161,12 @@ class _DetailsTab extends StatelessWidget {
                 onTap: () => onShowImage(index),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(14),
-                  child: Image.network(
-                    imageUrls[index],
+                  child: CachedNetworkImage(
+                    imageUrl: imageUrls[index],
                     width: 120,
                     height: 120,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
+                    errorWidget: (_, _, _) => Container(
                       width: 120,
                       height: 120,
                       color: theme.bgSurface,

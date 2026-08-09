@@ -54,6 +54,7 @@ dependencies:
   window_manager: ^0.4.3
   desktop_webview_window: ^0.2.0
   maplibre_gl: ^0.26.2
+  cached_network_image: ^3.4.1
 
 dev_dependencies:
   flutter_test:

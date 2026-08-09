@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -148,6 +149,39 @@ class _VerifyPlaceScreenState extends State<VerifyPlaceScreen>
     }
   }
 
+  Future<void> _toggleFeatured(Map<String, dynamic> place) async {
+    final currentFeatured = place['is_featured'] == true;
+    final newFeatured = !currentFeatured;
+    // Optimistic update lokal
+    setState(() {
+      final idx = _verifiedPlaces.indexWhere((p) => p['id'] == place['id']);
+      if (idx != -1) {
+        _verifiedPlaces[idx] = Map<String, dynamic>.from(_verifiedPlaces[idx])
+          ..['is_featured'] = newFeatured;
+      }
+    });
+    try {
+      await _client
+          .from('places')
+          .update({'is_featured': newFeatured})
+          .eq('id', place['id']);
+      _snack(
+        newFeatured ? '⭐ Ditambahkan ke unggulan!' : 'Dihapus dari unggulan.',
+        isError: false,
+      );
+    } catch (e) {
+      // Rollback jika gagal
+      setState(() {
+        final idx = _verifiedPlaces.indexWhere((p) => p['id'] == place['id']);
+        if (idx != -1) {
+          _verifiedPlaces[idx] = Map<String, dynamic>.from(_verifiedPlaces[idx])
+            ..['is_featured'] = currentFeatured;
+        }
+      });
+      _snack('Gagal: $e', isError: true);
+    }
+  }
+
   void _snack(String msg, {required bool isError}) {
     final theme = Provider.of<ThemeProvider>(context, listen: false);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -227,6 +261,7 @@ class _VerifyPlaceScreenState extends State<VerifyPlaceScreen>
             placesList: _verifiedPlaces,
             isLoading: _loadingVerified,
             onRefresh: _loadVerified,
+            onToggleFeatured: _toggleFeatured,
           ),
           _RejectedTab(
             placesList: _rejectedPlaces,
@@ -364,27 +399,34 @@ class _PendingTab extends StatelessWidget {
 }
 
 // ── Tab Verified ─────────────────────────────────────────────
-class _VerifiedTab extends StatelessWidget {
+class _VerifiedTab extends StatefulWidget {
   final List<Map<String, dynamic>> placesList;
   final bool isLoading;
   final Future<void> Function() onRefresh;
+  final Future<void> Function(Map<String, dynamic>) onToggleFeatured;
 
   const _VerifiedTab({
     required this.placesList,
     required this.isLoading,
     required this.onRefresh,
+    required this.onToggleFeatured,
   });
 
+  @override
+  State<_VerifiedTab> createState() => _VerifiedTabState();
+}
+
+class _VerifiedTabState extends State<_VerifiedTab> {
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
     return RefreshIndicator(
-      onRefresh: onRefresh,
+      onRefresh: widget.onRefresh,
       color: theme.iconColor,
       backgroundColor: theme.bgSurface,
-      child: isLoading
+      child: widget.isLoading
           ? Center(child: CircularProgressIndicator(color: theme.iconColor))
-          : placesList.isEmpty
+          : widget.placesList.isEmpty
           ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -404,32 +446,37 @@ class _VerifiedTab extends StatelessWidget {
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: placesList.length,
+              itemCount: widget.placesList.length,
               itemBuilder: (context, index) {
-                final place = placesList[index];
+                final place = widget.placesList[index];
                 final imageUrl = PoiImageHelper.primaryImageUrl(place);
                 final verifiedAt = place['verified_at'] != null
                     ? DateTime.tryParse(place['verified_at'])
                     : null;
+                final isFeatured = place['is_featured'] == true;
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
                     color: theme.bgSurface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: theme.border),
+                    border: Border.all(
+                      color: isFeatured
+                          ? const Color(0xFFF4B942).withValues(alpha: 0.5)
+                          : theme.border,
+                    ),
                   ),
                   child: ListTile(
                     contentPadding: const EdgeInsets.all(12),
                     leading: ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: imageUrl != null
-                          ? Image.network(
-                              imageUrl,
+                          ? CachedNetworkImage(
+                              imageUrl: imageUrl,
                               width: 50,
                               height: 50,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => Container(
+                              errorWidget: (_, _, _) => Container(
                                 width: 50,
                                 height: 50,
                                 color: theme.bgElevated,
@@ -449,12 +496,27 @@ class _VerifiedTab extends StatelessWidget {
                               ),
                             ),
                     ),
-                    title: Text(
-                      place['nama_tempat'] ?? 'Tanpa Nama',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: theme.textPrimary,
-                      ),
+                    title: Row(
+                      children: [
+                        if (isFeatured) ...[
+                          const Icon(
+                            Icons.star_rounded,
+                            color: Color(0xFFF4B942),
+                            size: 14,
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        Expanded(
+                          child: Text(
+                            place['nama_tempat'] ?? 'Tanpa Nama',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: theme.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,8 +533,8 @@ class _VerifiedTab extends StatelessWidget {
                         if (verifiedAt != null)
                           Text(
                             'Verified: ${verifiedAt.day}/${verifiedAt.month}/${verifiedAt.year}',
-                            style: TextStyle(
-                              color: const Color(0xFF28A745),
+                            style: const TextStyle(
+                              color: Color(0xFF28A745),
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
                             ),
@@ -482,6 +544,33 @@ class _VerifiedTab extends StatelessWidget {
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // ⭐ Toggle Featured button
+                        GestureDetector(
+                          onTap: () => widget.onToggleFeatured(place),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isFeatured
+                                  ? const Color(0xFFF4B942).withValues(alpha: 0.12)
+                                  : theme.bgElevated,
+                              borderRadius: BorderRadius.circular(8),
+                              border: isFeatured
+                                  ? Border.all(
+                                      color: const Color(0xFFF4B942).withValues(alpha: 0.4),
+                                    )
+                                  : null,
+                            ),
+                            child: Icon(
+                              isFeatured ? Icons.star_rounded : Icons.star_outline_rounded,
+                              color: isFeatured
+                                  ? const Color(0xFFF4B942)
+                                  : theme.textHint,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        // Edit button
                         GestureDetector(
                           onTap: () => Navigator.push(
                             context,
@@ -495,14 +584,18 @@ class _VerifiedTab extends StatelessWidget {
                               color: theme.bgElevated,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Icon(Icons.edit_outlined, color: theme.textHint, size: 18),
+                            child: Icon(
+                              Icons.edit_outlined,
+                              color: theme.textHint,
+                              size: 18,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Icon(
+                        const SizedBox(width: 6),
+                        const Icon(
                           Icons.verified_rounded,
-                          color: const Color(0xFF28A745),
-                          size: 24,
+                          color: Color(0xFF28A745),
+                          size: 22,
                         ),
                       ],
                     ),
@@ -568,12 +661,12 @@ class _RejectedTab extends StatelessWidget {
                     leading: ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: imageUrl != null
-                          ? Image.network(
-                              imageUrl,
+                          ? CachedNetworkImage(
+                              imageUrl: imageUrl,
                               width: 50,
                               height: 50,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => Container(
+                              errorWidget: (_, _, _) => Container(
                                 width: 50,
                                 height: 50,
                                 color: theme.bgElevated,
@@ -640,7 +733,11 @@ class _RejectedTab extends StatelessWidget {
                               color: theme.bgElevated,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Icon(Icons.edit_outlined, color: theme.textHint, size: 18),
+                            child: Icon(
+                              Icons.edit_outlined,
+                              color: theme.textHint,
+                              size: 18,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -690,12 +787,12 @@ class _PlaceCard extends StatelessWidget {
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
             child: imageUrl != null
-                ? Image.network(
-                    imageUrl,
+                ? CachedNetworkImage(
+                    imageUrl: imageUrl,
                     width: double.infinity,
                     height: 160,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
+                    errorWidget: (_, _, _) => Container(
                       width: double.infinity,
                       height: 160,
                       color: theme.bgElevated,

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
@@ -204,12 +205,12 @@ class _ManagePlaceScreenState extends State<ManagePlaceScreen> {
                   leading: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: imageUrl != null
-                        ? Image.network(
-                            imageUrl,
+                        ? CachedNetworkImage(
+                            imageUrl: imageUrl,
                             width: 58,
                             height: 58,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => Container(
+                            errorWidget: (_, _, _) => Container(
                               width: 58,
                               height: 58,
                               color: theme.bgElevated,

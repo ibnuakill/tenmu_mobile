@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -165,7 +166,9 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
       await Supabase.instance.client
           .from('places')
           .update({
-            'owner_id': widget.place['owner_id'] ?? Supabase.instance.client.auth.currentUser?.id,
+            'owner_id':
+                widget.place['owner_id'] ??
+                Supabase.instance.client.auth.currentUser?.id,
             'nama_tempat': _namaController.text.trim(),
             'alamat': _alamatController.text.trim(),
             'deskripsi': _deskripsiController.text.trim(),
@@ -364,7 +367,9 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: selected ? theme.btnPrimary : theme.bgElevated,
+                            color: selected
+                                ? theme.btnPrimary
+                                : theme.bgElevated,
                             borderRadius: BorderRadius.circular(999),
                             border: Border.all(
                               color: selected ? theme.btnPrimary : theme.border,
@@ -376,7 +381,9 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
                               Icon(
                                 f.icon,
                                 size: 16,
-                                color: selected ? theme.btnLabel : theme.iconColor,
+                                color: selected
+                                    ? theme.btnLabel
+                                    : theme.iconColor,
                               ),
                               const SizedBox(width: 6),
                               Text(
@@ -384,7 +391,9 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: selected ? theme.btnLabel : theme.textPrimary,
+                                  color: selected
+                                      ? theme.btnLabel
+                                      : theme.textPrimary,
                                 ),
                               ),
                             ],
@@ -513,12 +522,12 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
           if (previewUrl != null)
             Stack(
               children: [
-                Image.network(
-                  previewUrl,
+                CachedNetworkImage(
+                  imageUrl: previewUrl,
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => _imagePlaceholder(theme),
+                  errorWidget: (_, _, _) => _imagePlaceholder(theme),
                 ),
                 Positioned(
                   top: 10,
@@ -598,8 +607,8 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
                               ),
                             ),
                             clipBehavior: Clip.antiAlias,
-                            child: Image.network(
-                              _imageUrls[index],
+                            child: CachedNetworkImage(
+                              imageUrl: _imageUrls[index],
                               fit: BoxFit.cover,
                             ),
                           ),

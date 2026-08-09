@@ -21,6 +21,9 @@ import 'widgets/chat_bot.dart';
 import 'user_notification_screen.dart';
 import 'dart:math' as math;
 
+import 'dart:async';
+import 'package:cached_network_image/cached_network_image.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -42,10 +45,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _isUpdatingLocation = false;
   int _unreadNotifCount = 0;
   final ScrollController _scrollController = ScrollController();
+  Timer? _searchDebounce;
 
   // ── Carousel ──
   late final PageController _carouselCtrl;
   int _currentCardPage = 0;
+  final ValueNotifier<double> _carouselPage = ValueNotifier<double>(0.0);
 
   // ── Animation ──
   late final AnimationController _entranceCtrl;
@@ -78,9 +83,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOutCubic),
         );
 
-    _carouselCtrl = PageController(viewportFraction: 0.98, initialPage: 0);
+    _scrollController.addListener(_onScroll);
+
+    _carouselCtrl = PageController(viewportFraction: 0.88, initialPage: 0);
     _carouselCtrl.addListener(() {
-      final page = _carouselCtrl.page?.round() ?? 0;
+      final rawPage = _carouselCtrl.page ?? 0.0;
+      _carouselPage.value = rawPage;
+      final page = rawPage.round();
       if (page != _currentCardPage) {
         setState(() => _currentCardPage = page);
       }
@@ -92,7 +101,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<PlacesProvider>(context, listen: false).fetchPlaces();
+      final provider =
+          Provider.of<PlacesProvider>(context, listen: false);
+      provider.setQuery(_buildQuery());
+      provider.fetchFeatured();
       _requestUserLocation();
       _loadUserRole();
       _loadUserProfile();
@@ -102,8 +114,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _entranceCtrl.dispose();
     _cardCtrl.dispose();
+    _carouselPage.dispose();
     _carouselCtrl.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -222,6 +236,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         );
         setState(() => _currentPosition = pos);
+        // Posisi tersedia → ulangi query 'terdekat' ke server.
+        _scheduleQuery(immediate: true);
       } else {
         setState(() => _selectedSort = SortOption.terbaru);
       }
@@ -342,57 +358,66 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  // ── Filter logic ──
+  // ── Query server-side ──
 
-  List<Map<String, dynamic>> _getFilteredPlaces(PlacesProvider provider) {
-    final raw = provider.placesList;
-    List<Map<String, dynamic>> result = raw.where((u) {
-      bool matchSearch = true;
-      if (_searchQuery.isNotEmpty) {
-        final nama = (u['nama_tempat'] ?? '').toLowerCase();
-        final alamat = (u['alamat'] ?? '').toLowerCase();
-        matchSearch =
-            nama.contains(_searchQuery) || alamat.contains(_searchQuery);
-      }
-      bool matchCat = true;
-      final Set<String> active = {
-        ..._selectedCategories,
-        if (_selectedCategoryTab != null && _selectedCategoryTab != 'Semua')
-          _selectedCategoryTab!,
-      };
-      if (active.isNotEmpty) {
-        matchCat = active.contains(u['category'] ?? 'Lainnya');
-      }
-      return matchSearch && matchCat;
-    }).toList();
+  /// Susun PlaceQuery dari semua state filter/sort di UI.
+  /// Semua filter/sort kini dijalankan Postgres via RPC; client hanya menampilkan
+  /// hasil page yg sudah server-filtered.
+  PlaceQuery _buildQuery() {
+    final cats = [
+      ..._selectedCategories,
+      if (_selectedCategoryTab != null && _selectedCategoryTab != 'Semua')
+        _selectedCategoryTab!,
+    ].map(PoiCategory.normalizeCategory).toList();
 
-    if ((_selectedSort == SortOption.terdekat ||
-            _selectedSort == SortOption.terbaru) &&
-        _currentPosition != null) {
-      Haversine.sortByDistance(
-        places: result,
-        userLat: _currentPosition!.latitude,
-        userLng: _currentPosition!.longitude,
-      );
+    final SortMode sort;
+    if (_selectedSort == SortOption.terdekat && _currentPosition != null) {
+      sort = SortMode.terdekat;
     } else if (_selectedSort == SortOption.rating) {
-      result.sort((a, b) {
-        final rA =
-            Provider.of<PlacesProvider>(
-              context,
-              listen: false,
-            ).ratings[a['id']] ??
-            0.0;
-        final rB =
-            Provider.of<PlacesProvider>(
-              context,
-              listen: false,
-            ).ratings[b['id']] ??
-            0.0;
-        return rB.compareTo(rA);
-      });
+      sort = SortMode.rating;
+    } else {
+      sort = SortMode.terbaru;
     }
-    return result;
+
+    return PlaceQuery(
+      search: _searchQuery.toLowerCase().trim(),
+      categories: cats,
+      sort: sort,
+      userLat: _currentPosition?.latitude,
+      userLng: _currentPosition?.longitude,
+    );
   }
+
+  /// Debounce pencarian (400ms) lalu fetch ulang halaman 1.
+  void _scheduleQuery({bool immediate = false}) {
+    _searchDebounce?.cancel();
+    if (immediate) {
+      final provider =
+          Provider.of<PlacesProvider>(context, listen: false);
+      provider.setQuery(_buildQuery(), force: true);
+      return;
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      final provider =
+          Provider.of<PlacesProvider>(context, listen: false);
+      provider.setQuery(_buildQuery(), force: true);
+    });
+  }
+
+  /// Infinite scroll: fetch halaman berikutnya saat mendekati dasar list.
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 300) {
+      final p = Provider.of<PlacesProvider>(context, listen: false);
+      if (p.hasMore && !p.isLoadingMore && !p.isLoading) {
+        p.fetchMore();
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> _getFilteredPlaces(PlacesProvider provider) =>
+      provider.placesList;
 
   double _getRating(PlacesProvider p, int? id) => p.ratings[id] ?? 0.0;
 
@@ -508,6 +533,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             onChanged: (v) {
                               setLocal(() => localQuery = v.toLowerCase());
                               setState(() => _searchQuery = v.toLowerCase());
+                              _scheduleQuery();
                             },
                             style: TextStyle(
                               color: theme.textPrimary,
@@ -533,6 +559,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       onTap: () {
                                         setLocal(() => localQuery = '');
                                         setState(() => _searchQuery = '');
+                                        _scheduleQuery(immediate: true);
                                       },
                                       child: Icon(
                                         Icons.close_rounded,
@@ -565,6 +592,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               onCategoriesChanged: (s) {
                                 setLocal(() => localCats = s);
                                 setState(() => _selectedCategories = s);
+                                _scheduleQuery();
                               },
                             ),
                             const SizedBox(height: 20),
@@ -573,6 +601,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               onSortChanged: (s) {
                                 setLocal(() => localSort = s);
                                 setState(() => _selectedSort = s);
+                                _scheduleQuery();
                                 if (s == SortOption.terdekat &&
                                     _currentPosition == null) {
                                   _getCurrentLocationForSort();
@@ -590,7 +619,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           },
         );
       },
-    ).whenComplete(() => setState(() {}));
+    ).whenComplete(() {
+      // Sheet ditutup → sinkronkan query server dengan pilihan terakhir.
+      setState(() {});
+      _scheduleQuery(immediate: true);
+    });
   }
 
   // ════════════════════════════════════════
@@ -602,7 +635,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final theme = Provider.of<ThemeProvider>(context);
     final placesProvider = Provider.of<PlacesProvider>(context);
     final allPlaces = _getFilteredPlaces(placesProvider);
-    final featured = allPlaces.where((p) => p['is_featured'] == true).toList();
+    final featured = placesProvider.featuredList;
 
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
@@ -781,7 +814,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   border: Border.all(color: theme.border, width: 2),
                   image: avatarUrl != null
                       ? DecorationImage(
-                          image: NetworkImage(avatarUrl),
+                          image: CachedNetworkImageProvider(avatarUrl),
                           fit: BoxFit.cover,
                         )
                       : null,
@@ -914,6 +947,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               setState(() {
                 _selectedCategoryTab = (cat == 'Semua') ? null : cat;
               });
+              _scheduleQuery(immediate: true);
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
@@ -969,7 +1003,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       onRefresh: () async {
         final messenger = ScaffoldMessenger.of(context);
         placesProvider.clearError();
-        await placesProvider.fetchPlaces(force: true);
+        await placesProvider.setQuery(_buildQuery(), force: true);
+        await placesProvider.fetchFeatured(force: true);
         await _requestUserLocation();
         if (placesProvider.error != null &&
             placesProvider.placesList.isNotEmpty) {
@@ -990,16 +1025,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // ── 1. Featured Carousel ──
           const SizedBox(height: 20),
           _buildFeaturedCarousel(
-            featured.isNotEmpty ? featured : allPlaces.take(6).toList(),
+            // Fallback: jika tidak ada yang di-featured, tampilkan 8 terbaru
+            featured.isNotEmpty ? featured : allPlaces.take(8).toList(),
             theme,
             accent,
             placesProvider,
+            isFallback: featured.isEmpty,
           ),
 
           // ── 2. Semua Tempat list ──
           if (allPlaces.isNotEmpty) ...[
             _buildAllPlacesHeader(theme, accent, allPlaces.length),
-            ...allPlaces.take(25).toList().asMap().entries.map((e) {
+            ...allPlaces.asMap().entries.map((e) {
               return _buildListPlaceCard(
                 e.value,
                 _getRating(placesProvider, e.value['id']),
@@ -1008,7 +1045,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 e.key,
               );
             }),
-            const SizedBox(height: 8),
+            // Footer status load-more
+            if (placesProvider.isLoadingMore)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: accent,
+                    strokeWidth: 2,
+                  ),
+                ),
+              )
+            else if (!placesProvider.hasMore)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'Tidak ada tempat lagi',
+                    style: TextStyle(
+                      color: theme.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              )
+            else
+              const SizedBox(height: 8),
           ],
         ],
       ),
@@ -1020,60 +1082,86 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     List<Map<String, dynamic>> cards,
     ThemeProvider theme,
     Color accent,
-    PlacesProvider provider,
-  ) {
+    PlacesProvider provider, {
+    bool isFallback = false,
+  }) {
     final displayCards = cards.take(8).toList();
+    if (displayCards.isEmpty) return const SizedBox.shrink();
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Label section
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+          child: Row(
+            children: [
+              Icon(
+                isFallback ? Icons.schedule_rounded : Icons.star_rounded,
+                size: 16,
+                color: isFallback ? theme.textSecondary : const Color(0xFFF4B942),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                isFallback ? 'Terbaru' : 'Unggulan',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isFallback ? theme.textSecondary : const Color(0xFFF4B942),
+                  letterSpacing: 0.3,
+                ),
+              ),
+              if (isFallback) ...[
+                const Spacer(),
+                Text(
+                  'Belum ada tempat unggulan',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: theme.textHint,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
         SizedBox(
           height: 400,
           child: PageView.builder(
             controller: _carouselCtrl,
             itemCount: displayCards.length,
             physics: const BouncingScrollPhysics(),
+            onPageChanged: (i) {
+              _carouselPage.value = i.toDouble();
+              setState(() => _currentCardPage = i);
+            },
             itemBuilder: (context, index) {
-              return AnimatedBuilder(
-                animation: _carouselCtrl,
-                builder: (context, child) {
-                  double page =
-                      _carouselCtrl.hasClients && _carouselCtrl.page != null
-                      ? _carouselCtrl.page!
-                      : _currentCardPage.toDouble();
+              return ValueListenableBuilder<double>(
+                valueListenable: _carouselPage,
+                builder: (context, page, child) {
+                  // delta: -1 (kiri) .. 0 (aktif) .. 1 (kanan)
+                  final double delta = (index - page).clamp(-1.0, 1.0);
 
-                  // delta: -1 (kartu di kiri) .. 0 (aktif) .. 1 (kartu di kanan)
-                  double delta = (index - page).clamp(-1.0, 1.0);
-
-                  // mirip @keyframes rotate-cover: -55deg..0..55deg
-                  double rotationY = delta * (55 * math.pi / 180);
-
-                  // mirip @keyframes slide-cover: translateX 30%..0..-30%, scale 1..1.2..1
-                  double translateX = -delta * 40; // px, sesuaikan feel-nya
-                  double scale =
-                      1.0 -
-                      delta.abs() * 0.2; // max 1.0 di tengah (0.8 di ujung)
-
-                  double opacity = 1.0 - delta.abs() * 0.35;
+                  // Efek 3D cover-flow: rotate + scale + opacity
+                  final double rotationY = delta * (35 * math.pi / 180);
+                  final double translateX = -delta * 30;
+                  final double scale = 1.0 - delta.abs() * 0.18;
+                  final double opacity = 1.0 - delta.abs() * 0.4;
 
                   return Transform(
                     alignment: Alignment.center,
                     transform: Matrix4.identity()
-                      ..setEntry(
-                        3,
-                        2,
-                        0.0015,
-                      ) // perspective, mirip perspective: 500px
+                      ..setEntry(3, 2, 0.001) // perspective
                       ..translateByDouble(translateX, 0.0, 0.0, 1.0)
                       ..rotateY(rotationY)
                       ..scaleByDouble(scale, scale, 1.0, 1.0),
                     child: Opacity(
-                      opacity: opacity.clamp(0.55, 1.0),
+                      opacity: opacity.clamp(0.5, 1.0),
                       child: child,
                     ),
                   );
                 },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
+                    horizontal: 6,
                     vertical: 6,
                   ),
                   child: _buildFeaturedCardItem(
@@ -1087,28 +1175,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             },
           ),
         ),
-        // Dot indicator
-        const SizedBox(height: 14),
-        if (displayCards.length > 1)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(displayCards.length, (i) {
-              final active = i == _currentCardPage;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 280),
-                curve: Curves.easeOut,
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: active ? 22 : 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: active
-                      ? theme.textPrimary
-                      : theme.textHint.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              );
-            }),
-          ),
+          // Dot indicator
+          const SizedBox(height: 14),
+          if (displayCards.length > 1)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(displayCards.length, (i) {
+                final active = i == _currentCardPage;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOut,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: active ? 22 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: active
+                        ? (isFallback ? theme.textPrimary : const Color(0xFFF4B942))
+                        : theme.textHint.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                );
+              }),
+            ),
       ],
     );
   }
@@ -1146,14 +1234,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           children: [
             // Background image
             imageUrl != null
-                ? Image.network(
-                    imageUrl,
+                ? CachedNetworkImage(
+                    imageUrl: imageUrl,
                     fit: BoxFit.cover,
-                    cacheWidth: 800,
-                    errorBuilder: (_, _, _) => Container(
+                    memCacheWidth: 800,
+                    fadeInDuration: const Duration(milliseconds: 300),
+                    placeholder: (_, _) => Container(
                       color: theme.bgElevated,
                       child: Icon(
                         Icons.image_outlined,
+                        size: 48,
+                        color: theme.textHint,
+                      ),
+                    ),
+                    errorWidget: (_, _, _) => Container(
+                      color: theme.bgElevated,
+                      child: Icon(
+                        Icons.broken_image_outlined,
                         size: 48,
                         color: theme.textHint,
                       ),
@@ -1406,11 +1503,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 width: 100,
                 height: 100,
                 child: imageUrl != null
-                    ? Image.network(
-                        imageUrl,
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl,
                         fit: BoxFit.cover,
-                        cacheWidth: 200,
-                        errorBuilder: (_, _, _) => Container(
+                        memCacheWidth: 200,
+                        placeholder: (_, _) => Container(
+                          color: theme.bgElevated,
+                          child: Icon(
+                            Icons.image_outlined,
+                            color: theme.textHint,
+                            size: 24,
+                          ),
+                        ),
+                        errorWidget: (_, _, _) => Container(
                           color: theme.bgElevated,
                           child: Icon(
                             Icons.broken_image_outlined,
@@ -1559,7 +1664,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ElevatedButton.icon(
               onPressed: () {
                 provider.clearError();
-                provider.fetchPlaces(force: true);
+                provider.setQuery(_buildQuery(), force: true);
               },
               icon: const Icon(Icons.refresh),
               label: const Text('Coba Lagi'),
@@ -1635,11 +1740,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ),
             const SizedBox(height: 8),
-            if (_searchQuery.isNotEmpty)
+            if (_searchQuery.isNotEmpty ||
+                _selectedCategories.isNotEmpty ||
+                _selectedCategoryTab != null)
               GestureDetector(
                 onTap: () => setState(() {
                   _searchQuery = '';
+                  _selectedCategories = {};
                   _selectedCategoryTab = null;
+                  _scheduleQuery(immediate: true);
                 }),
                 child: Text(
                   'Hapus pencarian',
