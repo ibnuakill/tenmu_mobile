@@ -53,9 +53,10 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
     _maxPriceController.text = (widget.place['max_price'] ?? 100000).toString();
     _imageUrls.addAll(PoiImageHelper.extractImageUrls(widget.place));
 
-    final cat = widget.place['category'] ?? PoiCategory.lainnya;
-    _selectedCategory = PoiCategory.isValidCategory(cat)
-        ? cat
+    final rawCat = widget.place['category']?.toString() ?? PoiCategory.lainnya;
+    final normalized = PoiCategory.normalizeCategory(rawCat);
+    _selectedCategory = PoiCategory.allCategories.contains(normalized)
+        ? normalized
         : PoiCategory.lainnya;
 
     final fas = widget.place['fasilitas'];
@@ -321,7 +322,9 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
                   _label('Kategori', theme),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    initialValue: _selectedCategory,
+                    initialValue: PoiCategory.allCategories.contains(_selectedCategory)
+                        ? _selectedCategory
+                        : PoiCategory.lainnya,
                     dropdownColor: theme.bgSurface,
                     style: TextStyle(color: theme.textPrimary, fontSize: 15),
                     decoration: _inputDecoration(

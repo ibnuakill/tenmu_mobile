@@ -1163,7 +1163,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
 
                 // ── Dropdown Kategori ──
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedCategory,
+                  initialValue: PoiCategory.allCategories.contains(_selectedCategory)
+                      ? _selectedCategory
+                      : PoiCategory.lainnya,
                   dropdownColor: theme.bgSurface,
                   style: TextStyle(color: theme.textPrimary, fontSize: 15),
                   decoration: InputDecoration(

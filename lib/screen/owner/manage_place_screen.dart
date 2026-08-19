@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme_provider.dart';
 import '../../core/poi_image_helper.dart';
+import 'add_place_screen.dart';
 import 'edit_place_screen.dart';
 
 class ManagePlaceScreen extends StatefulWidget {
@@ -123,6 +124,20 @@ class _ManagePlaceScreenState extends State<ManagePlaceScreen> {
     final theme = Provider.of<ThemeProvider>(context);
     return Scaffold(
       backgroundColor: theme.bgBase,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AddPlaceScreen()),
+        ),
+        backgroundColor: theme.btnPrimary,
+        foregroundColor: theme.btnLabel,
+        elevation: 4,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text(
+          'Tambah Tempat',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
+      ),
       appBar: AppBar(
         backgroundColor: theme.bgBase,
         elevation: 0,
@@ -188,7 +203,7 @@ class _ManagePlaceScreenState extends State<ManagePlaceScreen> {
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
             itemCount: umkmList.length,
             itemBuilder: (context, index) {
               final place = umkmList[index];

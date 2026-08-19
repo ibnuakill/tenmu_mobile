@@ -3,8 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/user_role.dart';
-import '../admin/admin_home_screen.dart';
-import '../user/home_screen.dart';
+import '../admin/dashboard/admin_home_screen.dart';
+import '../user/home/home_screen.dart';
 
 // State jelas: success, banned, error
 enum _CheckResult { banned }
