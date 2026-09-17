@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'login_screen.dart';
+import 'auth_gate.dart';
 
 /// 3-slide onboarding — muncul sekali setelah splash, sebelum login.
-/// Selesai → tandai di SharedPreferences → navigasi ke LoginScreen.
+/// Selesai → tandai di SharedPreferences → kembali ke AuthGate / panggil callback.
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+  final VoidCallback? onCompleted;
+
+  const OnboardingScreen({super.key, this.onCompleted});
 
   /// Cek apakah onboarding sudah pernah ditandai selesai.
   static Future<bool> isCompleted() async {
@@ -27,9 +29,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_onboardingKey, true);
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
+    if (widget.onCompleted != null) {
+      widget.onCompleted!();
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const AuthGate()),
+      );
+    }
   }
 
   @override

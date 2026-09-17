@@ -8,6 +8,7 @@ import '../../owner/add_place_screen.dart';
 import '../map/route_map_screen.dart';
 import '../user_notification_screen.dart';
 import '../chat/chat_bot_sheet.dart';
+import '../video/video_feed_screen.dart';
 import '../widgets/sort_filter_widget.dart';
 import '../settings/settings_screen.dart';
 import 'home_controller.dart';
@@ -134,7 +135,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }) {
     return Scaffold(
       backgroundColor: theme.bgBase,
-      extendBody: true,
       body: FadeTransition(
         opacity: _fadeAnim,
         child: SlideTransition(
@@ -150,7 +150,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   userLocation: _ctrl.userLocation,
                   isUpdatingLocation: _ctrl.isUpdatingLocation,
                   unreadNotifCount: _ctrl.unreadNotifCount,
-                  avatarUrl: _ctrl.avatarUrl,
                   onTapLocation: () => _ctrl.updateLocationFromGPS(
                     ScaffoldMessenger.of(context),
                   ),
@@ -163,7 +162,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     );
                     _ctrl.loadUnreadCount();
                   },
-                  onTapAvatar: () => _onNavTap(4),
                 ),
               ),
               SliverToBoxAdapter(
@@ -358,6 +356,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         backgroundColor: Colors.transparent,
         builder: (_) => const ChatBotSheet(),
       );
+      return;
+    }
+    if (index == 5) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const VideoFeedScreen()),
+      ).then((_) {
+        if (mounted) _ctrl.setNavIndex(0);
+      });
       return;
     }
     _ctrl.setNavIndex(index);

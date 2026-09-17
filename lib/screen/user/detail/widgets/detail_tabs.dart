@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/poi_facility.dart';
 import '../../../../core/theme_provider.dart';
 import '../../review/review_section.dart';
+import '../../video/widgets/place_videos_section.dart';
 
 /// Tab content (Detail / Ulasan) — memilih tab via TabController.
 class DetailTabContent extends StatelessWidget {
@@ -35,6 +36,7 @@ class DetailTabContent extends StatelessWidget {
               place: place,
               imageUrls: imageUrls,
               onShowImage: onShowImage,
+              placeId: placeId,
             );
           case 1:
             return _ReviewsTab(theme: theme, placeId: placeId);
@@ -51,12 +53,14 @@ class _DetailsTab extends StatelessWidget {
   final Map<String, dynamic> place;
   final List<String> imageUrls;
   final void Function(int) onShowImage;
+  final dynamic placeId;
 
   const _DetailsTab({
     required this.theme,
     required this.place,
     required this.imageUrls,
     required this.onShowImage,
+    required this.placeId,
   });
 
   @override
@@ -209,6 +213,13 @@ class _DetailsTab extends StatelessWidget {
             ),
           ),
         ],
+
+        // Videos
+        if (placeId != null)
+          PlaceVideosSection(
+            placeId: placeId as int,
+            placeName: place['nama_tempat'] ?? 'Tempat Ini',
+          ),
       ],
     );
   }

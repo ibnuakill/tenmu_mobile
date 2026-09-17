@@ -9,16 +9,14 @@ import '../../../../core/poi_category.dart';
 import '../../../../core/haversine.dart';
 import '../../detail/poi_detail_screen.dart';
 
-/// Greeting header (Halo, nama + lokasi + notif + avatar).
+/// Greeting header (Halo, nama + lokasi + notif).
 class HomeGreetingHeader extends StatelessWidget {
   final String userName;
   final String? userLocation;
   final bool isUpdatingLocation;
   final int unreadNotifCount;
-  final String? avatarUrl;
   final VoidCallback onTapLocation;
   final VoidCallback onTapNotification;
-  final VoidCallback onTapAvatar;
 
   const HomeGreetingHeader({
     super.key,
@@ -27,10 +25,8 @@ class HomeGreetingHeader extends StatelessWidget {
     required this.userLocation,
     required this.isUpdatingLocation,
     required this.unreadNotifCount,
-    required this.avatarUrl,
     required this.onTapLocation,
     required this.onTapNotification,
-    required this.onTapAvatar,
   });
 
   final ThemeProvider theme;
@@ -50,9 +46,9 @@ class HomeGreetingHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Halo, $firstName',
+                    'Halo, $firstName 👋',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 26,
                       fontWeight: FontWeight.w800,
                       color: theme.textPrimary,
                       letterSpacing: -0.8,
@@ -98,12 +94,6 @@ class HomeGreetingHeader extends StatelessWidget {
               theme: theme,
               count: unreadNotifCount,
               onTap: onTapNotification,
-            ),
-            const SizedBox(width: 10),
-            _AvatarBubble(
-              theme: theme,
-              avatarUrl: avatarUrl,
-              onTap: onTapAvatar,
             ),
           ],
         ),
@@ -170,41 +160,6 @@ class _NotificationBell extends StatelessWidget {
   }
 }
 
-class _AvatarBubble extends StatelessWidget {
-  final ThemeProvider theme;
-  final String? avatarUrl;
-  final VoidCallback onTap;
-  const _AvatarBubble({
-    required this.theme,
-    required this.avatarUrl,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: theme.border, width: 2),
-          image: avatarUrl != null
-              ? DecorationImage(
-                  image: CachedNetworkImageProvider(avatarUrl!),
-                  fit: BoxFit.cover,
-                )
-              : null,
-          color: theme.bgElevated,
-        ),
-        child: avatarUrl == null
-            ? Icon(Icons.person_rounded, color: theme.textSecondary, size: 22)
-            : null,
-      ),
-    );
-  }
-}
 
 /// Search bar (tap-to-open filter sheet) + filter button.
 class HomeSearchBar extends StatelessWidget {
@@ -1127,32 +1082,42 @@ class HomePillBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = theme.isDarkMode;
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
-        child: Container(
-          height: 64,
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(32),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
+    final bgColor = isDark ? const Color(0xFF151515) : const Color(0xFF111111);
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.07)
+        : Colors.white.withValues(alpha: 0.09);
+
+    final items = <_NavItem>[
+      const _NavItem(icon: Icons.home_rounded, label: 'Beranda', index: 0),
+      const _NavItem(icon: Icons.map_rounded, label: 'Peta', index: 1),
+      if (isOwner)
+        const _NavItem(icon: Icons.add_circle_rounded, label: 'Tambah', index: 2),
+      const _NavItem(icon: Icons.auto_awesome_rounded, label: 'AI', index: 3),
+      const _NavItem(icon: Icons.smart_display_rounded, label: 'Video', index: 5),
+      const _NavItem(icon: Icons.person_rounded, label: 'Profil', index: 4),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border(top: BorderSide(color: borderColor, width: 0.8)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 62,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _PillItem(icon: Icons.home_rounded, index: 0, current: currentIndex, accent: accent, onTap: onTap),
-              _PillItem(icon: Icons.map_rounded, index: 1, current: currentIndex, accent: accent, onTap: onTap),
-              if (isOwner) _PillAdd(accent: accent, onTap: () => onTap(2)),
-              _PillItem(icon: Icons.auto_awesome_rounded, index: 3, current: currentIndex, accent: accent, onTap: onTap),
-              _PillItem(icon: Icons.person_rounded, index: 4, current: currentIndex, accent: accent, onTap: onTap),
-            ],
+            children: items
+                .map((item) => Expanded(
+                      child: _NavBarItem(
+                        item: item,
+                        isActive: currentIndex == item.index,
+                        accent: accent,
+                        isAddButton: isOwner && item.index == 2,
+                        onTap: () => onTap(item.index),
+                      ),
+                    ))
+                .toList(),
           ),
         ),
       ),
@@ -1160,66 +1125,74 @@ class HomePillBottomNav extends StatelessWidget {
   }
 }
 
-class _PillItem extends StatelessWidget {
+class _NavItem {
   final IconData icon;
+  final String label;
   final int index;
-  final int current;
-  final Color accent;
-  final ValueChanged<int> onTap;
-  const _PillItem({
+  const _NavItem({
     required this.icon,
+    required this.label,
     required this.index,
-    required this.current,
+  });
+}
+
+class _NavBarItem extends StatelessWidget {
+  final _NavItem item;
+  final bool isActive;
+  final Color accent;
+  final bool isAddButton;
+  final VoidCallback onTap;
+
+  const _NavBarItem({
+    required this.item,
+    required this.isActive,
     required this.accent,
+    required this.isAddButton,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final active = index == current;
-    return GestureDetector(
-      onTap: () => onTap(index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: active ? Colors.white.withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Icon(
-          icon,
-          size: 24,
-          color: active ? Colors.white : Colors.white.withValues(alpha: 0.45),
-        ),
-      ),
-    );
-  }
-}
+    final iconColor = isAddButton
+        ? accent
+        : isActive
+            ? Colors.white
+            : Colors.white.withValues(alpha: 0.4);
+    final labelColor = isAddButton
+        ? accent
+        : isActive
+            ? Colors.white
+            : Colors.white.withValues(alpha: 0.4);
 
-class _PillAdd extends StatelessWidget {
-  final Color accent;
-  final VoidCallback onTap;
-  const _PillAdd({required this.accent, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: accent,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: accent.withValues(alpha: 0.5),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            width: isActive ? 36 : 0,
+            height: 3,
+            margin: const EdgeInsets.only(bottom: 4),
+            decoration: BoxDecoration(
+              color: isActive ? accent : Colors.transparent,
+              borderRadius: BorderRadius.circular(2),
             ),
-          ],
-        ),
-        child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+          ),
+          Icon(item.icon, size: isAddButton ? 26 : 22, color: iconColor),
+          const SizedBox(height: 3),
+          Text(
+            item.label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+              color: labelColor,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
       ),
     );
   }

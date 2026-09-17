@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme_provider.dart';
 import '../../core/poi_image_helper.dart';
+import '../user/video/widgets/video_upload_sheet.dart';
 import 'add_place_screen.dart';
 import 'edit_place_screen.dart';
 
@@ -281,6 +282,19 @@ class _ManagePlaceScreenState extends State<ManagePlaceScreen> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (widget.isOwnerView)
+                        _iconBtn(
+                          icon: Icons.smart_display_outlined,
+                          color: theme.borderFocus,
+                          onTap: () => VideoUploadSheet.show(
+                            context,
+                            placeId: place['id'],
+                            placeName: place['nama_tempat'] ?? 'Tempat Ini',
+                          ),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      const SizedBox(width: 6),
                       _iconBtn(
                         icon: Icons.edit_outlined,
                         color: theme.borderFocus,

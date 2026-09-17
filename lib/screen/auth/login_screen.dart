@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/app_colors.dart';
 import '../../core/auth_rate_limit.dart';
+import 'auth_gate.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -28,6 +30,7 @@ class _LoginScreenState extends State<LoginScreen>
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
+  StreamSubscription<AuthState>? _authSub;
 
   @override
   void initState() {
@@ -48,10 +51,30 @@ class _LoginScreenState extends State<LoginScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
     _animCtrl.forward();
+
+    // Dengarkan auth state (misal saat login Google selesai via deep link)
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.signedIn && data.session != null) {
+        _onLoginSuccess();
+      }
+    });
+  }
+
+  void _onLoginSuccess() {
+    if (!mounted) return;
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(true);
+    } else {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AuthGate()),
+        (route) => false,
+      );
+    }
   }
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _animCtrl.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -67,10 +90,7 @@ class _LoginScreenState extends State<LoginScreen>
         // Mobile wajib pakai deep link agar token dikembalikan ke app setelah OAuth
         redirectTo: kIsWeb ? Uri.base.origin : 'tenmu://login-callback',
       );
-      // After OAuth, AuthGate stream akan detect session & redirect otomatis
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop(true);
-      }
+      // Saat browser kembali via deep link, _authSub di atas akan otomatis memanggil _onLoginSuccess()
     } on AuthException catch (e) {
       _showErrorDialog(
         title: 'Login Google Gagal',
@@ -122,10 +142,8 @@ class _LoginScreenState extends State<LoginScreen>
       // Login berhasil — reset attempt counter
       await AuthRateLimit.resetLoginAttempts(email);
 
-      // AuthGate akan handle redirect (termasuk kasus email belum terverifikasi)
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop(true);
-      }
+      // Arahkan ke home / pop login modal
+      _onLoginSuccess();
     } on AuthException catch (e) {
       final attempts = await AuthRateLimit.incrementLoginAttempt(email);
       final remaining = _maxLoginAttempts - attempts;

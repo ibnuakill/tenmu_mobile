@@ -18,13 +18,18 @@ class _AuthGateState extends State<AuthGate> {
   bool _checkingOnboarding = true;
   bool _showOnboarding = false;
 
+  // Stream disimpan sebagai field agar tidak di-subscribe ulang setiap rebuild
+  late final Stream<AuthState> _authStream;
+
   @override
   void initState() {
     super.initState();
     _checkOnboardingStatus();
 
+    _authStream = Supabase.instance.client.auth.onAuthStateChange;
+
     // Sync OneSignal login/logout with auth state changes (Android/iOS only)
-    Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+    _authStream.listen((event) {
       final session = event.session;
       if (session != null &&
           session.user.emailConfirmedAt != null &&
@@ -58,10 +63,19 @@ class _AuthGateState extends State<AuthGate> {
       );
     }
 
+    // Ambil session yang sudah tersimpan di local storage sebagai initialData
+    // agar StreamBuilder tidak flash ke LoginScreen saat stream belum emit
+    final currentSession = Supabase.instance.client.auth.currentSession;
+
     return StreamBuilder<AuthState>(
-      stream: Supabase.instance.client.auth.onAuthStateChange,
+      stream: _authStream,
+      // initialData mencegah flicker: pakai session aktif yang sudah ada
+      initialData: currentSession != null
+          ? AuthState(AuthChangeEvent.initialSession, currentSession)
+          : null,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Scaffold(
             backgroundColor: Color(0xFF0A0A0A),
             body: Center(
@@ -70,11 +84,20 @@ class _AuthGateState extends State<AuthGate> {
           );
         }
 
-        final session = snapshot.hasData ? snapshot.data!.session : null;
+        // Gunakan session dari stream event, fallback ke currentSession
+        final session = snapshot.hasData
+            ? snapshot.data!.session
+            : Supabase.instance.client.auth.currentSession;
 
         // Belum login & onboarding belum pernah → tampilkan onboarding
         if (session == null && _showOnboarding) {
-          return const OnboardingScreen();
+          return OnboardingScreen(
+            onCompleted: () {
+              setState(() {
+                _showOnboarding = false;
+              });
+            },
+          );
         }
 
         // Wajib login — ga ada guest mode
@@ -82,17 +105,27 @@ class _AuthGateState extends State<AuthGate> {
           return const LoginScreen();
         }
 
-        final user = Supabase.instance.client.auth.currentUser;
+        final effectiveUser =
+            session.user;
 
         // Email belum diverifikasi — skip untuk user OAuth (Google, dll.)
-        final isOAuthUser = user?.appMetadata['provider'] != null &&
-            user!.appMetadata['provider'] != 'email';
-        if (user != null && user.emailConfirmedAt == null && !isOAuthUser) {
-          return EmailVerificationScreen(email: user.email);
+        final provider = effectiveUser.appMetadata['provider']?.toString();
+        final providers = effectiveUser.appMetadata['providers'];
+        final isOAuthUser = (provider != null && provider != 'email') ||
+            (providers is List &&
+                providers.isNotEmpty &&
+                !providers.contains('email')) ||
+            (effectiveUser.identities != null &&
+                effectiveUser.identities!.any((id) => id.provider != 'email'));
+
+        if (effectiveUser.emailConfirmedAt == null && !isOAuthUser) {
+          return EmailVerificationScreen(email: effectiveUser.email);
         }
 
         // Udah login & terverifikasi → cek role
-        return const RoleChecker();
+        return RoleChecker(
+          key: ValueKey(effectiveUser.id),
+        );
       },
     );
   }
