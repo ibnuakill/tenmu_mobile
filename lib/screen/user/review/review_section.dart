@@ -5,6 +5,7 @@ import '../../../core/theme_provider.dart';
 import 'review_dialogs.dart';
 import 'widgets/review_input_sheet.dart';
 import 'widgets/review_widgets.dart';
+import '../../../core/lucide_icons.dart';
 
 /// Section ulasan POI: ringkasan rating + list review + input/edit/hapus.
 class ReviewSection extends StatefulWidget {
@@ -125,12 +126,12 @@ class _ReviewSectionState extends State<ReviewSection> {
                 ),
                 child: Row(
                   children: [
-                    Icon(
+                    LucideIcon(
                       isLoggedIn
                           ? (_myReview != null
-                                ? Icons.edit_outlined
-                                : Icons.rate_review_outlined)
-                          : Icons.lock_outline,
+                                ? 'pencil'
+                                : 'message-square-text')
+                          : 'lock',
                       size: 14,
                       color: theme.iconColor,
                     ),
@@ -177,8 +178,7 @@ class _ReviewSectionState extends State<ReviewSection> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Column(
                 children: [
-                  Icon(
-                    Icons.chat_bubble_outline_rounded,
+                  LucideIcon('message-circle',
                     size: 40,
                     color: theme.textHint,
                   ),

@@ -4,16 +4,22 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme_provider.dart';
+import '../../../core/widgets/app_dialog.dart';
+import '../../../core/app_update_provider.dart';
 import '../../../core/places_provider.dart';
 import '../../../core/user_role.dart';
+import '../../../core/session_timeout_service.dart';
 import '../../admin/profile/admin_profile_screen.dart';
 import '../../owner/manage_place_screen.dart';
 import '../../owner/add_place_screen.dart';
 import '../about_screen.dart';
 import '../favorite_screen.dart';
 import '../profile_settings_screen.dart';
+import 'owner_request_screen.dart';
+import '../help/help_center_screen.dart';
 import 'widgets/settings_tile.dart';
 import 'widgets/theme_mode_tile.dart';
+import '../../../core/lucide_icons.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -113,25 +119,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmLogout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Yakin ingin logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Keluar dari akun?',
+      message:
+          'Kamu akan keluar dari akun ini. Untuk masuk lagi, gunakan email dan '
+          'password yang sama.',
+      confirmLabel: 'Keluar',
+      cancelLabel: 'Batal',
+      icon: 'log-out',
+      destructive: true,
+      note: 'Favorit dan riwayat chat di perangkat tetap tersimpan.',
     );
-    if (confirmed == true) {
+    if (confirmed) {
+      await SessionTimeoutService.clearActivity();
       await Supabase.instance.client.auth.signOut();
       if (mounted) {
         Navigator.of(context).popUntil((route) => route.isFirst);
@@ -168,7 +169,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           leading: IconButton(
-            icon: Icon(Icons.arrow_back_rounded, color: theme.textPrimary),
+            icon: LucideIcon('arrow-left', color: theme.textPrimary),
             onPressed: () => Navigator.pop(context),
           ),
         ),
@@ -194,8 +195,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 theme: theme,
                 children: [
                   SettingsSwitchTile(
-                    icon: Icons.campaign_outlined,
-                    iconColor: const Color(0xFFFF9800),
+                    icon: 'megaphone',
+                    iconColor: theme.textPrimary,
                     title: 'Promosi & Penawaran',
                     subtitle: 'Dapatkan info promo dari UMKM',
                     value: _notifikasiPromo,
@@ -207,8 +208,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   Divider(color: theme.border, height: 1, indent: 56),
                   SettingsSwitchTile(
-                    icon: Icons.store_outlined,
-                    iconColor: const Color(0xFF4CAF50),
+                    icon: 'store',
+                    iconColor: theme.textPrimary,
                     title: 'UMKM Baru',
                     subtitle: 'Notifikasi saat UMKM baru muncul',
                     value: _notifikasiUmkmBaru,
@@ -230,8 +231,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 theme: theme,
                 children: [
                   SettingsDropdownTile(
-                    icon: Icons.straighten_outlined,
-                    iconColor: const Color(0xFF2196F3),
+                    icon: 'ruler',
+                    iconColor: theme.textPrimary,
                     title: 'Satuan Jarak',
                     subtitle: _satuanJarak == 'km'
                         ? 'Kilometer (km)'
@@ -241,8 +242,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   Divider(color: theme.border, height: 1, indent: 56),
                   SettingsActionTile(
-                    icon: Icons.cached_rounded,
-                    iconColor: const Color(0xFF9C27B0),
+                    icon: 'refresh-cw',
+                    iconColor: theme.textPrimary,
                     title: 'Bersihkan Cache',
                     subtitle: 'Hapus data cache & gambar tersimpan',
                     isLoading: _isClearing,
@@ -273,7 +274,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  icon: const Icon(Icons.logout_rounded),
+                  icon: const LucideIcon('log-out'),
                   label: const Text(
                     'Logout',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -308,8 +309,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_userRole == UserRole.owner || _userRole == UserRole.superadmin) {
       children.addAll([
         SettingsNavTile(
-          icon: Icons.store_rounded,
-          iconColor: const Color(0xFFFF6F00),
+          icon: 'store',
+          iconColor: theme.textPrimary,
           title: _userRole == UserRole.owner
               ? 'Tambah Tempat'
               : 'Tambah Tempat (Testing)',
@@ -324,8 +325,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         Divider(color: theme.border, height: 1, indent: 56),
         SettingsNavTile(
-          icon: Icons.edit_location_alt_outlined,
-          iconColor: const Color(0xFFFF6F00),
+          icon: 'map-pin-pen',
+          iconColor: theme.textPrimary,
           title: _userRole == UserRole.owner
               ? 'Kelola Tempat Saya'
               : 'Kelola Semua Tempat (Testing)',
@@ -344,13 +345,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         Divider(color: theme.border, height: 1, indent: 56),
       ]);
+    } else if (_userRole == UserRole.user) {
+      // Untuk user biasa: opsi ajukan jadi pemilik UMKM
+      children.addAll([
+        SettingsNavTile(
+          icon: 'store',
+          iconColor: theme.textPrimary,
+          title: 'Daftar Jadi Pemilik UMKM',
+          subtitle: 'Ajukan usahamu agar bisa menambah tempat',
+          theme: theme,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const OwnerRequestScreen()),
+          ),
+        ),
+        Divider(color: theme.border, height: 1, indent: 56),
+      ]);
     }
 
     if (user != null) {
       children.addAll([
         SettingsNavTile(
-          icon: Icons.person_outline_rounded,
-          iconColor: const Color(0xFF00BCD4),
+          icon: 'user',
+          iconColor: theme.textPrimary,
           title: 'Pengaturan Akun',
           subtitle: 'Ubah nama, foto profil, dan password',
           theme: theme,
@@ -373,8 +390,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     children.addAll([
       SettingsNavTile(
-        icon: Icons.favorite_outline_rounded,
-        iconColor: const Color(0xFFE91E63),
+        icon: 'heart',
+        iconColor: theme.textPrimary,
         title: 'Favorit Saya',
         subtitle: 'Lihat UMKM yang kamu simpan',
         theme: theme,
@@ -385,8 +402,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       Divider(color: theme.border, height: 1, indent: 56),
       SettingsNavTile(
-        icon: Icons.info_outline_rounded,
-        iconColor: const Color(0xFF607D8B),
+        icon: 'message-circle',
+        iconColor: theme.textPrimary,
+        title: 'Pusat Bantuan',
+        subtitle: 'FAQ dan chat admin via WhatsApp',
+        theme: theme,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const HelpCenterScreen()),
+        ),
+      ),
+      Divider(color: theme.border, height: 1, indent: 56),
+      SettingsNavTile(
+        icon: 'download',
+        iconColor: theme.textPrimary,
+        title: 'Cek Pembaruan',
+        subtitle: 'Cari versi terbaru TenMu',
+        theme: theme,
+        onTap: _checkForUpdate,
+      ),
+      Divider(color: theme.border, height: 1, indent: 56),
+      SettingsNavTile(
+        icon: 'info',
+        iconColor: theme.textPrimary,
         title: 'Tentang Aplikasi',
         subtitle: 'Versi, teknologi, dan informasi lainnya',
         theme: theme,
@@ -398,6 +436,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ]);
 
     return children;
+  }
+
+  Future<void> _checkForUpdate() async {
+    final updater = context.read<AppUpdateProvider>();
+    final latest = await updater.checkForUpdate();
+    if (!mounted) return;
+    if (latest == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: const Text('Kamu sudah pakai versi terbaru.')),
+      );
+    }
+    // Kalau ada versi baru, `UpdateGate` otomatis menampilkan dialog.
   }
 
   void _showDistanceUnitPicker(BuildContext context, ThemeProvider theme) {

@@ -1,9 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import '../../../../core/lucide_icons.dart';
 
 /// Frosted circle icon button (back/bookmark on hero image).
 class GlassCircleButton extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final VoidCallback onTap;
   final Color? iconColor;
   final double size;
@@ -30,7 +32,59 @@ class GlassCircleButton extends StatelessWidget {
               color: Color(0x44000000),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 18, color: iconColor ?? Colors.white),
+            child: LucideIcon(icon, size: 18, color: iconColor ?? Colors.white),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tombol bulat berisi logo SVG (mis. WhatsApp) dengan background solid
+/// supaya tetap jelas di atas foto.
+class SvgCircleButton extends StatelessWidget {
+  final String asset;
+  final VoidCallback onTap;
+  final Color backgroundColor;
+  final Color iconColor;
+  final double size;
+  final String? semanticsLabel;
+
+  const SvgCircleButton({
+    super.key,
+    required this.asset,
+    required this.onTap,
+    this.backgroundColor = const Color(0xFF25D366),
+    this.iconColor = Colors.white,
+    this.size = 40,
+    this.semanticsLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.22),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(
+          child: SvgPicture.asset(
+            asset,
+            width: size * 0.5,
+            height: size * 0.5,
+            colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+            semanticsLabel: semanticsLabel,
           ),
         ),
       ),

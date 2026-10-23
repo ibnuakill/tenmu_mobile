@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -15,29 +14,19 @@ class ManageUsersScreen extends StatefulWidget {
   State<ManageUsersScreen> createState() => _ManageUsersScreenState();
 }
 
-class _ManageUsersScreenState extends State<ManageUsersScreen>
-    with SingleTickerProviderStateMixin {
+class _ManageUsersScreenState extends State<ManageUsersScreen> {
   final _client = Supabase.instance.client;
-  late TabController _tabController;
 
   List<Map<String, dynamic>> _users = [];
   List<Map<String, dynamic>> _reviews = [];
   bool _loadingUsers = true;
   bool _loadingReviews = true;
-  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadUsers();
     _loadReviews();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadUsers() async {
@@ -102,23 +91,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
         _snack('User $currentName $action.', isError: false);
       } catch (e) {
         _snack('Gagal: $e', isError: true);
-      }
-    }
-  }
-
-  Future<void> _deleteReview(Map<String, dynamic> review) async {
-    final confirm = await _showConfirmDialog(
-      title: 'Hapus Ulasan?',
-      content:
-          'Ulasan dengan rating ${review['rating']} bintang ini akan dihapus secara permanen.',
-    );
-    if (confirm == true && mounted) {
-      try {
-        await _client.from('reviews').delete().eq('id', review['id']);
-        await _loadReviews();
-        _snack('Ulasan berhasil dihapus.', isError: false);
-      } catch (e) {
-        _snack('Gagal menghapus: $e', isError: true);
       }
     }
   }
@@ -210,51 +182,26 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
         surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: false,
         title: Text(
-          'Kelola User & Ulasan',
-          style: GoogleFonts.poppins(
+          'Manajemen User',
+          style: TextStyle(
+            fontFamily: 'Nunito',
             color: kTextPrimary,
             fontWeight: FontWeight.w600,
             fontSize: 17,
           ),
         ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: kPrimary,
-          indicatorWeight: 3,
-          labelColor: kPrimary,
-          unselectedLabelColor: kTextMuted,
-          labelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 13),
-          unselectedLabelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w500, fontSize: 13),
-          tabs: const [
-            Tab(text: 'Daftar User'),
-            Tab(text: 'Semua Ulasan'),
-          ],
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          UserListTab(
-            users: _users,
-            reviews: _reviews,
-            isLoading: _loadingUsers,
-            onDeleteAll: _deleteAllReviewsByUser,
-            onRoleChanged: _updateUserRole,
-            onToggleBan: _toggleBanUser,
-            onRefresh: () async {
-              await _loadUsers();
-              await _loadReviews();
-            },
-          ),
-          AllReviewsTab(
-            reviews: _reviews,
-            isLoading: _loadingReviews,
-            searchQuery: _searchQuery,
-            onSearchChanged: (v) => setState(() => _searchQuery = v),
-            onDelete: _deleteReview,
-            onRefresh: _loadReviews,
-          ),
-        ],
+      body: UserListTab(
+        users: _users,
+        reviews: _reviews,
+        isLoading: _loadingUsers,
+        onDeleteAll: _deleteAllReviewsByUser,
+        onRoleChanged: _updateUserRole,
+        onToggleBan: _toggleBanUser,
+        onRefresh: () async {
+          await _loadUsers();
+          await _loadReviews();
+        },
       ),
     );
   }

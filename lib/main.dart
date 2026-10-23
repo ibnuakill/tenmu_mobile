@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,10 +8,15 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tenmu/core/theme_provider.dart';
 import 'package:tenmu/core/places_provider.dart';
 import 'package:tenmu/core/notification_service.dart';
+import 'package:tenmu/core/notification_center.dart';
+import 'package:tenmu/core/app_update_provider.dart';
+import 'package:tenmu/core/widgets/update_gate.dart';
 import 'package:tenmu/screen/auth/auth_gate.dart';
 import 'package:tenmu/screen/auth/forgot_password_screen.dart';
 import 'package:tenmu/screen/splash/animated_splash_screen.dart';
-import 'package:window_manager/window_manager.dart';
+import 'package:app_links/app_links.dart';
+
+import 'platform/desktop.dart' if (dart.library.js_interop) 'platform/web.dart';
 
 // Fungsi main() adalah titik awal berjalannya aplikasi Flutter
 Future<void> main() async {
@@ -30,27 +33,18 @@ Future<void> main() async {
     ),
   );
 
+  // Init deep link handler untuk magic link & reset password
+  _initDeepLinks();
+
   // Init OneSignal (tanpa externalUserId dulu — SDK login menyusul setelah auth)
   NotificationService.init();
 
   // Init window manager (untuk fullscreen di desktop)
-  if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
-    await WindowManager.instance.ensureInitialized();
-
-    // Global keyboard listener: Esc / F11 → toggle fullscreen
-    // HardwareKeyEventListener nangkep event meski window lagi di fullscreen OS layer
-    HardwareKeyboard.instance.addHandler((event) {
-      if (event is KeyDownEvent &&
-          (event.logicalKey == LogicalKeyboardKey.escape ||
-              event.logicalKey == LogicalKeyboardKey.f11)) {
-        unawaited(() async {
-          final isFull = await WindowManager.instance.isFullScreen();
-          await WindowManager.instance.setFullScreen(!isFull);
-        }());
-      }
-      return false;
-    });
-  }
+  // Dibungkus try/catch: kegagalan init desktop TIDAK boleh menggagalkan app
+  // (dulu bikin layar hitam karena exception sebelum runApp).
+  try {
+    await setupDesktop();
+  } catch (_) {}
 
   // Menjalankan aplikasi
   runApp(
@@ -58,10 +52,39 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => PlacesProvider()),
+        ChangeNotifierProvider(create: (_) => AppUpdateProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationCenter()),
       ],
       child: const TenMuApp(),
     ),
   );
+}
+
+// Deep link handler — tangkap tenmu:// saat app sudah berjalan
+void _initDeepLinks() {
+  final appLinks = AppLinks();
+
+  // Tangkap link saat app dibuka dari cold start via deep link
+  appLinks.getInitialLink().then((uri) {
+    if (uri != null) _handleDeepLink(uri);
+  }).catchError((_) {});
+
+  // Tangkap link saat app sudah di foreground/background
+  appLinks.uriLinkStream.listen(
+    (uri) => _handleDeepLink(uri),
+    onError: (_) {},
+  );
+}
+
+Future<void> _handleDeepLink(Uri uri) async {
+  final uriStr = uri.toString();
+  // Supabase PKCE: exchange code yang ada di deep link menjadi session
+  if (uriStr.contains('tenmu://login-callback') ||
+      uriStr.contains('tenmu://reset-callback')) {
+    try {
+      await Supabase.instance.client.auth.getSessionFromUrl(uri);
+    } catch (_) {}
+  }
 }
 
 // Membuat kerangka dasar aplikasi (MaterialApp)
@@ -83,8 +106,19 @@ class TenMuApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'TenMu',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: const AnimatedSplashScreen(nextScreen: AuthGate()),
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        fontFamily: 'Nunito',
+        primarySwatch: Colors.blue,
+        scaffoldBackgroundColor: const Color(0xFF0C0C0C),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF1ED760),
+          surface: Color(0xFF141414),
+        ),
+      ),
+      home: const UpdateGate(
+        child: AnimatedSplashScreen(nextScreen: AuthGate()),
+      ),
       onGenerateRoute: (settings) {
         // Handle deep link reset password
         if (settings.name != null &&

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme_provider.dart';
+import '../../../../core/lucide_icons.dart';
 
 /// Bottom sheet input review baru / edit review yang sudah ada.
 class ReviewInputSheet extends StatefulWidget {
@@ -125,7 +126,7 @@ class _ReviewInputSheetState extends State<ReviewInputSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 24, 20, 24 + bottomInset),
       child: Column(
@@ -168,10 +169,10 @@ class _ReviewInputSheetState extends State<ReviewInputSheet> {
                   onTap: () => setState(() => _selectedRating = starValue),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Icon(
+                    child: LucideIcon(
                       starValue <= _selectedRating
-                          ? Icons.star_rounded
-                          : Icons.star_outline_rounded,
+                          ? 'star'
+                          : 'star',
                       size: 40,
                       color: starValue <= _selectedRating
                           ? const Color(0xFFFFB800)

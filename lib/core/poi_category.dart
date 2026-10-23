@@ -1,134 +1,111 @@
-/// POI Category Constants
-/// Kategori POI (Point of Interest) & Wisata / UMKM Tenmu App
+/// POI Category Constants — 5 sektor universal UMKM Kabupaten Cirebon
+///
+/// Struktur: satu tingkat kategori saja (5 sektor). Sub-kategori dihapus
+/// pada migrasi 5-sektor (lihat `supabase/migrate_to_5_sectors.sql`).
 library;
 
 import 'package:flutter/material.dart';
 
 class PoiCategory {
-  static const String wisataBudaya = 'Wisata & Budaya';
-  static const String kulinerCafe = 'Kuliner & Cafe';
-  static const String olehOlehKerajinan = 'Oleh-oleh & Kerajinan';
-  static const String penginapanHotel = 'Penginapan & Hotel';
-  static const String pertokoanUmkm = 'Pertokoan & UMKM';
-  static const String jasaLayanan = 'Jasa & Layanan';
-  static const String lainnya = 'Lainnya';
+  // ══════════════════════════════════════════════════════════════════
+  // 5 sektor universal
+  // ══════════════════════════════════════════════════════════════════
+  static const String kuliner = 'Kuliner (Makanan & Olahan)';
+  static const String kriya = 'Kerajinan & Manufaktur Tradisional';
+  static const String ritel = 'Perdagangan & Retail';
+  static const String agribisnis = 'Agribisnis';
+  static const String jasa = 'Jasa';
 
-  // Backward compatibility constants (supaya data/pencarian lama tetap kompatibel)
-  static const String makanan = 'Kuliner & Cafe';
-  static const String perdagangan = 'Pertokoan & UMKM';
-  static const String konfeksi = 'Pertokoan & UMKM';
-  static const String jasa = 'Jasa & Layanan';
-  static const String pertanian = 'Wisata & Budaya';
-  static const String perikanan = 'Wisata & Budaya';
-  static const String peternakan = 'Wisata & Budaya';
-  static const String batik = 'Oleh-oleh & Kerajinan';
-  static const String rotan = 'Oleh-oleh & Kerajinan';
-  static const String meubel = 'Oleh-oleh & Kerajinan';
-  static const String gerabah = 'Oleh-oleh & Kerajinan';
-  static const String kerajinan = 'Oleh-oleh & Kerajinan';
-  static const String olahanBuah = 'Oleh-oleh & Kerajinan';
-  static const String olahanPertanian = 'Oleh-oleh & Kerajinan';
-
+  /// Semua kategori (urutan tampil di UI).
   static const List<String> allCategories = [
-    wisataBudaya,
-    kulinerCafe,
-    olehOlehKerajinan,
-    penginapanHotel,
-    pertokoanUmkm,
-    jasaLayanan,
-    lainnya,
+    kuliner,
+    kriya,
+    ritel,
+    agribisnis,
+    jasa,
   ];
 
-  static bool isValidCategory(String category) {
-    return allCategories.contains(category) ||
-        _legacyMapping.containsKey(category);
-  }
+  static bool isValidCategory(String category) =>
+      allCategories.contains(category);
 
-  static final Map<String, String> _legacyMapping = {
-    'Makanan': kulinerCafe,
-    'Perdagangan': pertokoanUmkm,
-    'Konfeksi': pertokoanUmkm,
-    'Jasa': jasaLayanan,
-    'Pertanian': wisataBudaya,
-    'Perikanan': wisataBudaya,
-    'Peternakan': wisataBudaya,
-    'Batik': olehOlehKerajinan,
-    'Rotan': olehOlehKerajinan,
-    'Meubel': olehOlehKerajinan,
-    'Gerabah': olehOlehKerajinan,
-    'Kerajinan': olehOlehKerajinan,
-    'Olahan Buah': olehOlehKerajinan,
-    'Olahan Pertanian': olehOlehKerajinan,
-  };
-
-  /// Memetakan kategori lama di database Supabase ke kategori baru
+  /// Memetakan kategori lama di database Supabase ke sektor baru.
+  /// Kategori yang tidak dikenal → sektor ritel.
   static String normalizeCategory(String category) {
     if (allCategories.contains(category)) return category;
-    return _legacyMapping[category] ?? lainnya;
+    return ritel;
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  // Emoji / Lucide icon / Material Icon / SVG / Warna
+  // ══════════════════════════════════════════════════════════════════
   static String getCategoryEmoji(String category) {
-    final cat = normalizeCategory(category);
-    switch (cat) {
-      case wisataBudaya:
-        return '🏰';
-      case kulinerCafe:
-        return '🍜';
-      case olehOlehKerajinan:
-        return '🛍️';
-      case penginapanHotel:
-        return '🏨';
-      case pertokoanUmkm:
-        return '🛒';
-      case jasaLayanan:
+    switch (normalizeCategory(category)) {
+      case kuliner:
+        return '🍽️';
+      case kriya:
+        return '🎨';
+      case ritel:
+        return '🏪';
+      case agribisnis:
+        return '🌾';
+      case jasa:
         return '🔧';
       default:
         return '📍';
     }
   }
 
+  static String getCategoryLucide(String category) {
+    switch (normalizeCategory(category)) {
+      case kuliner:
+        return 'utensils';
+      case kriya:
+        return 'gift';
+      case ritel:
+        return 'shopping-cart';
+      case agribisnis:
+        return 'tag';
+      case jasa:
+        return 'wrench';
+      default:
+        return 'map-pin';
+    }
+  }
+
   static IconData getCategoryIcon(String category) {
-    final cat = normalizeCategory(category);
-    switch (cat) {
-      case wisataBudaya:
-        return Icons.landscape_outlined;
-      case kulinerCafe:
+    switch (normalizeCategory(category)) {
+      case kuliner:
         return Icons.restaurant_outlined;
-      case olehOlehKerajinan:
+      case kriya:
         return Icons.palette_outlined;
-      case penginapanHotel:
-        return Icons.hotel_outlined;
-      case pertokoanUmkm:
+      case ritel:
         return Icons.storefront_outlined;
-      case jasaLayanan:
+      case agribisnis:
+        return Icons.grass_outlined;
+      case jasa:
         return Icons.build_outlined;
       default:
         return Icons.place_outlined;
     }
   }
 
-  /// Path SVG custom icon untuk tiap kategori (jika tersedia)
   static String? getCategorySvgPath(String category) {
-    final cat = normalizeCategory(category);
-    switch (cat) {
-      case wisataBudaya:
-        return 'assets/icons/categories/travel-explore-rounded.svg';
-      case kulinerCafe:
+    switch (normalizeCategory(category)) {
+      case kuliner:
         return 'assets/icons/categories/cup-hot-fill.svg';
-      case olehOlehKerajinan:
+      case kriya:
         return 'assets/icons/categories/gift-fill.svg';
-      case penginapanHotel:
-        return 'assets/icons/categories/hotel-fill.svg';
-      case pertokoanUmkm:
+      case ritel:
         return 'assets/icons/categories/shopping-cart-fill.svg';
-      case jasaLayanan:
+      case agribisnis:
+        return 'assets/icons/categories/shop.svg';
+      case jasa:
         return 'assets/icons/categories/wrench-fill.svg';
       default:
         return 'assets/icons/categories/shop.svg';
     }
   }
 
-  /// Warna representasi tiap kategori (menggunakan warna utama Tenmu yang konsisten)
   static Color getCategoryColor(String category) {
     return const Color(0xFF1ED760); // Hijau utama Tenmu
   }

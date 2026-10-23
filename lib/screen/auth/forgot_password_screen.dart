@@ -61,7 +61,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     // Cek lock
     final locked = await AuthRateLimit.isForgotLocked(email);
     if (locked) {
-      final remaining = await AuthRateLimit.getLoginRemainingLockSeconds(email);
+      final remaining = await AuthRateLimit.getForgotRemainingLockSeconds(email);
       _toast(
         'Terlalu banyak percobaan. Coba lagi setelah ${AuthRateLimit.formatDuration(remaining)}.',
         isError: true,

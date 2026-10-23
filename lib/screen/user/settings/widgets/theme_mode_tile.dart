@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme_provider.dart';
+import '../../../../core/lucide_icons.dart';
 
 /// Tile khusus untuk switch dark / white mode.
 class ThemeModeTile extends StatelessWidget {
@@ -22,8 +23,8 @@ class ThemeModeTile extends StatelessWidget {
               color: _accent.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+            child: LucideIcon(
+              isDark ? 'moon' : 'sun',
               color: _accent,
               size: 22,
             ),
@@ -83,14 +84,14 @@ class _SegmentedToggle extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _SegmentButton(
-            icon: Icons.dark_mode_rounded,
+            icon: 'moon',
             label: 'Dark',
             selected: isDark,
             theme: theme,
             onTap: () => onChanged(true),
           ),
           _SegmentButton(
-            icon: Icons.light_mode_rounded,
+            icon: 'sun',
             label: 'White',
             selected: !isDark,
             theme: theme,
@@ -103,7 +104,7 @@ class _SegmentedToggle extends StatelessWidget {
 }
 
 class _SegmentButton extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final String label;
   final bool selected;
   final ThemeProvider theme;
@@ -132,7 +133,7 @@ class _SegmentButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            LucideIcon(
               icon,
               size: 15,
               color: selected ? theme.btnLabel : theme.textSecondary,

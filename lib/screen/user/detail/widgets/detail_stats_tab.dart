@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme_provider.dart';
+import '../../../../core/lucide_icons.dart';
 
 /// Stats horizontal row (jarak / durasi / rating).
 class DetailStatsRow extends StatelessWidget {
@@ -42,7 +43,7 @@ class DetailStatsRow extends StatelessWidget {
           children: [
             Expanded(
               child: _StatItem(
-                icon: Icons.access_time_outlined,
+                icon: 'clock',
                 iconColor: theme.btnPrimary,
                 value: durationText ?? '--',
                 label: 'Durasi',
@@ -56,7 +57,7 @@ class DetailStatsRow extends StatelessWidget {
             ),
             Expanded(
               child: _StatItem(
-                icon: Icons.location_on_outlined,
+                icon: 'map-pin',
                 iconColor: theme.btnPrimary,
                 value: distanceText ?? '--',
                 label: 'Jarak',
@@ -70,7 +71,7 @@ class DetailStatsRow extends StatelessWidget {
             ),
             Expanded(
               child: _StatItem(
-                icon: Icons.star_outline_rounded,
+                icon: 'star',
                 iconColor: Colors.amber,
                 value: ratingText,
                 label: reviewLabel,
@@ -85,7 +86,7 @@ class DetailStatsRow extends StatelessWidget {
 }
 
 class _StatItem extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final Color iconColor;
   final String value;
   final String label;
@@ -104,7 +105,7 @@ class _StatItem extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: 20, color: iconColor),
+        LucideIcon(icon, size: 20, color: iconColor),
         const SizedBox(height: 6),
         Text(
           value,

@@ -21,7 +21,6 @@ class HomeController extends ChangeNotifier {
   String _searchQuery = '';
   Set<String> _selectedCategories = {};
   SortOption _selectedSort = SortOption.terbaru;
-  String? _selectedCategoryTab; // null = Semua
 
   // ── App State ──
   Position? _currentPosition;
@@ -41,7 +40,7 @@ class HomeController extends ChangeNotifier {
   String get searchQuery => _searchQuery;
   Set<String> get selectedCategories => _selectedCategories;
   SortOption get selectedSort => _selectedSort;
-  String? get selectedCategoryTab => _selectedCategoryTab;
+  String? get selectedCategoryTab => null;
   Position? get currentPosition => _currentPosition;
   int get currentNavIndex => _currentNavIndex;
   UserRole? get userRole => _userRole;
@@ -228,8 +227,6 @@ class HomeController extends ChangeNotifier {
   PlaceQuery buildQuery() {
     final cats = [
       ..._selectedCategories,
-      if (_selectedCategoryTab != null && _selectedCategoryTab != 'Semua')
-        _selectedCategoryTab!,
     ].map(PoiCategory.normalizeCategory).toList();
 
     final SortMode sort;
@@ -296,12 +293,6 @@ class HomeController extends ChangeNotifier {
     if (v == SortOption.terdekat && _currentPosition == null) {
       requestLocationForSort(provider);
     }
-  }
-
-  void setCategoryTab(String? v, PlacesProvider provider) {
-    _selectedCategoryTab = v;
-    notifyListeners();
-    scheduleQuery(provider, immediate: true);
   }
 
   void resetFilters(PlacesProvider provider) {

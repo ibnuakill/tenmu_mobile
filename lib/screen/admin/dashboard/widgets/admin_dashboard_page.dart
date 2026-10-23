@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'admin_design.dart';
 import 'admin_shell.dart';
 
@@ -25,6 +26,11 @@ class DashboardPage extends StatelessWidget {
   final VoidCallback onVerify;
   final VoidCallback onActivity;
 
+  final String dateStr;
+  final DateTimeRange? dateRange;
+  final void Function(DateTimeRange)? onDateRangeChanged;
+  final List<Map<String, dynamic>> placesList;
+
   const DashboardPage({
     super.key,
     required this.isLoading,
@@ -43,18 +49,17 @@ class DashboardPage extends StatelessWidget {
     required this.placesLastMonth,
     required this.usersLastMonth,
     required this.reviewsLastMonth,
+    required this.dateStr,
+    this.dateRange,
+    this.onDateRangeChanged,
+    this.placesList = const [],
     required this.onRetry,
     required this.onVerify,
     required this.onActivity,
   });
 
-
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    const bulan = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-    final dateStr = '1 ${bulan[now.month]} - ${now.day} ${bulan[now.month]}, ${now.year}';
-
     return Scaffold(
       backgroundColor: kPageBg,
       body: SafeArea(
@@ -72,7 +77,7 @@ class DashboardPage extends StatelessWidget {
                   child: LayoutBuilder(
                     builder: (ctx, constraints) {
                       final isMobile = constraints.maxWidth < 600;
-                      
+
                       if (isMobile) {
                         // ── MOBILE LAYOUT ──
                         return Column(
@@ -81,7 +86,8 @@ class DashboardPage extends StatelessWidget {
                             // Title
                             Text(
                               'Dashboard Admin Tenmu',
-                              style: GoogleFonts.poppins(
+                              style: TextStyle(
+                                fontFamily: 'Nunito',
                                 fontSize: 24,
                                 fontWeight: FontWeight.w700,
                                 color: kTextPrimary,
@@ -89,14 +95,70 @@ class DashboardPage extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            
+
                             // Date + Kelola UMKM + Akun (Row)
                             Row(
                               children: [
                                 // Date range pill (shrink)
-                                Expanded(
+                                GestureDetector(
+                                  onTap: () async {
+                                    final picked = await _pickDateRange(
+                                      context,
+                                    );
+                                    if (picked != null &&
+                                        onDateRangeChanged != null) {
+                                      onDateRangeChanged!(picked);
+                                    }
+                                  },
+                                  child: Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: kCardBg,
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
+                                        border: Border.all(color: kBorderColor),
+                                        boxShadow: const [kShadow],
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.calendar_today_rounded,
+                                            size: 12,
+                                            color: kTextMuted,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              dateStr,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontFamily: 'Nunito',
+                                                fontSize: 10,
+                                                color: kTextPrimary,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+
+                                // Kelola UMKM compact
+                                GestureDetector(
+                                  onTap: onVerify,
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: kCardBg,
                                       borderRadius: BorderRadius.circular(999),
@@ -105,14 +167,19 @@ class DashboardPage extends StatelessWidget {
                                     ),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.calendar_today_rounded, size: 12, color: kTextMuted),
+                                        const Icon(
+                                          Icons.add_rounded,
+                                          size: 14,
+                                          color: kTextPrimary,
+                                        ),
                                         const SizedBox(width: 4),
-                                        Expanded(
-                                          child: Text(
-                                            dateStr,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 10, color: kTextPrimary, fontWeight: FontWeight.w600),
+                                        Text(
+                                          'UMKM',
+                                          style: TextStyle(
+                                            fontFamily: 'Nunito',
+                                            fontSize: 11,
+                                            color: kTextPrimary,
+                                            fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                       ],
@@ -120,31 +187,27 @@ class DashboardPage extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                
-                                // Kelola UMKM compact
+
+                                // Export compact (mobile)
                                 GestureDetector(
-                                  onTap: onVerify,
+                                  onTap: () => _exportToSpreadsheet(context),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    width: 34,
+                                    height: 34,
                                     decoration: BoxDecoration(
-                                      color: kCardBg,
+                                      color: kPrimary,
                                       borderRadius: BorderRadius.circular(999),
-                                      border: Border.all(color: kBorderColor),
                                       boxShadow: const [kShadow],
                                     ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.add_rounded, size: 14, color: kTextPrimary),
-                                        const SizedBox(width: 4),
-                                        Text('UMKM',
-                                          style: GoogleFonts.plusJakartaSans(
-                                            fontSize: 11, color: kTextPrimary, fontWeight: FontWeight.w700)),
-                                      ],
+                                    child: const Icon(
+                                      Icons.file_download_outlined,
+                                      size: 16,
+                                      color: Colors.white,
                                     ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                
+
                                 // Akun Menu
                                 const AccountMenuButton(),
                               ],
@@ -158,7 +221,8 @@ class DashboardPage extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 'Dashboard Admin Tenmu',
-                                style: GoogleFonts.poppins(
+                                style: TextStyle(
+                                  fontFamily: 'Nunito',
                                   fontSize: 24,
                                   fontWeight: FontWeight.w700,
                                   color: kTextPrimary,
@@ -167,32 +231,19 @@ class DashboardPage extends StatelessWidget {
                               ),
                             ),
                             // Date range pill
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: kCardBg,
-                                borderRadius: BorderRadius.circular(999),
-                                border: Border.all(color: kBorderColor),
-                                boxShadow: const [kShadow],
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.calendar_today_rounded, size: 13, color: kTextMuted),
-                                  const SizedBox(width: 8),
-                                  Text(dateStr,
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 12, color: kTextPrimary, fontWeight: FontWeight.w600)),
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: kTextMuted),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Action pill button (+ Kelola UMKM)
                             GestureDetector(
-                              onTap: onVerify,
+                              onTap: () async {
+                                final picked = await _pickDateRange(context);
+                                if (picked != null &&
+                                    onDateRangeChanged != null) {
+                                  onDateRangeChanged!(picked);
+                                }
+                              },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 8,
+                                ),
                                 decoration: BoxDecoration(
                                   color: kCardBg,
                                   borderRadius: BorderRadius.circular(999),
@@ -201,11 +252,98 @@ class DashboardPage extends StatelessWidget {
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.add_rounded, size: 16, color: kTextPrimary),
+                                    const Icon(
+                                      Icons.calendar_today_rounded,
+                                      size: 13,
+                                      color: kTextMuted,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      dateStr,
+                                      style: TextStyle(
+                                        fontFamily: 'Nunito',
+                                        fontSize: 12,
+                                        color: kTextPrimary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.keyboard_arrow_down_rounded,
+                                      size: 16,
+                                      color: kTextMuted,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            // Export to Spreadsheet
+                            GestureDetector(
+                              onTap: () => _exportToSpreadsheet(context),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: kPrimary,
+                                  borderRadius: BorderRadius.circular(999),
+                                  boxShadow: const [kShadow],
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.file_download_outlined,
+                                      size: 14,
+                                      color: Colors.white,
+                                    ),
                                     const SizedBox(width: 6),
-                                    Text('Kelola UMKM',
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 12, color: kTextPrimary, fontWeight: FontWeight.w700)),
+                                    Text(
+                                      'Export',
+                                      style: TextStyle(
+                                        fontFamily: 'Nunito',
+                                        fontSize: 11,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            // Action pill button (+ Kelola UMKM)
+                            GestureDetector(
+                              onTap: onVerify,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: kCardBg,
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(color: kBorderColor),
+                                  boxShadow: const [kShadow],
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.add_rounded,
+                                      size: 16,
+                                      color: kTextPrimary,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Kelola UMKM',
+                                      style: TextStyle(
+                                        fontFamily: 'Nunito',
+                                        fontSize: 12,
+                                        color: kTextPrimary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -224,7 +362,12 @@ class DashboardPage extends StatelessWidget {
               // ── MAIN DASHBOARD GRID CONTENT ──
               if (isLoading)
                 const SliverFillRemaining(
-                  child: Center(child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5)),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: kPrimary,
+                      strokeWidth: 2.5,
+                    ),
+                  ),
                 )
               else if (error != null)
                 SliverFillRemaining(
@@ -244,27 +387,35 @@ class DashboardPage extends StatelessWidget {
                     child: LayoutBuilder(
                       builder: (ctx, constraints) {
                         if (constraints.maxWidth >= 950) {
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Left Card (UMKM Summary Card)
-                              SizedBox(
-                                width: 290,
-                                child: _buildEmeraldCardWidget(),
-                              ),
-                              const SizedBox(width: 16),
-                              // Center Card (UMKM Growth Bar Chart)
-                              Expanded(
-                                flex: 3,
-                                child: _buildEngagementBarChart(),
-                              ),
-                              const SizedBox(width: 16),
-                              // Right Card (User Summary Line Chart)
-                              SizedBox(
-                                width: 280,
-                                child: _buildTotalBalanceLineChart(),
-                              ),
-                            ],
+                          // Tinggi kartu disamakan & pas konten: IntrinsicHeight +
+                          // stretch -> semua kartu setinggi kartu tertinggi.
+                          final cardNarrow =
+                              (constraints.maxWidth - 32) / 3 < 420;
+                          return IntrinsicHeight(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Left Card (UMKM Summary Card)
+                                Expanded(
+                                  flex: 1,
+                                  child: _buildEmeraldCardWidget(),
+                                ),
+                                const SizedBox(width: 16),
+                                // Center Card (UMKM Growth Bar Chart)
+                                Expanded(
+                                  flex: 1,
+                                  child: _buildEngagementBarChart(
+                                    narrow: cardNarrow,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                // Right Card (User Summary Line Chart)
+                                Expanded(
+                                  flex: 1,
+                                  child: _buildTotalBalanceLineChart(),
+                                ),
+                              ],
+                            ),
                           );
                         }
                         return Column(
@@ -290,21 +441,23 @@ class DashboardPage extends StatelessWidget {
                     child: LayoutBuilder(
                       builder: (ctx, constraints) {
                         if (constraints.maxWidth >= 950) {
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Bottom Left (Recent Activity Table)
-                              Expanded(
-                                flex: 6,
-                                child: _buildRecentActivityTable(),
-                              ),
-                              const SizedBox(width: 16),
-                              // Bottom Right (Top UMKM)
-                              Expanded(
-                                flex: 4,
-                                child: _buildTopUmkmWidget(),
-                              ),
-                            ],
+                          return IntrinsicHeight(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Bottom Left (Recent Activity Table)
+                                Expanded(
+                                  flex: 1,
+                                  child: _buildRecentActivityTable(),
+                                ),
+                                const SizedBox(width: 16),
+                                // Bottom Right (Top UMKM)
+                                Expanded(
+                                  flex: 1,
+                                  child: _buildTopUmkmWidget(),
+                                ),
+                              ],
+                            ),
                           );
                         }
                         return Column(
@@ -330,13 +483,33 @@ class DashboardPage extends StatelessWidget {
 
   Widget _arrowButton() {
     return Container(
-      width: 28, height: 28,
-      decoration: BoxDecoration(
-        color: kPageBg,
-        shape: BoxShape.circle,
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(color: kPageBg, shape: BoxShape.circle),
+      child: const Icon(
+        Icons.north_east_rounded,
+        size: 14,
+        color: kTextSecondary,
       ),
-      child: const Icon(Icons.north_east_rounded, size: 14, color: kTextSecondary),
     );
+  }
+
+  Future<DateTimeRange?> _pickDateRange(BuildContext context) async {
+    final start = await showDatePicker(
+      context: context,
+      initialDate: dateRange?.start ?? DateTime.now(),
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2030),
+    );
+    if (start == null) return null;
+    final end = await showDatePicker(
+      context: context,
+      initialDate: dateRange?.end ?? start,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2030),
+    );
+    if (end == null) return null;
+    return DateTimeRange(start: start, end: end);
   }
 
   // ═════════════════════════════════════════════════════════════════════════════
@@ -361,8 +534,23 @@ class DashboardPage extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Ringkasan UMKM', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
-                  Text('Aktif dan menunggu approval', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextMuted)),
+                  Text(
+                    'Ringkasan UMKM',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  Text(
+                    'Aktif dan menunggu approval',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 11,
+                      color: kTextMuted,
+                    ),
+                  ),
                 ],
               ),
               _arrowButton(),
@@ -377,7 +565,11 @@ class DashboardPage extends StatelessWidget {
               color: kPrimary,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
-                BoxShadow(color: kPrimary.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6)),
+                BoxShadow(
+                  color: kPrimary.withValues(alpha: 0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
               ],
             ),
             child: Column(
@@ -386,23 +578,64 @@ class DashboardPage extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('TENMU', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 1.5)),
-                    const Icon(Icons.verified_user_rounded, color: Colors.white70, size: 20),
+                    Text(
+                      'TENMU',
+                      style: TextStyle(
+                        fontFamily: 'Nunito',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const Icon(
+                      Icons.verified_user_rounded,
+                      color: Colors.white70,
+                      size: 20,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('Total listing UMKM', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: Colors.white70)),
+                Text(
+                  'Total listing UMKM',
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 11,
+                    color: Colors.white70,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 Text(
                   '$totalPlaces Tempat',
-                  style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -0.5),
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('$activeCount aktif', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: Colors.white70)),
-                    Text('$pendingCount pending', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w700)),
+                    Text(
+                      '$activeCount aktif',
+                      style: TextStyle(
+                        fontFamily: 'Nunito',
+                        fontSize: 11,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    Text(
+                      '$pendingCount pending',
+                      style: TextStyle(
+                        fontFamily: 'Nunito',
+                        fontSize: 11,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -418,18 +651,44 @@ class DashboardPage extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Review bulan ini', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextMuted)),
+                  Text(
+                    'Review bulan ini',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 11,
+                      color: kTextMuted,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text('$reviewsThisMonth Ulasan', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                  Text(
+                    '$reviewsThisMonth Ulasan',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                    ),
+                  ),
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: kAccentGreen.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Text('$totalReviews total', style: GoogleFonts.plusJakartaSans(color: kAccentGreen, fontSize: 11, fontWeight: FontWeight.w700)),
+                child: Text(
+                  '$totalReviews total',
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    color: kAccentGreen,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ],
           ),
@@ -439,7 +698,7 @@ class DashboardPage extends StatelessWidget {
   }
 
   // 2. CENTER: UMKM Growth Chart Widget
-  Widget _buildEngagementBarChart() {
+  Widget _buildEngagementBarChart({bool narrow = false}) {
     final bars = dailySubmissions.length >= 6
         ? dailySubmissions.sublist(dailySubmissions.length - 6)
         : dailySubmissions;
@@ -458,21 +717,31 @@ class DashboardPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          LayoutBuilder(
-            builder: (ctx, constraints) {
-              final isNarrow = constraints.maxWidth < 420;
-              if (isNarrow) {
+          // Header: pakai flag `narrow` dari parent (bukan LayoutBuilder) supaya
+          // widget ini tetap bisa diukur oleh IntrinsicHeight di baris kartu.
+          Builder(
+            builder: (ctx) {
+              if (narrow) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.subtitles_outlined, size: 18, color: kTextSecondary),
+                        const Icon(
+                          Icons.subtitles_outlined,
+                          size: 18,
+                          color: kTextSecondary,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Pertumbuhan UMKM',
-                            style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary),
+                            style: TextStyle(
+                              fontFamily: 'Nunito',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: kTextPrimary,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -490,16 +759,37 @@ class DashboardPage extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            child: Text('14 hari', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextSecondary)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            child: Text(
+                              '14 hari',
+                              style: TextStyle(
+                                fontFamily: 'Nunito',
+                                fontSize: 11,
+                                color: kTextSecondary,
+                              ),
+                            ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: kPrimary,
                               borderRadius: BorderRadius.circular(999),
                             ),
-                            child: Text('Terbaru', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                            child: Text(
+                              'Terbaru',
+                              style: TextStyle(
+                                fontFamily: 'Nunito',
+                                fontSize: 11,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -510,12 +800,21 @@ class DashboardPage extends StatelessWidget {
 
               return Row(
                 children: [
-                  const Icon(Icons.subtitles_outlined, size: 18, color: kTextSecondary),
+                  const Icon(
+                    Icons.subtitles_outlined,
+                    size: 18,
+                    color: kTextSecondary,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Pertumbuhan UMKM',
-                      style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary),
+                      style: TextStyle(
+                        fontFamily: 'Nunito',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: kTextPrimary,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -531,16 +830,37 @@ class DashboardPage extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          child: Text('14 hari', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextSecondary)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          child: Text(
+                            '14 hari',
+                            style: TextStyle(
+                              fontFamily: 'Nunito',
+                              fontSize: 11,
+                              color: kTextSecondary,
+                            ),
+                          ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: kPrimary,
                             borderRadius: BorderRadius.circular(999),
                           ),
-                          child: Text('Terbaru', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                          child: Text(
+                            'Terbaru',
+                            style: TextStyle(
+                              fontFamily: 'Nunito',
+                              fontSize: 11,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -551,11 +871,11 @@ class DashboardPage extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 14),
 
           // ── BAR CHART (Pill Bars with April Solid Green Highlight) ──
           SizedBox(
-            height: 190,
+            height: 140,
             child: BarChart(
               BarChartData(
                 alignment: BarChartAlignment.spaceAround,
@@ -572,16 +892,30 @@ class DashboardPage extends StatelessWidget {
                         if (idx >= 0 && idx < months.length) {
                           return Padding(
                             padding: const EdgeInsets.only(top: 8),
-                            child: Text(months[idx], style: GoogleFonts.plusJakartaSans(fontSize: 10, color: kTextMuted, fontWeight: FontWeight.w600)),
+                            child: Text(
+                              months[idx],
+                              style: TextStyle(
+                                fontFamily: 'Nunito',
+                                fontSize: 10,
+                                color: kTextMuted,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           );
                         }
                         return const SizedBox.shrink();
                       },
                     ),
                   ),
-                  leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                 ),
                 gridData: FlGridData(show: false),
                 borderData: FlBorderData(show: false),
@@ -607,7 +941,9 @@ class DashboardPage extends StatelessWidget {
       barRods: [
         BarChartRodData(
           toY: y,
-          color: isHighlighted ? kPrimary : const Color(0xFFA7F3D0).withValues(alpha: 0.7),
+          color: isHighlighted
+              ? kPrimary
+              : const Color(0xFFA7F3D0).withValues(alpha: 0.7),
           width: 26,
           borderRadius: BorderRadius.circular(16),
         ),
@@ -633,8 +969,23 @@ class DashboardPage extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Total Pengguna', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
-                  Text('Akun pengguna aplikasi', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextMuted)),
+                  Text(
+                    'Total Pengguna',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  Text(
+                    'Akun pengguna aplikasi',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 11,
+                      color: kTextMuted,
+                    ),
+                  ),
                 ],
               ),
               _arrowButton(),
@@ -642,11 +993,24 @@ class DashboardPage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          Text('Terdaftar di Tenmu', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextMuted)),
+          Text(
+            'Terdaftar di Tenmu',
+            style: TextStyle(
+              fontFamily: 'Nunito',
+              fontSize: 11,
+              color: kTextMuted,
+            ),
+          ),
           const SizedBox(height: 2),
           Text(
             '$totalUsers Pengguna',
-            style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w800, color: kTextPrimary, letterSpacing: -0.5),
+            style: TextStyle(
+              fontFamily: 'Nunito',
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: kTextPrimary,
+              letterSpacing: -0.5,
+            ),
           ),
           const SizedBox(height: 14),
 
@@ -658,8 +1022,10 @@ class DashboardPage extends StatelessWidget {
                 gridData: FlGridData(show: false),
                 titlesData: FlTitlesData(show: false),
                 borderData: FlBorderData(show: false),
-                minX: 0, maxX: 6,
-                minY: 0, maxY: 6,
+                minX: 0,
+                maxX: 6,
+                minY: 0,
+                maxY: 6,
                 lineBarsData: [
                   LineChartBarData(
                     spots: const [
@@ -678,7 +1044,10 @@ class DashboardPage extends StatelessWidget {
                     belowBarData: BarAreaData(
                       show: true,
                       gradient: LinearGradient(
-                        colors: [kAccentGreen.withValues(alpha: 0.25), kAccentGreen.withValues(alpha: 0.0)],
+                        colors: [
+                          kAccentGreen.withValues(alpha: 0.25),
+                          kAccentGreen.withValues(alpha: 0.0),
+                        ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                       ),
@@ -689,7 +1058,7 @@ class DashboardPage extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Action buttons: Send ↑ & Receive ↓
           Row(
@@ -698,7 +1067,7 @@ class DashboardPage extends StatelessWidget {
                 child: GestureDetector(
                   onTap: onVerify,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
                       color: kPrimary,
                       borderRadius: BorderRadius.circular(999),
@@ -706,9 +1075,21 @@ class DashboardPage extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Kelola UMKM', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                        Text(
+                          'Kelola UMKM',
+                          style: TextStyle(
+                            fontFamily: 'Nunito',
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         const SizedBox(width: 4),
-                        const Icon(Icons.storefront_rounded, color: Colors.white, size: 14),
+                        const Icon(
+                          Icons.storefront_rounded,
+                          color: Colors.white,
+                          size: 14,
+                        ),
                       ],
                     ),
                   ),
@@ -719,7 +1100,7 @@ class DashboardPage extends StatelessWidget {
                 child: GestureDetector(
                   onTap: onActivity,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
                       color: kPageBg,
                       borderRadius: BorderRadius.circular(999),
@@ -727,9 +1108,21 @@ class DashboardPage extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Audit Log', style: GoogleFonts.plusJakartaSans(color: kTextPrimary, fontSize: 12, fontWeight: FontWeight.w600)),
+                        Text(
+                          'Audit Log',
+                          style: TextStyle(
+                            fontFamily: 'Nunito',
+                            color: kTextPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         const SizedBox(width: 4),
-                        const Icon(Icons.timeline_rounded, color: kTextSecondary, size: 14),
+                        const Icon(
+                          Icons.timeline_rounded,
+                          color: kTextSecondary,
+                          size: 14,
+                        ),
                       ],
                     ),
                   ),
@@ -764,8 +1157,23 @@ class DashboardPage extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Aktivitas Terbaru', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
-                  Text('UMKM baru daftar dan status verifikasi', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextMuted)),
+                  Text(
+                    'Aktivitas Terbaru',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  Text(
+                    'UMKM baru daftar dan status verifikasi',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 11,
+                      color: kTextMuted,
+                    ),
+                  ),
                 ],
               ),
               _arrowButton(),
@@ -778,11 +1186,67 @@ class DashboardPage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               children: [
-                Expanded(flex: 3, child: Text('Nama UMKM', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w600))),
-                Expanded(flex: 2, child: Text('Tanggal', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w600))),
-                Expanded(flex: 2, child: Text('Jam', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w600))),
-                Expanded(flex: 2, child: Text('Status', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w600))),
-                Expanded(flex: 2, child: Text('Kategori', textAlign: TextAlign.right, style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w600))),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    'Nama UMKM',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 11,
+                      color: kTextMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Tanggal',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 11,
+                      color: kTextMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Jam',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 11,
+                      color: kTextMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Status',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 11,
+                      color: kTextMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Kategori',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 11,
+                      color: kTextMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -792,7 +1256,12 @@ class DashboardPage extends StatelessWidget {
           if (recentActivities.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: Text('Belum ada riwayat aktivitas.', style: GoogleFonts.plusJakartaSans(color: kTextMuted))),
+              child: Center(
+                child: Text(
+                  'Belum ada riwayat aktivitas.',
+                  style: TextStyle(fontFamily: 'Nunito', color: kTextMuted),
+                ),
+              ),
             )
           else
             Column(
@@ -800,7 +1269,9 @@ class DashboardPage extends StatelessWidget {
                 final name = a['nama_tempat'] as String? ?? 'Unknown';
                 final status = a['verification_status'] as String? ?? 'pending';
                 final cat = a['category'] as String? ?? 'UMKM';
-                final createdAt = DateTime.tryParse(a['created_at'] as String? ?? '');
+                final createdAt = DateTime.tryParse(
+                  a['created_at'] as String? ?? '',
+                );
 
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -814,11 +1285,29 @@ class DashboardPage extends StatelessWidget {
                             CircleAvatar(
                               radius: 14,
                               backgroundColor: kPrimary.withValues(alpha: 0.1),
-                              child: Text(name.substring(0, 1).toUpperCase(), style: GoogleFonts.poppins(color: kPrimary, fontSize: 11, fontWeight: FontWeight.w700)),
+                              child: Text(
+                                name.substring(0, 1).toUpperCase(),
+                                style: TextStyle(
+                                  fontFamily: 'Nunito',
+                                  color: kPrimary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(name, overflow: TextOverflow.ellipsis, maxLines: 1, style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                              child: Text(
+                                name,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontFamily: 'Nunito',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: kTextPrimary,
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -826,12 +1315,26 @@ class DashboardPage extends StatelessWidget {
                       // Date
                       Expanded(
                         flex: 2,
-                        child: Text(_formatDate(createdAt), style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextSecondary)),
+                        child: Text(
+                          _formatDate(createdAt),
+                          style: TextStyle(
+                            fontFamily: 'Nunito',
+                            fontSize: 11,
+                            color: kTextSecondary,
+                          ),
+                        ),
                       ),
                       // Time
                       Expanded(
                         flex: 2,
-                        child: Text(_formatTime(createdAt), style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextSecondary)),
+                        child: Text(
+                          _formatTime(createdAt),
+                          style: TextStyle(
+                            fontFamily: 'Nunito',
+                            fontSize: 11,
+                            color: kTextSecondary,
+                          ),
+                        ),
                       ),
                       // Status dot
                       Expanded(
@@ -839,16 +1342,28 @@ class DashboardPage extends StatelessWidget {
                         child: Row(
                           children: [
                             Container(
-                              width: 6, height: 6,
+                              width: 6,
+                              height: 6,
                               decoration: BoxDecoration(
-                                color: status == 'verified' ? kAccentGreen : kAccentAmber,
+                                color: status == 'verified'
+                                    ? kAccentGreen
+                                    : kAccentAmber,
                                 shape: BoxShape.circle,
                               ),
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              status == 'verified' ? 'Aktif' : status == 'rejected' ? 'Ditolak' : 'Pending',
-                              style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextPrimary, fontWeight: FontWeight.w600),
+                              status == 'verified'
+                                  ? 'Aktif'
+                                  : status == 'rejected'
+                                  ? 'Ditolak'
+                                  : 'Pending',
+                              style: TextStyle(
+                                fontFamily: 'Nunito',
+                                fontSize: 11,
+                                color: kTextPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
                         ),
@@ -859,7 +1374,12 @@ class DashboardPage extends StatelessWidget {
                         child: Text(
                           cat,
                           textAlign: TextAlign.right,
-                          style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w700, color: kTextPrimary),
+                          style: TextStyle(
+                            fontFamily: 'Nunito',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: kTextPrimary,
+                          ),
                         ),
                       ),
                     ],
@@ -884,8 +1404,23 @@ class DashboardPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('UMKM Rating Tertinggi', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700, color: kTextPrimary)),
-          Text('Berdasarkan view places_with_ratings', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextMuted)),
+          Text(
+            'UMKM Rating Tertinggi',
+            style: TextStyle(
+              fontFamily: 'Nunito',
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: kTextPrimary,
+            ),
+          ),
+          Text(
+            'Berdasarkan view places_with_ratings',
+            style: TextStyle(
+              fontFamily: 'Nunito',
+              fontSize: 11,
+              color: kTextMuted,
+            ),
+          ),
           const SizedBox(height: 12),
 
           Row(
@@ -894,7 +1429,12 @@ class DashboardPage extends StatelessWidget {
                 topPlaces.isEmpty
                     ? 'Belum ada rating'
                     : "${((topPlaces.first['avg_rating'] as num?)?.toDouble() ?? 0).toStringAsFixed(1)} ★",
-                style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w800, color: kTextPrimary),
+                style: TextStyle(
+                  fontFamily: 'Nunito',
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: kTextPrimary,
+                ),
               ),
               const SizedBox(width: 10),
               Container(
@@ -903,7 +1443,15 @@ class DashboardPage extends StatelessWidget {
                   color: kAccentGreen.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Text('${topPlaces.length} UMKM', style: GoogleFonts.plusJakartaSans(color: kAccentGreen, fontSize: 10, fontWeight: FontWeight.w700)),
+                child: Text(
+                  '${topPlaces.length} UMKM',
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    color: kAccentGreen,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ],
           ),
@@ -918,8 +1466,23 @@ class DashboardPage extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Paling Direkomendasikan', style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary)),
-                  Text('Rating dan jumlah ulasan', style: GoogleFonts.plusJakartaSans(fontSize: 10, color: kTextMuted)),
+                  Text(
+                    'Paling Direkomendasikan',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  Text(
+                    'Rating dan jumlah ulasan',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 10,
+                      color: kTextMuted,
+                    ),
+                  ),
                 ],
               ),
               _arrowButton(),
@@ -928,8 +1491,14 @@ class DashboardPage extends StatelessWidget {
           const SizedBox(height: 14),
 
           if (topPlaces.isEmpty)
-            Text('Rating akan muncul setelah UMKM menerima review.',
-                style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kTextMuted))
+            Text(
+              'Rating akan muncul setelah UMKM menerima review.',
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                fontSize: 12,
+                color: kTextMuted,
+              ),
+            )
           else
             Column(
               children: topPlaces.take(4).map((place) {
@@ -944,37 +1513,59 @@ class DashboardPage extends StatelessWidget {
                       CircleAvatar(
                         radius: 15,
                         backgroundColor: kAccentGreen.withValues(alpha: 0.12),
-                        child: const Icon(Icons.star_rounded, size: 16, color: kAccentGreen),
+                        child: const Icon(
+                          Icons.star_rounded,
+                          size: 16,
+                          color: kAccentGreen,
+                        ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: kTextPrimary)),
-                            Text(category,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 10, color: kTextMuted)),
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'Nunito',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: kTextPrimary,
+                              ),
+                            ),
+                            Text(
+                              category,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'Nunito',
+                                fontSize: 10,
+                                color: kTextMuted,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      Text('${rating.toStringAsFixed(1)} ★',
-                          style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: kTextPrimary)),
+                      Text(
+                        '${rating.toStringAsFixed(1)} ★',
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: kTextPrimary,
+                        ),
+                      ),
                       const SizedBox(width: 6),
-                      Text('($reviews)',
-                          style: GoogleFonts.plusJakartaSans(
-                              fontSize: 10, color: kTextMuted)),
+                      Text(
+                        '($reviews)',
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
+                          fontSize: 10,
+                          color: kTextMuted,
+                        ),
+                      ),
                     ],
                   ),
                 );
@@ -984,6 +1575,57 @@ class DashboardPage extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _exportToSpreadsheet(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      if (placesList.isEmpty) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Belum ada data UMKM untuk diexport.')),
+        );
+        return;
+      }
+
+      // Build CSV content (Excel-compatible, BOM for UTF-8)
+      final buf = StringBuffer();
+      buf.writeln('Nama UMKM;Kategori;Status Verifikasi;Tanggal Dibuat');
+      final sorted = List<Map<String, dynamic>>.from(placesList)
+        ..sort((a, b) {
+          final ta = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime(2000);
+          final tb = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime(2000);
+          return tb.compareTo(ta);
+        });
+      for (final p in sorted) {
+        final nama = (p['nama_tempat']?.toString() ?? '-').replaceAll(';', ',').replaceAll('\n', ' ');
+        final kategori = (p['category']?.toString() ?? '-').replaceAll(';', ',').replaceAll('\n', ' ');
+        final status = (p['verification_status']?.toString() ?? '-');
+        final createdAt = DateTime.tryParse(p['created_at']?.toString() ?? '');
+        final tgl = _formatDate(createdAt);
+        buf.writeln('$nama;$kategori;$status;$tgl');
+      }
+
+      final dir = await getDownloadsDirectory() ?? Directory.current;
+      final stamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '-')
+          .split('.')
+          .first;
+      final file = File('${dir.path}${Platform.pathSeparator}tenmu-umkm-$stamp.csv');
+      await file.writeAsString('\uFEFF${buf.toString()}');
+
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Export berhasil: ${file.path}'),
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Gagal export: $e')),
+      );
+    }
+  }
+
   String _formatDate(DateTime? value) {
     if (value == null) return '-';
     const months = [

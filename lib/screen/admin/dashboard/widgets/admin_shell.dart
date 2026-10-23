@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'admin_design.dart';
+import '../../../../core/session_timeout_service.dart';
 import '../../profile/admin_profile_screen.dart';
 
 // ── AKUN: dropdown Logout / Ubah Sandi & Email ──
@@ -9,22 +9,23 @@ Future<void> confirmAdminLogout(BuildContext context) async {
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: Text('Logout', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-      content: Text('Yakin ingin logout dari akun admin?', style: GoogleFonts.plusJakartaSans()),
+      title: Text('Logout', style: TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w600)),
+      content: Text('Yakin ingin logout dari akun admin?', style: TextStyle(fontFamily: 'Nunito', )),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
-          child: Text('Batal', style: GoogleFonts.plusJakartaSans(color: kTextSecondary)),
+          child: Text('Batal', style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary)),
         ),
         ElevatedButton(
           onPressed: () => Navigator.pop(ctx, true),
           style: ElevatedButton.styleFrom(backgroundColor: kAccentRed, foregroundColor: Colors.white),
-          child: Text('Logout', style: GoogleFonts.plusJakartaSans()),
+          child: Text('Logout', style: TextStyle(fontFamily: 'Nunito', )),
         ),
       ],
     ),
   );
   if (confirmed == true) {
+    await SessionTimeoutService.clearActivity();
     await Supabase.instance.client.auth.signOut();
     if (context.mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -59,8 +60,7 @@ class IconRailSidebar extends StatelessWidget {
     (2, Icons.category_rounded, 'Kategori & Tag'),
     (3, Icons.people_alt_rounded, 'Manajemen User'),
     (4, Icons.rate_review_rounded, 'Review & Rating'),
-    (5, Icons.campaign_rounded, 'Konten & Promo'),
-    (6, Icons.analytics_rounded, 'Laporan & Analitik'),
+    (6, Icons.notifications_active_rounded, 'Notifikasi'),
     (7, Icons.map_rounded, 'Peta Sebaran'),
     (9, Icons.timeline_rounded, 'Audit Trail'),
   ];
@@ -77,15 +77,22 @@ class IconRailSidebar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 20),
       child: Column(
         children: [
-          // ── Nav items ──
-          for (final item in _navItems)
-            _railItem(item.$1, item.$2, item.$3),
-
-          const Spacer(),
+          // ── Nav items (scrollable kalau layar pendek) ──
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  for (final item in _navItems)
+                    _railItem(item.$1, item.$2, item.$3),
+                ],
+              ),
+            ),
+          ),
 
           // ── Bottom Verifikasi ──
           // Akun (Ubah Sandi / Logout) pindah ke pojok kanan atas layar.
           _railItem(8, Icons.verified_rounded, 'Verifikasi UMKM'),
+          _railItem(11, Icons.how_to_reg_rounded, 'Pengajuan Owner'),
         ],
       ),
     );
@@ -159,7 +166,7 @@ class AccountMenuButton extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Text('Ubah Sandi / Email',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: TextStyle(fontFamily: 'Nunito', 
                       color: kTextPrimary, fontSize: 13)),
               ],
             ),
@@ -178,7 +185,7 @@ class AccountMenuButton extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Text('Logout',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: TextStyle(fontFamily: 'Nunito', 
                       color: kAccentRed, fontSize: 13)),
               ],
             ),
@@ -189,7 +196,7 @@ class AccountMenuButton extends StatelessWidget {
           height: 44,
           decoration: BoxDecoration(
             color: kCardBg,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(22),
             border: Border.all(color: kBorderColor),
             boxShadow: const [kShadow],
           ),
@@ -218,21 +225,6 @@ class AdminComingSoonPage extends StatelessWidget {
     required this.icon,
     required this.items,
   });
-
-  factory AdminComingSoonPage.content() {
-    return const AdminComingSoonPage(
-      title: 'Manajemen Konten & Promo',
-      description:
-          'Ruang untuk banner home, editorial picks, promo, dan push notification terjadwal.',
-      icon: Icons.campaign_rounded,
-      items: [
-        'Banner dan promo halaman utama',
-        'Artikel atau rekomendasi kuliner pilihan admin',
-        'Push notification promo atau UMKM baru',
-        'Status publish, draft, dan arsip konten',
-      ],
-    );
-  }
 
   factory AdminComingSoonPage.analytics() {
     return const AdminComingSoonPage(
@@ -283,7 +275,7 @@ class AdminComingSoonPage extends StatelessWidget {
                     const SizedBox(height: 18),
                     Text(
                       title,
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(fontFamily: 'Nunito', 
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
                         color: kTextPrimary,
@@ -292,7 +284,7 @@ class AdminComingSoonPage extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       description,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(fontFamily: 'Nunito', 
                         fontSize: 13,
                         height: 1.5,
                         color: kTextSecondary,
@@ -314,7 +306,7 @@ class AdminComingSoonPage extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 item,
-                                style: GoogleFonts.plusJakartaSans(
+                                style: TextStyle(fontFamily: 'Nunito', 
                                   fontSize: 13,
                                   color: kTextPrimary,
                                   fontWeight: FontWeight.w600,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/poi_category.dart';
 import 'widgets/admin_design.dart';
 import 'widgets/admin_shell.dart';
 import 'widgets/admin_dashboard_page.dart';
@@ -8,8 +9,11 @@ import '../activity/admin_activity_screen.dart';
 import '../kategori/manage_kategori_screen.dart';
 import '../map/admin_map_screen.dart';
 import '../msme/admin_msme_screen.dart';
+import '../notifikasi/admin_notifikasi_screen.dart';
+import '../review/manage_review_screen.dart';
 import '../settings/admin_settings_screen.dart';
 import '../users/manage_users_screen.dart';
+import '../users/manage_owner_requests_screen.dart';
 import '../verify/verify_place_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
@@ -35,10 +39,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   List<Map<String, dynamic>> _recentActivities = [];
   List<Map<String, dynamic>> _topPlaces = [];
   int _todayActivityCount = 0;
+  List<Map<String, dynamic>> _placesList = [];
 
   int _placesLastMonth = 0;
   int _usersLastMonth = 0;
   int _reviewsLastMonth = 0;
+  DateTimeRange? _dateRange;
+
+  String _getDateStr(DateTime now) {
+    const bulan = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    if (_dateRange != null) {
+      return '${_dateRange!.start.day} ${bulan[_dateRange!.start.month]} - '
+          '${_dateRange!.end.day} ${bulan[_dateRange!.end.month]}, ${_dateRange!.end.year}';
+    }
+    return '1 ${bulan[now.month]} - ${now.day} ${bulan[now.month]}, ${now.year}';
+  }
 
   @override
   void initState() {
@@ -81,6 +96,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ]).timeout(const Duration(seconds: 15));
 
       final placeList = results[0] as List;
+      _placesList = placeList.cast<Map<String, dynamic>>();
       final userList = results[1] as List;
       final reviewList = results[2] as List;
       final submissionsRaw = results[3] as List;
@@ -143,7 +159,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       final catCounts = <String, int>{};
       for (final item in placeList) {
         final cat = item['category']?.toString().trim();
-        final key = cat == null || cat.isEmpty ? 'Lainnya' : cat;
+        final key = cat == null || cat.isEmpty
+            ? PoiCategory.ritel
+            : PoiCategory.normalizeCategory(cat);
         catCounts[key] = (catCounts[key] ?? 0) + 1;
       }
       _categoryCounts = catCounts;
@@ -193,13 +211,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
       if (!mounted) return;
       setState(() => _isLoading = false);
+      _log('DONE: places=$_totalPlaces users=$_totalUsers reviews=$_totalReviews error=$_error');
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e.toString();
         _isLoading = false;
       });
+      _log('ERROR: $e');
     }
+  }
+
+  void _log(String msg) {
+    try {
+      final f = File('${Directory.current.path}/dashboard_debug.log');
+      f.writeAsString('${DateTime.now()}: $msg\n', mode: FileMode.append);
+    } catch (_) {}
   }
 
   @override
@@ -222,8 +249,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         placesLastMonth: _placesLastMonth,
         usersLastMonth: _usersLastMonth,
         reviewsLastMonth: _reviewsLastMonth,
+        placesList: _placesList,
         onRetry: _loadDashboard,
         onVerify: () => setState(() => _tabIndex = 1),
+        dateStr: _getDateStr(DateTime.now()),
+        dateRange: _dateRange,
+        onDateRangeChanged: (range) => setState(() => _dateRange = range),
         onActivity: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const AdminActivityScreen()),
@@ -232,13 +263,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       const AdminMsmeScreen(),
       const ManageKategoriScreen(),
       const ManageUsersScreen(),
-      const ManageUsersScreen(),
-      AdminComingSoonPage.content(),
-      AdminComingSoonPage.analytics(),
+      const ManageReviewScreen(),
+      // index 5: "Konten & Promo" sudah dihapus dari navbar.
+      // Placeholder kosong dipertahankan supaya index page lain tidak bergeser.
+      const SizedBox.shrink(),
+      const AdminNotifikasiScreen(),
       const AdminMapScreen(),
       const VerifyPlaceScreen(),
       const AdminSettingsScreen(),
       const AdminActivityScreen(),
+      const ManageOwnerRequestsScreen(),
     ];
 
     return Scaffold(
@@ -315,7 +349,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             const SizedBox(height: 2),
             Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
+              style: TextStyle(fontFamily: 'Nunito', 
                 fontSize: 10,
                 fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                 color: active ? kPrimary : kTextMuted,

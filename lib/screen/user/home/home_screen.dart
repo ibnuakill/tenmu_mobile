@@ -1,14 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme_provider.dart';
 import '../../../core/places_provider.dart';
-import '../../../core/poi_category.dart';
+import '../../../core/notification_center.dart';
+import '../../../widgets/notification_popup.dart';
 import '../../owner/add_place_screen.dart';
 import '../map/route_map_screen.dart';
 import '../user_notification_screen.dart';
 import '../chat/chat_bot_sheet.dart';
-import '../video/video_feed_screen.dart';
+import '../post/post_feed_screen.dart';
 import '../widgets/sort_filter_widget.dart';
 import '../settings/settings_screen.dart';
 import 'home_controller.dart';
@@ -35,8 +38,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final Animation<double> _fadeAnim;
   late final Animation<Offset> _slideAnim;
   int _currentCardPage = 0;
-
-  final List<String> _categories = ['Semua', ...PoiCategory.allCategories];
+  StreamSubscription<AppNotification>? _notifSub;
+  bool _notifInited = false;
 
   @override
   void initState() {
@@ -85,11 +88,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _ctrl.loadUserRole();
       _ctrl.loadUserProfile();
       _ctrl.loadUnreadCount();
+      _initNotifications();
     });
+  }
+
+  /// Nyalakan pusat notifikasi: badge lonceng + pop-up saat pesan baru masuk.
+  void _initNotifications() {
+    if (_notifInited || !mounted) return;
+    _notifInited = true;
+    final nc = context.read<NotificationCenter>();
+    _notifSub ??= nc.onNew.listen((n) {
+      if (!mounted) return;
+      showNotificationPopup(
+        context,
+        notification: n,
+        onTap: _openNotifScreen,
+      );
+    });
+    nc.start();
+  }
+
+  Future<void> _openNotifScreen() async {
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const UserNotificationScreen()),
+    );
+    if (mounted) context.read<NotificationCenter>().refresh();
   }
 
   @override
   void dispose() {
+    _notifSub?.cancel();
     _ctrl.dispose();
     _entranceCtrl.dispose();
     _cardCtrl.dispose();
@@ -126,6 +156,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  /// Kartu carousel 3D di beranda: maksimal 10 POI, urut TERBARU di depan.
+  List<Map<String, dynamic>> _featuredCards(
+    List<Map<String, dynamic>> featured,
+    List<Map<String, dynamic>> allPlaces,
+  ) {
+    final source = featured.isNotEmpty ? featured : allPlaces;
+    final sorted = [...source]..sort((a, b) {
+      final da = DateTime.tryParse(a['created_at']?.toString() ?? '');
+      final db = DateTime.tryParse(b['created_at']?.toString() ?? '');
+      if (da == null && db == null) return 0;
+      if (da == null) return 1;
+      if (db == null) return -1;
+      return db.compareTo(da); // terbaru dulu
+    });
+    return sorted.take(10).toList();
+  }
+
   Widget _buildScaffold({
     required ThemeProvider theme,
     required Color accent,
@@ -149,19 +196,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   userName: _ctrl.userName ?? 'Pengguna',
                   userLocation: _ctrl.userLocation,
                   isUpdatingLocation: _ctrl.isUpdatingLocation,
-                  unreadNotifCount: _ctrl.unreadNotifCount,
+                  unreadNotifCount: context.watch<NotificationCenter>().unreadCount,
                   onTapLocation: () => _ctrl.updateLocationFromGPS(
                     ScaffoldMessenger.of(context),
                   ),
-                  onTapNotification: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const UserNotificationScreen(),
-                      ),
-                    );
-                    _ctrl.loadUnreadCount();
-                  },
+                  onTapNotification: _openNotifScreen,
                 ),
               ),
               SliverToBoxAdapter(
@@ -183,15 +222,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
               SliverToBoxAdapter(
-                child: HomeCategoryChips(
-                  theme: theme,
-                  accent: accent,
-                  categories: _categories,
-                  selectedCategoryTab: _ctrl.selectedCategoryTab,
-                  onChanged: (v) => _ctrl.setCategoryTab(v, provider),
-                ),
-              ),
-              SliverToBoxAdapter(
                 child: _buildContent(theme, accent, provider, allPlaces, featured),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 32)),
@@ -209,8 +239,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  bool _hasActiveFilter() =>
-      _ctrl.selectedCategories.isNotEmpty ||
+  bool _hasActiveFilter() => _ctrl.selectedCategories.isNotEmpty ||
       _ctrl.selectedSort != SortOption.terbaru;
 
   Widget _buildContent(
@@ -222,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   ) {
     if (provider.isLoading && provider.placesList.isEmpty) {
       return Padding(
-        padding: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.2),
+        padding: EdgeInsets.only(top: MediaQuery.sizeOf(context).height * 0.2),
         child: Center(
           child: CircularProgressIndicator(color: accent, strokeWidth: 2.5),
         ),
@@ -246,7 +275,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         hasFilter: _hasActiveFilter() || _ctrl.searchQuery.isNotEmpty,
         onClearFilter: () {
           _ctrl.resetFilters(provider);
-          _ctrl.setCategoryTab(null, provider);
         },
       );
     }
@@ -262,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           HomeFeaturedCarousel(
             theme: theme,
             accent: accent,
-            cards: featured.isNotEmpty ? featured : allPlaces.take(8).toList(),
+            cards: _featuredCards(featured, allPlaces),
             controller: _carouselCtrl,
             pageNotifier: _carouselPage,
             currentPage: _currentCardPage,
@@ -276,16 +304,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               count: allPlaces.length,
               hasFilter: _hasActiveFilter() || _ctrl.searchQuery.isNotEmpty,
             ),
-            ...allPlaces.asMap().entries.map(
-                  (e) => HomePoiListCard(
-                    place: e.value,
-                    rating: provider.ratings[e.value['id']] ?? 0.0,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: 0.65,
+                ),
+                itemCount: allPlaces.length,
+                itemBuilder: (context, index) {
+                  final place = allPlaces[index];
+                  return HomePoiGridCard(
+                    place: place,
+                    rating: provider.ratings[place['id']] ?? 0.0,
                     theme: theme,
                     accent: accent,
-                    index: e.key,
+                    index: index,
                     userPosition: _ctrl.currentPosition,
-                  ),
-                ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
             if (provider.isLoadingMore)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 20),
@@ -313,14 +357,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     HomeFilterSheet.show(
       context,
       initialQuery: _ctrl.searchQuery,
-      initialCategories: _ctrl.selectedCategories,
       initialSort: _ctrl.selectedSort,
+      initialCategories: _ctrl.selectedCategories,
       onQueryChanged: (v) {
         _ctrl.patchQuery(v);
         _ctrl.scheduleQuery(context.read<PlacesProvider>());
       },
-      onCategoriesChanged: (s) {
-        _ctrl.setCategories(s, context.read<PlacesProvider>());
+      onCategoriesChanged: (v) {
+        _ctrl.setCategories(v, context.read<PlacesProvider>());
       },
       onSortChanged: (s) {
         _ctrl.setSort(s, context.read<PlacesProvider>());
@@ -361,7 +405,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (index == 5) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const VideoFeedScreen()),
+        MaterialPageRoute(builder: (_) => const PostFeedScreen()),
       ).then((_) {
         if (mounted) _ctrl.setNavIndex(0);
       });

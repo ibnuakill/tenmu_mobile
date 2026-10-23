@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/poi_image_helper.dart';
 import '../../../../core/theme_provider.dart';
 import '../route_map_controller.dart';
+import '../../../../core/lucide_icons.dart';
 
 /// Bottom sheet saat mode navigasi aktif (info card + mode switcher,
 /// atau arrival card saat sudah sampai).
@@ -169,11 +170,11 @@ class _TravelModeSelector extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  LucideIcon(
                     switch (mode) {
-                      TravelMode.walking => Icons.directions_walk_rounded,
-                      TravelMode.motorcycle => Icons.two_wheeler_rounded,
-                      TravelMode.car => Icons.directions_car_rounded,
+                      TravelMode.walking => 'footprints',
+                      TravelMode.motorcycle => 'bike',
+                      TravelMode.car => 'car',
                     },
                     size: 16,
                   ),
@@ -223,8 +224,7 @@ class _ArrivalCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.check_circle_outline,
+            const LucideIcon('circle-check',
               color: Colors.white,
               size: 48,
             ),
@@ -248,14 +248,14 @@ class _ArrivalCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _ArrivalStat(
-                  icon: Icons.straighten,
+                  icon: 'ruler',
                   value:
                       '${controller.totalTripDistanceKm.toStringAsFixed(1)} km',
                   label: 'Total Jarak',
                 ),
                 Container(height: 30, width: 1, color: Colors.white30),
                 _ArrivalStat(
-                  icon: Icons.timer_outlined,
+                  icon: 'timer',
                   value: controller.formatEstimate(controller.totalTripMinutes),
                   label: 'Waktu Tempuh',
                 ),
@@ -266,7 +266,7 @@ class _ArrivalCard extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: controller.finishTrip,
-                icon: const Icon(Icons.close, color: Colors.white),
+                icon: const LucideIcon('x', color: Colors.white),
                 label: const Text(
                   'Selesai',
                   style: TextStyle(
@@ -291,7 +291,7 @@ class _ArrivalCard extends StatelessWidget {
 }
 
 class _ArrivalStat extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final String value;
   final String label;
   const _ArrivalStat({
@@ -305,7 +305,7 @@ class _ArrivalStat extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: Colors.white, size: 22),
+        LucideIcon(icon, color: Colors.white, size: 22),
         const SizedBox(height: 4),
         Text(
           value,
@@ -347,7 +347,7 @@ class MapBrowseInfo extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.touch_app_rounded, color: theme.iconColor, size: 24),
+          LucideIcon('pointer', color: theme.iconColor, size: 24),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -443,7 +443,7 @@ class MapUmkmPreview extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close),
+                  icon: const LucideIcon('x'),
                   onPressed: onClose,
                 ),
               ],
@@ -460,7 +460,7 @@ class MapUmkmPreview extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.directions, color: theme.btnLabel, size: 20),
+                  LucideIcon('route', color: theme.btnLabel, size: 20),
                   const SizedBox(width: 8),
                   Text(
                     'Mulai Rute',
@@ -490,7 +490,7 @@ class _PlaceholderImage extends StatelessWidget {
       width: 60,
       height: 60,
       color: theme.bgElevated,
-      child: Icon(Icons.storefront, color: theme.textHint),
+      child: LucideIcon('store', color: theme.textHint),
     );
   }
 }
@@ -514,7 +514,7 @@ class MapErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.location_off_outlined, size: 64, color: theme.textHint),
+            LucideIcon('map-pin-off', size: 64, color: theme.textHint),
             const SizedBox(height: 16),
             Text(
               message ?? 'Lokasi tidak tersedia.',
@@ -528,7 +528,7 @@ class MapErrorView extends StatelessWidget {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
+              icon: const LucideIcon('refresh-cw'),
               label: const Text('Coba Lagi'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.bgElevated,
@@ -575,7 +575,7 @@ class MapFabStack extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: theme.border),
           ),
-          child: Icon(Icons.explore_outlined, color: theme.btnPrimary),
+          child: LucideIcon('compass', color: theme.btnPrimary),
         ),
         const SizedBox(height: 12),
         FloatingActionButton(
@@ -598,7 +598,7 @@ class MapFabStack extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: theme.border),
           ),
-          child: Icon(Icons.my_location, color: theme.iconColor),
+          child: LucideIcon('locate-fixed', color: theme.iconColor),
         ),
       ],
     );
@@ -620,7 +620,7 @@ class MapFallbackBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, size: 16, color: Colors.orange.shade800),
+          LucideIcon('info', size: 16, color: Colors.orange.shade800),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

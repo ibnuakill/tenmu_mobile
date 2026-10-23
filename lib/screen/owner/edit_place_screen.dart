@@ -1,11 +1,8 @@
-import 'dart:io';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/theme_provider.dart';
+import 'widgets/place_form_style.dart';
 import '../../core/poi_category.dart';
 import '../../core/poi_facility.dart';
 import '../../core/poi_image_helper.dart';
@@ -28,14 +25,12 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
   final _jamTutupController = TextEditingController();
   final _latController = TextEditingController();
   final _lngController = TextEditingController();
-  final _minPriceController = TextEditingController();
-  final _maxPriceController = TextEditingController();
 
   bool _isLoading = false;
   bool _isUploadingImage = false;
   final List<String> _imageUrls = [];
   int _selectedImageIndex = 0;
-  String _selectedCategory = PoiCategory.lainnya;
+  String _selectedCategory = PoiCategory.ritel;
   final Set<String> _selectedFacilities = {};
 
   @override
@@ -49,15 +44,13 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
     _jamTutupController.text = widget.place['jam_tutup'] ?? '';
     _latController.text = widget.place['latitude']?.toString() ?? '';
     _lngController.text = widget.place['longitude']?.toString() ?? '';
-    _minPriceController.text = (widget.place['min_price'] ?? 0).toString();
-    _maxPriceController.text = (widget.place['max_price'] ?? 100000).toString();
     _imageUrls.addAll(PoiImageHelper.extractImageUrls(widget.place));
 
-    final rawCat = widget.place['category']?.toString() ?? PoiCategory.lainnya;
+    final rawCat = widget.place['category']?.toString() ?? '';
     final normalized = PoiCategory.normalizeCategory(rawCat);
     _selectedCategory = PoiCategory.allCategories.contains(normalized)
         ? normalized
-        : PoiCategory.lainnya;
+        : PoiCategory.ritel;
 
     final fas = widget.place['fasilitas'];
     if (fas is List) {
@@ -75,8 +68,6 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
     _jamTutupController.dispose();
     _latController.dispose();
     _lngController.dispose();
-    _minPriceController.dispose();
-    _maxPriceController.dispose();
     super.dispose();
   }
 
@@ -95,9 +86,11 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
       for (final picked in pickedFiles) {
         final fileName =
             '${DateTime.now().millisecondsSinceEpoch}_${picked.name}';
+        final bytes = await picked.readAsBytes();
         await Supabase.instance.client.storage
             .from('umkm_images')
-            .upload(fileName, File(picked.path));
+            .uploadBinary(fileName, bytes,
+                fileOptions: FileOptions(contentType: picked.mimeType));
 
         uploadedUrls.add(
           Supabase.instance.client.storage
@@ -153,44 +146,9 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final minPrice =
-          int.tryParse(
-            _minPriceController.text.replaceAll(RegExp(r'[^0-9]'), ''),
-          ) ??
-          0;
-      final maxPrice =
-          int.tryParse(
-            _maxPriceController.text.replaceAll(RegExp(r'[^0-9]'), ''),
-          ) ??
-          100000;
-
       await Supabase.instance.client
           .from('places')
-          .update({
-            'owner_id':
-                widget.place['owner_id'] ??
-                Supabase.instance.client.auth.currentUser?.id,
-            'nama_tempat': _namaController.text.trim(),
-            'alamat': _alamatController.text.trim(),
-            'deskripsi': _deskripsiController.text.trim(),
-            'nomor_telepon': _nomorTeleponController.text.trim().isNotEmpty
-                ? _nomorTeleponController.text.trim()
-                : null,
-            'jam_buka': _jamBukaController.text.trim().isNotEmpty
-                ? _jamBukaController.text.trim()
-                : null,
-            'jam_tutup': _jamTutupController.text.trim().isNotEmpty
-                ? _jamTutupController.text.trim()
-                : null,
-            'latitude': double.tryParse(_latController.text.trim()),
-            'longitude': double.tryParse(_lngController.text.trim()),
-            'gambar_url': _imageUrls.isNotEmpty ? _imageUrls.first : null,
-            'image_urls': _imageUrls,
-            'category': _selectedCategory,
-            'min_price': minPrice,
-            'max_price': maxPrice,
-            'fasilitas': _selectedFacilities.toList(),
-          })
+          .update(_buildUpdatePayload())
           .eq('id', widget.place['id']);
 
       if (mounted) {
@@ -204,8 +162,34 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
     }
   }
 
+  Map<String, dynamic> _buildUpdatePayload() {
+    return {
+      'owner_id':
+          widget.place['owner_id'] ??
+          Supabase.instance.client.auth.currentUser?.id,
+      'nama_tempat': _namaController.text.trim(),
+      'alamat': _alamatController.text.trim(),
+      'deskripsi': _deskripsiController.text.trim(),
+      'nomor_telepon': _nomorTeleponController.text.trim().isNotEmpty
+          ? _nomorTeleponController.text.trim()
+          : null,
+      'jam_buka': _jamBukaController.text.trim().isNotEmpty
+          ? _jamBukaController.text.trim()
+          : null,
+      'jam_tutup': _jamTutupController.text.trim().isNotEmpty
+          ? _jamTutupController.text.trim()
+          : null,
+      'latitude': double.tryParse(_latController.text.trim()),
+      'longitude': double.tryParse(_lngController.text.trim()),
+      'gambar_url': _imageUrls.isNotEmpty ? _imageUrls.first : null,
+      'image_urls': _imageUrls,
+      'category': _selectedCategory,
+      'fasilitas': _selectedFacilities.toList(),
+    };
+  }
+
   void _toast(String message, {bool isError = false}) {
-    final theme = Provider.of<ThemeProvider>(context, listen: false);
+    final theme = const PlaceFormStyle();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message, style: TextStyle(color: theme.textPrimary)),
@@ -223,38 +207,31 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Provider.of<ThemeProvider>(context);
+    final theme = const PlaceFormStyle();
     return Scaffold(
       backgroundColor: theme.bgBase,
-      appBar: AppBar(
-        title: Text(
-          'Edit Tempat',
-          style: TextStyle(
-            color: theme.textPrimary,
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
-          ),
-        ),
-        backgroundColor: theme.bgBase,
-        elevation: 0,
-        iconTheme: IconThemeData(color: theme.textPrimary),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+      appBar: PlaceFormStyle.appBar(context),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const PlaceFormHeader(
+              title: 'Edit Tempat',
+              subtitle: 'Perbarui data tempat kamu, lalu simpan perubahannya.',
+            ),
+            const SizedBox(height: 22),
             _buildImageSection(theme),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: theme.bgSurface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: theme.border),
-              ),
+            const SizedBox(height: 14),
+
+            PlaceSection(
+              title: 'Informasi Tempat',
+              icon: Icons.storefront_outlined,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _label('Nama Tempat', theme),
                   const SizedBox(height: 8),
@@ -294,39 +271,51 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
                     keyboardType: TextInputType.phone,
                     theme: theme,
                   ),
-                  const SizedBox(height: 16),
-                  _label('Jam Operasional', theme),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _field(
-                          controller: _jamBukaController,
-                          hint: '08:00',
-                          icon: Icons.schedule_outlined,
-                          theme: theme,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _field(
-                          controller: _jamTutupController,
-                          hint: '22:00',
-                          icon: Icons.schedule,
-                          theme: theme,
-                        ),
-                      ),
-                    ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            PlaceSection(
+              title: 'Jam Operasional',
+              icon: Icons.access_time,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _field(
+                      controller: _jamBukaController,
+                      hint: 'Jam buka (08:00)',
+                      icon: Icons.schedule_outlined,
+                      theme: theme,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  _label('Kategori', theme),
-                  const SizedBox(height: 8),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _field(
+                      controller: _jamTutupController,
+                      hint: 'Jam tutup (22:00)',
+                      icon: Icons.schedule,
+                      theme: theme,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            PlaceSection(
+              title: 'Kategori & Fasilitas',
+              icon: Icons.category_outlined,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   DropdownButtonFormField<String>(
-                    initialValue: PoiCategory.allCategories.contains(_selectedCategory)
+                    initialValue: PoiCategory.allCategories
+                            .contains(_selectedCategory)
                         ? _selectedCategory
-                        : PoiCategory.lainnya,
+                        : PoiCategory.ritel,
                     dropdownColor: theme.bgSurface,
-                    style: TextStyle(color: theme.textPrimary, fontSize: 15),
+                    style: TextStyle(color: theme.textPrimary, fontSize: 14.5),
                     decoration: _inputDecoration(
                       hint: 'Pilih kategori',
                       icon: Icons.category_outlined,
@@ -342,16 +331,17 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
                     }).toList(),
                     onChanged: (value) {
                       if (value != null) {
-                        setState(() => _selectedCategory = value);
+                        setState(() {
+                          _selectedCategory = value;
+                        });
                       }
                     },
                   ),
-                  const SizedBox(height: 16),
                   _label('Fasilitas', theme),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: PoiFacility.all.map((f) {
                       final selected = _selectedFacilities.contains(f.id);
                       return GestureDetector(
@@ -366,13 +356,13 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
+                            horizontal: 13,
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
                             color: selected
                                 ? theme.btnPrimary
-                                : theme.bgElevated,
+                                : theme.bgBase,
                             borderRadius: BorderRadius.circular(999),
                             border: Border.all(
                               color: selected ? theme.btnPrimary : theme.border,
@@ -383,7 +373,7 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
                             children: [
                               Icon(
                                 f.icon,
-                                size: 16,
+                                size: 15,
                                 color: selected
                                     ? theme.btnLabel
                                     : theme.iconColor,
@@ -392,7 +382,7 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
                               Text(
                                 f.label,
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 12.5,
                                   fontWeight: FontWeight.w600,
                                   color: selected
                                       ? theme.btnLabel
@@ -405,109 +395,60 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 16),
-                  _label('Rentang Harga', theme),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _field(
-                          controller: _minPriceController,
-                          hint: 'Harga minimum',
-                          icon: Icons.payments_outlined,
-                          keyboardType: TextInputType.number,
-                          theme: theme,
-                        ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            PlaceSection(
+              title: 'Koordinat',
+              icon: Icons.my_location_outlined,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _field(
+                      controller: _latController,
+                      hint: 'Latitude',
+                      icon: Icons.my_location_outlined,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                        signed: true,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _field(
-                          controller: _maxPriceController,
-                          hint: 'Harga maksimum',
-                          icon: Icons.payments,
-                          keyboardType: TextInputType.number,
-                          theme: theme,
-                        ),
-                      ),
-                    ],
+                      theme: theme,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  _label('Koordinat', theme),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _field(
-                          controller: _latController,
-                          hint: 'Latitude',
-                          icon: Icons.my_location_outlined,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                            signed: true,
-                          ),
-                          theme: theme,
-                        ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _field(
+                      controller: _lngController,
+                      hint: 'Longitude',
+                      icon: Icons.place_outlined,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                        signed: true,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _field(
-                          controller: _lngController,
-                          hint: 'Longitude',
-                          icon: Icons.place_outlined,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                            signed: true,
-                          ),
-                          theme: theme,
-                        ),
-                      ),
-                    ],
+                      theme: theme,
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: _isLoading
-                  ? Center(
-                      child: CircularProgressIndicator(
-                        color: theme.textSecondary,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : ElevatedButton.icon(
-                      onPressed: _updateData,
-                      icon: Icon(
-                        Icons.check_rounded,
-                        color: theme.btnLabel,
-                        size: 20,
-                      ),
-                      label: Text(
-                        'Simpan Perubahan',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: theme.btnLabel,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.btnPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                    ),
+            PlacePrimaryButton(
+              label: 'Simpan Perubahan',
+              icon: Icons.check_rounded,
+              loading: _isLoading,
+              onPressed: _updateData,
             ),
           ],
+            ),
+          ),
         ),
+      ),
       ),
     );
   }
 
-  Widget _buildImageSection(ThemeProvider theme) {
+  Widget _buildImageSection(PlaceFormStyle theme) {
     final previewUrl = _imageUrls.isNotEmpty
         ? _imageUrls[_selectedImageIndex]
         : null;
@@ -691,7 +632,7 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
     );
   }
 
-  Widget _thumbAction(ThemeProvider theme, {required IconData icon}) {
+  Widget _thumbAction(PlaceFormStyle theme, {required IconData icon}) {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -702,7 +643,7 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
     );
   }
 
-  Widget _imagePlaceholder(ThemeProvider theme) => Container(
+  Widget _imagePlaceholder(PlaceFormStyle theme) => Container(
     height: 160,
     color: theme.bgElevated,
     child: Center(
@@ -720,7 +661,7 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
     ),
   );
 
-  Widget _label(String text, ThemeProvider theme) => Text(
+  Widget _label(String text, PlaceFormStyle theme) => Text(
     text,
     style: TextStyle(
       color: theme.textSecondary,
@@ -733,7 +674,7 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
   InputDecoration _inputDecoration({
     required String hint,
     required IconData icon,
-    required ThemeProvider theme,
+    required PlaceFormStyle theme,
   }) {
     return InputDecoration(
       hintText: hint,
@@ -763,7 +704,7 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
-    required ThemeProvider theme,
+    required PlaceFormStyle theme,
   }) {
     return TextField(
       controller: controller,

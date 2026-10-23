@@ -87,7 +87,7 @@ class PlacesProvider extends ChangeNotifier {
       DateTime.now().difference(_lastFetch!) > const Duration(minutes: 5);
 
   static const _columns =
-      'id, nama_tempat, alamat, deskripsi, gambar_url, image_urls, category, min_price, max_price, latitude, longitude, is_featured, fasilitas, jam_buka, jam_tutup, nomor_telepon, website, harga_teks, created_at, avg_rating, review_count';
+      'id, nama_tempat, alamat, deskripsi, gambar_url, image_urls, category, latitude, longitude, is_featured, fasilitas, jam_buka, jam_tutup, nomor_telepon, website, created_at, avg_rating, review_count';
 
   /// Ganti kueri → fetch ulang halaman 1 (reset cursor). [force] memaksa fetch
   /// meski cache 5 menit masih hangat (dipakai pull-to-refresh / retry).

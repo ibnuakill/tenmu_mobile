@@ -1,8 +1,8 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:io' show Platform;
 
 /// Service for OneSignal push notifications.
 ///
@@ -18,13 +18,13 @@ class NotificationService {
   static final _appId = dotenv.env['ONESIGNAL_APP_ID'] ?? '';
 
   static bool _sdkInitialized = false;
-  static bool get _isSupported => Platform.isAndroid || Platform.isIOS;
+  static bool get _isSupported => !kIsWeb;
 
   /// Initialize OneSignal SDK (one-time). Safe to call multiple times.
   static Future<void> init() async {
     if (_sdkInitialized) return;
     if (!_isSupported) {
-      debugPrint('[NotificationService] OneSignal not supported on ${Platform.operatingSystem}');
+      debugPrint('[NotificationService] OneSignal not supported on web');
       _sdkInitialized = true; // mark initialized to avoid retry
       return;
     }

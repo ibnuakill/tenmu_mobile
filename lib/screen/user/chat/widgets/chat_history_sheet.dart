@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme_provider.dart';
 import '../chat_models.dart';
+import '../../../../core/lucide_icons.dart';
 
 /// Bottom sheet daftar riwayat chat — user bisa LIHAT & buka lagi sesi lama.
 class ChatHistorySheet extends StatefulWidget {
@@ -37,7 +38,7 @@ class _ChatHistorySheetState extends State<ChatHistorySheet> {
     final theme = Provider.of<ThemeProvider>(context);
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.6,
+      height: MediaQuery.sizeOf(context).height * 0.6,
       decoration: BoxDecoration(
         color: theme.bgBase,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -73,7 +74,7 @@ class _ChatHistorySheetState extends State<ChatHistorySheet> {
                     Navigator.pop(context);
                     widget.onNewChat();
                   },
-                  icon: const Icon(Icons.add_comment_outlined, size: 18),
+                  icon: const LucideIcon('message-square-plus', size: 18),
                   label: const Text('Chat Baru'),
                   style: TextButton.styleFrom(
                     foregroundColor: theme.btnPrimary,
@@ -81,7 +82,7 @@ class _ChatHistorySheetState extends State<ChatHistorySheet> {
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: Icon(Icons.close_rounded, color: theme.textSecondary),
+                  icon: LucideIcon('x', color: theme.textSecondary),
                 ),
               ],
             ),
@@ -189,8 +190,7 @@ class _SessionTile extends StatelessWidget {
             ),
             IconButton(
               onPressed: onDelete,
-              icon: Icon(
-                Icons.delete_outline_rounded,
+              icon: LucideIcon('trash',
                 color: theme.textSecondary,
                 size: 20,
               ),

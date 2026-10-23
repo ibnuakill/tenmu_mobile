@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'detail_helpers.dart';
+import '../../../../core/lucide_icons.dart';
 
 /// Full-screen image preview dialog with zoom + swipe + dot indicator.
 class DetailImagePreview {
@@ -32,8 +33,7 @@ class DetailImagePreview {
                       child: CachedNetworkImage(
                         imageUrl: imageUrls[index],
                         fit: BoxFit.contain,
-                        errorWidget: (_, _, _) => const Icon(
-                          Icons.broken_image_outlined,
+                        errorWidget: (_, _, _) => const LucideIcon('image-off',
                           color: Colors.white38,
                           size: 48,
                         ),
@@ -62,8 +62,7 @@ class DetailImagePreview {
                         color: Colors.black38,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.close_rounded,
+                      child: const LucideIcon('x',
                         color: Colors.white,
                         size: 22,
                       ),

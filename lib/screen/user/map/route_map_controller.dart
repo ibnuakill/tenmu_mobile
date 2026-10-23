@@ -132,54 +132,19 @@ class RouteMapController extends ChangeNotifier {
 
   Future<void> initLocationAndRoute() async {
     try {
-      final accessStatus = await LocationPermissionHelper.ensureAccess(
-        context,
-        featureLabel: 'melihat rute lokasi',
-      );
-      if (accessStatus != LocationAccessStatus.granted) {
-        errorMessage = switch (accessStatus) {
-          LocationAccessStatus.serviceDisabled =>
-            'GPS belum aktif.\nAktifkan lokasi lalu coba lagi.',
-          LocationAccessStatus.permissionDenied =>
-            'Izin lokasi belum diberikan.\nIzinkan akses lokasi lalu coba lagi.',
-          LocationAccessStatus.permissionDeniedForever =>
-            'Izin lokasi ditolak permanen.\nBuka pengaturan aplikasi lalu aktifkan izin lokasi.',
-          LocationAccessStatus.granted => null,
-        };
+      if (!await _ensureGpsPermission()) return;
+
+      currentPosition = await _resolveCurrentPosition();
+      if (currentPosition == null) {
         isLoading = false;
+        errorMessage =
+            'GPS belum bisa menentukan lokasi.\nPastikan lokasi aktif dan coba lagi.';
         notifyListeners();
         return;
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 10,
-        ),
-      );
-      currentPosition = position;
-
       if (destinationLat != null && destinationLng != null) {
-        final result = await fetchRoute(position);
-        if (result != null) {
-          final (points, distanceMeters, durationSeconds) = result;
-          routePoints = points;
-          osrmTotalDistance = distanceMeters;
-          originalStraightDistance = Geolocator.distanceBetween(
-            position.latitude,
-            position.longitude,
-            destinationLat!,
-            destinationLng!,
-          );
-          distanceInKm = distanceMeters / 1000;
-          estimatedTimeInMins = (durationSeconds / 60).round();
-          useFallback = false;
-          isLoading = false;
-          hasArrived = false;
-        } else {
-          applyFallbackRoute(position);
-        }
-        notifyListeners();
+        await _fetchRouteOrFallback(currentPosition!);
       } else {
         isLoading = false;
         notifyListeners();
@@ -198,36 +163,84 @@ class RouteMapController extends ChangeNotifier {
     }
   }
 
+  Future<bool> _ensureGpsPermission() async {
+    final accessStatus = await LocationPermissionHelper.ensureAccess(
+      context,
+      featureLabel: 'melihat rute lokasi',
+    );
+    if (accessStatus != LocationAccessStatus.granted) {
+      errorMessage = switch (accessStatus) {
+        LocationAccessStatus.serviceDisabled =>
+          'GPS belum aktif.\nAktifkan lokasi lalu coba lagi.',
+        LocationAccessStatus.permissionDenied =>
+          'Izin lokasi belum diberikan.\nIzinkan akses lokasi lalu coba lagi.',
+        LocationAccessStatus.permissionDeniedForever =>
+          'Izin lokasi ditolak permanen.\nBuka pengaturan aplikasi lalu aktifkan izin lokasi.',
+        LocationAccessStatus.granted => null,
+      };
+      isLoading = false;
+      notifyListeners();
+      return false;
+    }
+    return true;
+  }
+
+  Future<Position?> _resolveCurrentPosition() async {
+    // Pertama coba last known position — instan, nggak nunggu GPS warm-up.
+    try {
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null) return last;
+    } catch (_) {}
+
+    // Kalau masih belum ada, ambil fix baru dengan timeout biar nggak nge-hang.
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 10,
+        ),
+      ).timeout(const Duration(seconds: 8));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _fetchRouteOrFallback(Position position) async {
+    final result = await fetchRoute(position);
+    if (result != null) {
+      final (points, distanceMeters, durationSeconds) = result;
+      routePoints = points;
+      osrmTotalDistance = distanceMeters;
+      originalStraightDistance = Geolocator.distanceBetween(
+        currentPosition!.latitude,
+        currentPosition!.longitude,
+        destinationLat!,
+        destinationLng!,
+      );
+      distanceInKm = distanceMeters / 1000;
+      estimatedTimeInMins = (durationSeconds / 60).round();
+      useFallback = false;
+      isLoading = false;
+      hasArrived = false;
+    } else {
+      applyFallbackRoute(position);
+    }
+    notifyListeners();
+  }
+
   Future<(List<LatLng> points, double distanceM, double durationS)?>
       fetchRoute(Position position, {int retry = 1}) async {
     if (destinationLat == null || destinationLng == null) return null;
-
-    String profileUrl(String baseUrl) {
-      final profile = travelMode.osrmProfile;
-      if (baseUrl.contains('routing.openstreetmap.de')) {
-        final sub = switch (travelMode) {
-          TravelMode.walking => 'foot',
-          TravelMode.motorcycle => 'car',
-          TravelMode.car => 'car',
-        };
-        final osmProfile = switch (travelMode) {
-          TravelMode.walking => 'foot',
-          TravelMode.motorcycle => 'driving',
-          TravelMode.car => 'driving',
-        };
-        return 'https://routing.openstreetmap.de/routed-$sub/route/v1/$osmProfile';
-      }
-      return '$baseUrl/$profile';
-    }
 
     const servers = <String>['https://router.project-osrm.org/route/v1', ''];
 
     for (int i = 0; i < servers.length; i++) {
       final baseUrl = i == 1 ? 'https://routing.openstreetmap.de' : servers[i];
+      final profile = _profileUrl(baseUrl, travelMode);
       for (int attempt = 0; attempt <= retry; attempt++) {
         try {
           final url = Uri.parse(
-            '${profileUrl(baseUrl)}/'
+            '$profile/'
             '${position.longitude},${position.latitude};'
             '$destinationLng,$destinationLat'
             '?geometries=geojson&overview=full',
@@ -473,10 +486,25 @@ class RouteMapController extends ChangeNotifier {
   }
 
   void finishTrip() {
+    final dist = totalTripDistanceKm;
+    final mins = totalTripMinutes;
+    final name = destinationName ?? 'Tujuan';
     isShowingRoute = false;
     routePoints = [];
     hasArrived = false;
     notifyListeners();
+
+    if (dist > 0 || mins > 0) {
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => _TripSummaryDialog(
+          name: name,
+          distKm: dist,
+          mins: mins,
+        ),
+      );
+    }
   }
 
   void retryInit() {
@@ -513,14 +541,32 @@ class RouteMapController extends ChangeNotifier {
 
   String _resolveCategory(Map<String, dynamic> place) {
     final c = place['category']?.toString().trim();
-    if (c == null || c.isEmpty) return PoiCategory.lainnya;
+    if (c == null || c.isEmpty) return PoiCategory.ritel;
     return PoiCategory.normalizeCategory(c);
   }
 
   /// Convert kategori string → safe MapLibre image key
   /// e.g. 'Kuliner & Cafe' → 'marker_kuliner_cafe'
   static String catKey(String cat) {
-    return 'marker_${cat.toLowerCase().replaceAll(RegExp(r'[&\s]+'), '_').replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'^_|_$'), '')}';
+    return 'marker_${cat.toLowerCase().replaceAll(RegExp(r'[&\\s]+'), '_').replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'^_|_$'), '')}';
+  }
+
+  static String _profileUrl(String baseUrl, TravelMode mode) {
+    final profile = mode.osrmProfile;
+    if (baseUrl.contains('routing.openstreetmap.de')) {
+      final sub = switch (mode) {
+        TravelMode.walking => 'foot',
+        TravelMode.motorcycle => 'car',
+        TravelMode.car => 'car',
+      };
+      final osmProfile = switch (mode) {
+        TravelMode.walking => 'foot',
+        TravelMode.motorcycle => 'driving',
+        TravelMode.car => 'driving',
+      };
+      return 'https://routing.openstreetmap.de/routed-$sub/route/v1/$osmProfile';
+    }
+    return '$baseUrl/$profile';
   }
 
   String formatEstimate(int mins) {
@@ -575,5 +621,112 @@ class RouteMapController extends ChangeNotifier {
     _positionStreamSubscription?.cancel();
     _compassSubscription?.cancel();
     super.dispose();
+  }
+}
+
+/// Stat kecil di ringkasan perjalanan.
+class _SummaryStat extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _SummaryStat({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 24, color: Colors.blue.shade600),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: Colors.grey),
+        ),
+      ],
+    );
+  }
+}
+
+/// Dialog ringkasan perjalanan saat selesai (diekstrak dari finishTrip).\n
+class _TripSummaryDialog extends StatelessWidget {
+  final String name;
+  final double distKm;
+  final int mins;
+  const _TripSummaryDialog({
+    required this.name,
+    required this.distKm,
+    required this.mins,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      title: const Text(
+        'Perjalanan Selesai',
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Kamu telah sampai di $name',
+            style: const TextStyle(fontSize: 14, color: Colors.grey),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _SummaryStat(
+                icon: Icons.route,
+                label: 'Jarak',
+                value: '${distKm.toStringAsFixed(1)} km',
+              ),
+              Container(
+                width: 1,
+                height: 40,
+                color: Colors.grey.shade300,
+              ),
+              _SummaryStat(
+                icon: Icons.access_time,
+                label: 'Waktu',
+                value: mins < 60 ? '$mins mnt' : '${(mins / 60).round()} jam',
+              ),
+            ],
+          ),
+          if (mins > 0 && distKm > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Rata-rata kecepatan: ${(distKm / (mins / 60)).toStringAsFixed(1)} km/jam',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontStyle: FontStyle.italic,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Selesai'),
+        ),
+      ],
+    );
   }
 }

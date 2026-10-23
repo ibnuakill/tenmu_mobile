@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Quixotic Palette
@@ -145,7 +144,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
   void _toast(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg, style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13)),
+        content: Text(msg, style: TextStyle(fontFamily: 'Nunito', color: Colors.white, fontSize: 13)),
         backgroundColor: isError ? _kAccentRed : _kPrimary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -176,7 +175,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
         ),
         title: Text(
           'Pengaturan Akun',
-          style: GoogleFonts.poppins(
+          style: TextStyle(fontFamily: 'Nunito', 
             color: _kTextPrimary,
             fontWeight: FontWeight.w600,
             fontSize: 17,
@@ -218,7 +217,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
                     children: [
                       Text(
                         'Admin TenMu',
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(fontFamily: 'Nunito', 
                           fontWeight: FontWeight.w700,
                           color: _kTextPrimary,
                           fontSize: 16,
@@ -227,7 +226,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
                       const SizedBox(height: 2),
                       Text(
                         _currentEmail,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: TextStyle(fontFamily: 'Nunito', 
                           fontSize: 13,
                           color: _kTextSecondary,
                         ),
@@ -261,11 +260,11 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
                 dividerColor: Colors.transparent,
                 labelColor: Colors.white,
                 unselectedLabelColor: _kTextSecondary,
-                labelStyle: GoogleFonts.plusJakartaSans(
+                labelStyle: TextStyle(fontFamily: 'Nunito', 
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
                 ),
-                unselectedLabelStyle: GoogleFonts.plusJakartaSans(
+                unselectedLabelStyle: TextStyle(fontFamily: 'Nunito', 
                   fontWeight: FontWeight.w500,
                   fontSize: 13,
                 ),
@@ -310,7 +309,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
           children: [
             Text(
               'Ganti Email',
-              style: GoogleFonts.poppins(
+              style: TextStyle(fontFamily: 'Nunito', 
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
                 color: _kTextPrimary,
@@ -319,7 +318,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
             const SizedBox(height: 4),
             Text(
               'Link konfirmasi akan dikirim ke email baru sebelum perubahan berlaku.',
-              style: GoogleFonts.plusJakartaSans(
+              style: TextStyle(fontFamily: 'Nunito', 
                 fontSize: 12,
                 color: _kTextSecondary,
                 height: 1.5,
@@ -339,7 +338,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
               ),
               child: Text(
                 _currentEmail,
-                style: GoogleFonts.plusJakartaSans(color: _kTextMuted, fontSize: 14),
+                style: TextStyle(fontFamily: 'Nunito', color: _kTextMuted, fontSize: 14),
               ),
             ),
 
@@ -381,7 +380,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
           children: [
             Text(
               'Ganti Password',
-              style: GoogleFonts.poppins(
+              style: TextStyle(fontFamily: 'Nunito', 
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
                 color: _kTextPrimary,
@@ -390,7 +389,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
             const SizedBox(height: 4),
             Text(
               'Masukkan password saat ini untuk memverifikasi identitasmu.',
-              style: GoogleFonts.plusJakartaSans(
+              style: TextStyle(fontFamily: 'Nunito', 
                 fontSize: 12,
                 color: _kTextSecondary,
                 height: 1.5,
@@ -454,7 +453,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
 
   Widget _label(String text) => Text(
     text,
-    style: GoogleFonts.plusJakartaSans(
+    style: TextStyle(fontFamily: 'Nunito', 
       color: _kTextSecondary,
       fontWeight: FontWeight.w600,
       fontSize: 12,
@@ -475,10 +474,10 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
       controller: controller,
       keyboardType: keyboardType,
       obscureText: isPassword ? obscure : false,
-      style: GoogleFonts.plusJakartaSans(color: _kTextPrimary, fontSize: 14),
+      style: TextStyle(fontFamily: 'Nunito', color: _kTextPrimary, fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: GoogleFonts.plusJakartaSans(color: _kTextMuted, fontSize: 14),
+        hintStyle: TextStyle(fontFamily: 'Nunito', color: _kTextMuted, fontSize: 14),
         prefixIcon: Icon(icon, color: _kTextMuted, size: 18),
         suffixIcon: isPassword
             ? IconButton(
@@ -536,7 +535,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
               )
             : Text(
                 label,
-                style: GoogleFonts.plusJakartaSans(
+                style: TextStyle(fontFamily: 'Nunito', 
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),

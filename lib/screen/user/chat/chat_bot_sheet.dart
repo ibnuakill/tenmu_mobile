@@ -7,6 +7,8 @@ import 'widgets/chat_input_bar.dart';
 import 'widgets/chat_history_sheet.dart';
 import 'widgets/chat_search_results.dart';
 import 'widgets/message_bubble.dart';
+import '../../../core/lucide_icons.dart';
+import '../../../core/widgets/app_dialog.dart';
 
 /// Chat bottom sheet — state percakapan + komposisi UI.
 class ChatBotSheet extends StatefulWidget {
@@ -85,6 +87,9 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
         if (result.mentioned.isNotEmpty) {
           setState(() => _searchResults = result.mentioned);
         }
+      } on ChatQuotaException catch (e) {
+        // Kena batas anti-spam → jangan fallback (biar batasnya efektif).
+        reply = e.friendlyMessage;
       } catch (e) {
         debugPrint('Edge AI error: $e');
         // Gagal → fallback lokal (AI mungkin mati; ping ulang nanti).
@@ -167,26 +172,20 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
   }
 
   Future<void> _confirmDeleteSession(ChatSession session) async {
-    final theme = Provider.of<ThemeProvider>(context, listen: false);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: theme.bgSurface,
-        title: const Text('Hapus riwayat chat ini?'),
-        content: const Text('Percakapan sesi ini akan dihapus dari perangkat.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Batal', style: TextStyle(color: theme.textSecondary)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
+    final preview = session.preview.trim().replaceAll('\n', ' ');
+    final label = preview.length > 40 ? '${preview.substring(0, 40)}…' : preview;
+    final ok = await showAppConfirmDialog(
+      context,
+      title: 'Hapus riwayat chat?',
+      message:
+          'Percakapan "$label" akan dihapus permanen dari perangkat ini.',
+      confirmLabel: 'Hapus',
+      cancelLabel: 'Batal',
+      icon: 'trash',
+      destructive: true,
+      note: 'Tindakan ini tidak bisa dibatalkan.',
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     await ChatAIService.deleteSession(session.id);
     final sessions = await ChatAIService.loadSessions();
     if (!mounted) return;
@@ -220,7 +219,7 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
     final theme = Provider.of<ThemeProvider>(context);
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.72,
+      height: MediaQuery.sizeOf(context).height * 0.72,
       decoration: BoxDecoration(
         color: theme.bgBase,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -349,8 +348,7 @@ class _ChatHeader extends StatelessWidget {
                 color: theme.bgElevated,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.history_rounded,
+              child: LucideIcon('rotate-ccw-clock',
                 color: theme.textSecondary,
                 size: 18,
               ),
@@ -365,8 +363,7 @@ class _ChatHeader extends StatelessWidget {
                 color: theme.bgElevated,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.close_rounded,
+              child: LucideIcon('x',
                 color: theme.textSecondary,
                 size: 18,
               ),

@@ -6,14 +6,14 @@ import 'package:flutter/material.dart';
 /// bgBase → bgSurface → bgElevated → border → borderFocus
 abstract class AppColorsLight {
   // ── Background ─────────────────────────────────────────────────────────────
-  /// Latar belakang halaman utama (putih bersih)
-  static const Color bgBase = Color(0xFFFAFAFA);
+  /// Latar belakang halaman utama (soft grey, bukan putih polos)
+  static const Color bgBase = Color(0xFFF2F4F7);
 
-  /// Latar belakang card / panel / sheet
+  /// Latar belakang card / panel / sheet (putih bersih di atas bg abu)
   static const Color bgSurface = Color(0xFFFFFFFF);
 
   /// Latar belakang elemen elevated (input field, chip, dll.)
-  static const Color bgElevated = Color(0xFFF5F5F5);
+  static const Color bgElevated = Color(0xFFEAECF0);
 
   // ── Border ─────────────────────────────────────────────────────────────────
   /// Border default (tidak aktif)

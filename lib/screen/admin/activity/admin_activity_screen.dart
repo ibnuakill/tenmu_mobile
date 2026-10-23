@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Quixotic palette (sama dengan admin_home_screen.dart)
@@ -75,7 +74,7 @@ class _AdminActivityScreenState extends State<AdminActivityScreen> {
         ),
         title: Text(
           'Aktivitas Terbaru',
-          style: GoogleFonts.poppins(
+          style: TextStyle(fontFamily: 'Nunito', 
             fontSize: 17,
             fontWeight: FontWeight.w600,
             color: _kTextPrimary,
@@ -103,7 +102,7 @@ class _AdminActivityScreenState extends State<AdminActivityScreen> {
                     const Icon(Icons.refresh_rounded, color: _kPrimary, size: 15),
                     const SizedBox(width: 5),
                     Text('Refresh',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(fontFamily: 'Nunito', 
                         color: _kPrimary, fontSize: 12, fontWeight: FontWeight.w600)),
                   ],
                 ),
@@ -129,11 +128,11 @@ class _AdminActivityScreenState extends State<AdminActivityScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text('Belum ada aktivitas',
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(fontFamily: 'Nunito', 
                           color: _kTextPrimary, fontWeight: FontWeight.w600, fontSize: 15)),
                       const SizedBox(height: 4),
                       Text('Aktivitas akan muncul di sini setelah ada data',
-                        style: GoogleFonts.plusJakartaSans(color: _kTextMuted, fontSize: 13)),
+                        style: TextStyle(fontFamily: 'Nunito', color: _kTextMuted, fontSize: 13)),
                     ],
                   ),
                 )
@@ -216,12 +215,12 @@ class _AdminActivityScreenState extends State<AdminActivityScreen> {
               children: [
                 RichText(
                   text: TextSpan(
-                    style: GoogleFonts.plusJakartaSans(
+                    style: TextStyle(fontFamily: 'Nunito', 
                       fontSize: 13, color: _kTextSecondary, height: 1.4),
                     children: [
                       TextSpan(
                         text: name,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: TextStyle(fontFamily: 'Nunito', 
                           fontWeight: FontWeight.w700, color: _kTextPrimary, fontSize: 13),
                       ),
                       TextSpan(text: ' $desc'),
@@ -231,7 +230,7 @@ class _AdminActivityScreenState extends State<AdminActivityScreen> {
                 if (time.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(time,
-                    style: GoogleFonts.plusJakartaSans(fontSize: 11, color: _kTextMuted)),
+                    style: TextStyle(fontFamily: 'Nunito', fontSize: 11, color: _kTextMuted)),
                 ],
               ],
             ),

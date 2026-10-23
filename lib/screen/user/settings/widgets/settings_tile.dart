@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme_provider.dart';
+import '../../../../core/lucide_icons.dart';
 
 /// Section header (uppercase tracking).
 class SettingsSectionHeader extends StatelessWidget {
@@ -57,7 +58,7 @@ class SettingsCard extends StatelessWidget {
 
 /// Standard leading icon chip (40x40, tinted background).
 class _LeadingIcon extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final Color color;
   const _LeadingIcon({required this.icon, required this.color});
 
@@ -70,7 +71,7 @@ class _LeadingIcon extends StatelessWidget {
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(icon, color: color, size: 22),
+      child: LucideIcon(icon, color: color, size: 22),
     );
   }
 }
@@ -111,7 +112,7 @@ class _TwoLineLabel extends StatelessWidget {
 
 /// Switch tile (icon + label + switch.adaptive).
 class SettingsSwitchTile extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final Color iconColor;
   final String title;
   final String subtitle;
@@ -159,7 +160,7 @@ class SettingsSwitchTile extends StatelessWidget {
 
 /// Navigation tile (icon + label + chevron).
 class SettingsNavTile extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final Color iconColor;
   final String title;
   final String subtitle;
@@ -194,7 +195,7 @@ class SettingsNavTile extends StatelessWidget {
                 theme: theme,
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: theme.textHint, size: 22),
+            LucideIcon('chevron-right', color: theme.textHint, size: 22),
           ],
         ),
       ),
@@ -204,7 +205,7 @@ class SettingsNavTile extends StatelessWidget {
 
 /// Action tile (icon + label, no trailing widget — bisa loading).
 class SettingsActionTile extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final Color iconColor;
   final String title;
   final String subtitle;
@@ -259,7 +260,7 @@ class SettingsActionTile extends StatelessWidget {
 
 /// Dropdown / picker tile (icon + label + expand_more).
 class SettingsDropdownTile extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final Color iconColor;
   final String title;
   final String subtitle;
@@ -294,7 +295,7 @@ class SettingsDropdownTile extends StatelessWidget {
                 theme: theme,
               ),
             ),
-            Icon(Icons.expand_more_rounded, color: theme.textHint, size: 22),
+            LucideIcon('chevron-down', color: theme.textHint, size: 22),
           ],
         ),
       ),
@@ -336,8 +337,7 @@ class SettingsPickerOption extends StatelessWidget {
               ),
             ),
             if (isSelected)
-              Icon(
-                Icons.check_circle_rounded,
+              LucideIcon('circle-check',
                 color: theme.btnPrimary,
                 size: 22,
               ),

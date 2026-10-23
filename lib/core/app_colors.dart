@@ -6,21 +6,21 @@ import 'package:flutter/material.dart';
 /// bgBase → bgSurface → bgElevated → border → borderFocus
 abstract class AppColors {
   // ── Background ─────────────────────────────────────────────────────────────
-  /// Latar belakang halaman utama (hitam dalam)
-  static const Color bgBase = Color(0xFF121212);
+  /// Latar belakang halaman utama (deep pitch black)
+  static const Color bgBase = Color(0xFF0C0C0C);
 
-  /// Latar belakang card / panel / sheet
-  static const Color bgSurface = Color(0xFF181818);
+  /// Latar belakang card / panel / sheet (subtle dark surface)
+  static const Color bgSurface = Color(0xFF141414);
 
   /// Latar belakang elemen elevated (input field, chip, dll.)
-  static const Color bgElevated = Color(0xFF1F1F1F);
+  static const Color bgElevated = Color(0xFF1C1C1C);
 
   // ── Border ─────────────────────────────────────────────────────────────────
-  /// Border default (tidak aktif)
-  static const Color border = Color(0xFF4D4D4D);
+  /// Border default (halus & menyatu dengan latar gelap)
+  static const Color border = Color(0xFF262626);
 
   /// Border saat elemen sedang fokus / aktif
-  static const Color borderFocus = Color(0xFF7C7C7C);
+  static const Color borderFocus = Color(0xFF404040);
 
   // ── Teks ───────────────────────────────────────────────────────────────────
   /// Teks utama (headings, label penting)

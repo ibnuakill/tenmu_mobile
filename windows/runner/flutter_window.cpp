@@ -14,6 +14,25 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
 
+  // Fullscreen borderless (seperti F11) SEBELUM view Flutter dibuat, supaya
+  // surface pertama langsung seukuran layar. Kalau diubah setelah view jadi
+  // (mis. lewat window_manager), Flutter tidak repaint → layar hitam.
+  {
+    HWND hwnd = GetHandle();
+    HMONITOR monitor = ::MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY);
+    MONITORINFO mi = {sizeof(MONITORINFO)};
+    if (monitor != nullptr && ::GetMonitorInfo(monitor, &mi)) {
+      LONG style = ::GetWindowLong(hwnd, GWL_STYLE);
+      style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX |
+                 WS_SYSMENU);
+      ::SetWindowLong(hwnd, GWL_STYLE, style);
+      ::SetWindowPos(hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
+                     mi.rcMonitor.right - mi.rcMonitor.left,
+                     mi.rcMonitor.bottom - mi.rcMonitor.top,
+                     SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    }
+  }
+
   RECT frame = GetClientArea();
 
   // The size here must match the window dimensions to avoid unnecessary surface

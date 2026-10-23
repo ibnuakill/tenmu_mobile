@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/session_timeout_service.dart';
 import '../profile/admin_profile_screen.dart';
 import 'widgets/admin_settings_widgets.dart';
 
@@ -36,15 +36,15 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: kCardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Logout', style: GoogleFonts.poppins(color: kTextPrimary, fontWeight: FontWeight.w700)),
+        title: Text('Logout', style: TextStyle(fontFamily: 'Nunito', color: kTextPrimary, fontWeight: FontWeight.w700)),
         content: Text(
           'Yakin ingin logout dari akun admin?',
-          style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 13),
+          style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary, fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Batal', style: GoogleFonts.plusJakartaSans(color: kTextSecondary)),
+            child: Text('Batal', style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -53,12 +53,13 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
             ),
-            child: Text('Logout', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+            child: Text('Logout', style: TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w600)),
           ),
         ],
       ),
     );
     if (confirmed == true) {
+      await SessionTimeoutService.clearActivity();
       await Supabase.instance.client.auth.signOut();
       if (mounted) {
         Navigator.of(context).popUntil((route) => route.isFirst);
@@ -69,7 +70,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
   void _toast(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg, style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13)),
+        content: Text(msg, style: TextStyle(fontFamily: 'Nunito', color: Colors.white, fontSize: 13)),
         backgroundColor: isError ? kAccentRed : kPrimary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -91,7 +92,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         automaticallyImplyLeading: false,
         title: Text(
           'Pengaturan Admin',
-          style: GoogleFonts.poppins(
+          style: TextStyle(fontFamily: 'Nunito', 
             color: kTextPrimary,
             fontWeight: FontWeight.w600,
             fontSize: 17,
@@ -161,7 +162,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                 icon: const Icon(Icons.logout_rounded, size: 18),
                 label: Text(
                   'Logout dari Admin Panel',
-                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 14),
+                  style: TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w700, fontSize: 14),
                 ),
               ),
             ),
@@ -173,7 +174,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                 children: [
                   Text(
                     'TenMu Admin Panel • Quixotic Edition',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: TextStyle(fontFamily: 'Nunito', 
                       color: kTextMuted,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -183,7 +184,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       'UID: ${user.id.substring(0, 8)}...',
-                      style: GoogleFonts.plusJakartaSans(color: kTextMuted, fontSize: 11),
+                      style: TextStyle(fontFamily: 'Nunito', color: kTextMuted, fontSize: 11),
                     ),
                   ],
                 ],

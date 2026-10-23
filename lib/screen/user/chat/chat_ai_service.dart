@@ -11,6 +11,12 @@ import 'chat_models.dart';
 class ChatAIService {
   static const int _maxContextMessages = 10;
 
+  /// Batas anti-abuse di sisi client (server punya limit sendiri).
+  static const int maxMessageChars = 500;
+  static const int maxMessagesPerMinute = 6;
+  static const int maxMessagesPerDay = 200;
+  static const Duration minSendInterval = Duration(seconds: 2);
+
   /// Bersihkan markdown Gemini (**tebal**, *miring*, `kode`) → teks polos.
   static String cleanMarkdown(String text) {
     var t = text;
@@ -36,16 +42,29 @@ class ChatAIService {
   }
 
   /// Panggil Edge Function 'chat-bot'. Throws bila gagal (5xx/network);
-  /// caller akan fallback ke pencarian lokal.
+  /// caller akan fallback ke pencarian lokal. Throws [ChatQuotaException]
+  /// bila kena batas anti-spam (JANGAN fallback — biar batasnya efektif).
   static Future<({String reply, List<Map<String, dynamic>> mentioned})>
       callEdgeAi(String userText, List<ChatMessage> messages) async {
-    final preview = messages.length > _maxContextMessages
-        ? messages.sublist(messages.length - _maxContextMessages)
+    final text = sanitize(userText);
+    if (text.isEmpty) throw const ChatQuotaException(0, 'Pesan tidak boleh kosong.');
+
+    final wait = await _ChatQuota.reserve();
+    if (wait > 0) throw ChatQuotaException(wait);
+
+    // Riwayat: buang pesan user terakhir (itu `text` yang dikirim terpisah),
+    // supaya pesan tidak terkirim dua kali ke model (hemat token).
+    final history = (messages.isNotEmpty && messages.last.isUser)
+        ? messages.sublist(0, messages.length - 1)
         : messages;
+    final preview = history.length > _maxContextMessages
+        ? history.sublist(history.length - _maxContextMessages)
+        : history;
+
     final res = await Supabase.instance.client.functions.invoke(
       'chat-bot',
       body: {
-        'message': userText,
+        'message': text,
         'history': preview
             .map((m) => {
                   'role': m.isUser ? 'user' : 'model',
@@ -56,6 +75,9 @@ class ChatAIService {
             .toList(),
       },
     );
+    if (res.status == 429) {
+      throw const ChatQuotaException(60, 'Kamu terlalu sering chat. Coba lagi sebentar ya 🙏');
+    }
     if (res.status >= 400) throw Exception('AI tidak tersedia (${res.status})');
     final data = (res.data as Map?) ?? const {};
     final reply = (data['reply'] as String?) ?? '';
@@ -64,6 +86,15 @@ class ChatAIService {
             .toList() ??
         <Map<String, dynamic>>[];
     return (reply: reply, mentioned: mentioned);
+  }
+
+  /// Bersihkan input user: buang karakter kontrol, rapikan spasi, batasi panjang.
+  static String sanitize(String input) {
+    var t = input.replaceAll(
+        RegExp(r'[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]'), ' ');
+    t = t.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (t.length > maxMessageChars) t = t.substring(0, maxMessageChars);
+    return t;
   }
 
   // ── Riwayat chat: berbasis SESI (bisa dilihat/dibuka lagi) ──
@@ -241,3 +272,74 @@ class ChatAIService {
     return (reply: reply, results: results);
   }
 }
+
+/// Dilempar saat user kena batas anti-spam (bukan error AI).
+class ChatQuotaException implements Exception {
+  final int retryAfterSeconds;
+  final String message;
+
+  const ChatQuotaException(this.retryAfterSeconds, [String? msg])
+      : message = msg ?? '';
+
+  String get friendlyMessage {
+    if (message.isNotEmpty) return message;
+    if (retryAfterSeconds <= 0) {
+      return 'Pesan tidak bisa dikirim sekarang. Coba lagi ya 🙏';
+    }
+    if (retryAfterSeconds <= 90) {
+      return 'Sabar ya, tunggu $retryAfterSeconds detik lagi sebelum kirim pesan baru.';
+    }
+    final menit = (retryAfterSeconds / 60).ceil();
+    if (menit <= 90) {
+      return 'Terlalu banyak pesan. Coba lagi dalam $menit menit ya 🙏';
+    }
+    return 'Kuota chat kamu sudah penuh untuk hari ini. Coba lagi besok ya 🙏';
+  }
+
+  @override
+  String toString() => 'ChatQuotaException($retryAfterSeconds)';
+}
+
+/// Pembatas kirim pesan di sisi client (lapisan pertama sebelum server).
+/// Disimpan lokal supaya spam dari satu perangkat tetap tertahan walau offline.
+class _ChatQuota {
+  static const String _key = 'chat_send_times_v1';
+
+  /// Kembalikan 0 bila boleh kirim (dan catat), atau detik tunggu bila ditolak.
+  static Future<int> reserve() async {
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    final times = <int>[];
+    final raw = prefs.getString(_key);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        for (final e in (jsonDecode(raw) as List)) {
+          times.add((e as num).toInt());
+        }
+      } catch (_) {
+        // data korup → anggap kosong
+      }
+    }
+    final dayMs = const Duration(days: 1).inMilliseconds;
+    times.removeWhere((t) => now - t >= dayMs || t > now);
+
+    if (times.isNotEmpty) {
+      final gap = now - times.last;
+      if (gap < ChatAIService.minSendInterval.inMilliseconds) {
+        return ((ChatAIService.minSendInterval.inMilliseconds - gap) / 1000).ceil();
+      }
+    }
+    final lastMinute = times.where((t) => now - t < 60000).length;
+    if (lastMinute >= ChatAIService.maxMessagesPerMinute) return 60;
+    if (times.length >= ChatAIService.maxMessagesPerDay) {
+      final oldest = times.first;
+      return ((dayMs - (now - oldest)) / 1000).ceil();
+    }
+
+    times.add(now);
+    await prefs.setString(_key, jsonEncode(times));
+    return 0;
+  }
+}
+

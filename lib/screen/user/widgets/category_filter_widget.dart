@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme_provider.dart';
 import '../../../core/poi_category.dart';
+import '../../../core/lucide_icons.dart';
 
 /// CategoryFilterWidget - Menampilkan chip kategori yang bisa di-toggle
 /// User bisa select multiple categories untuk filter
@@ -112,7 +113,7 @@ class _CategoryFilterWidgetState extends State<CategoryFilterWidget> {
               runSpacing: 8,
               children: PoiCategory.allCategories.map((category) {
                 final isSelected = _localSelected.contains(category);
-                final emoji = PoiCategory.getCategoryEmoji(category);
+                final iconName = PoiCategory.getCategoryLucide(category);
 
                 return GestureDetector(
                   onTap: () => _toggleCategory(category),
@@ -132,9 +133,10 @@ class _CategoryFilterWidgetState extends State<CategoryFilterWidget> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          emoji,
-                          style: const TextStyle(fontSize: 14),
+                        LucideIcon(
+                          iconName,
+                          size: 14,
+                          color: isSelected ? theme.btnLabel : theme.textPrimary,
                         ),
                         const SizedBox(width: 6),
                         Text(

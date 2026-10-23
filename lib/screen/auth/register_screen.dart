@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/app_colors.dart';
 
+import '../../core/email_validator.dart';
+import 'widgets/auth_common.dart';
+
+/// Layar Daftar akun baru TenMu (email + password).
+///
+/// Setelah daftar, user langsung masuk (Supabase `enable_confirmations = false`)
+/// dan `AuthGate` akan mengarahkan ke RoleChecker.
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -11,925 +15,264 @@ class RegisterScreen extends StatefulWidget {
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen>
-    with SingleTickerProviderStateMixin {
-  final _namaController = TextEditingController();
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final _confirmController = TextEditingController();
 
-  bool _isLoading = false;
   bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
-  bool _isVerifying = false; // Track if user is in verification step
-  bool _isCheckingVerification = false;
-  String? _registeredEmail; // Store email for verification
-  String _selectedRole = 'user'; // Default role: user biasa
+  bool _obscureConfirm = true;
+  bool _agreedToTerms = false;
+  bool _isLoading = false;
 
-  late AnimationController _animCtrl;
-  late Animation<double> _fadeAnim;
-  late Animation<Offset> _slideAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-      ),
-    );
-    _animCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
-    _slideAnim = Tween<Offset>(
-      begin: const Offset(0, 0.25),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
-    _animCtrl.forward();
-  }
+  String? _nameError;
+  String? _emailError;
+  String? _passwordError;
+  String? _confirmError;
 
   @override
   void dispose() {
-    _animCtrl.dispose();
-    _namaController.dispose();
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
-  Future<void> _signUpWithGoogle() async {
+  Future<void> _register() async {
     if (_isLoading) return;
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final confirm = _confirmController.text;
+
+    // Validasi
+    if (name.isEmpty) {
+      setState(() => _nameError = 'Nama lengkap wajib diisi');
+      return;
+    }
+    final emailErr = EmailValidator.validate(email);
+    if (emailErr != null) {
+      setState(() => _emailError = emailErr);
+      return;
+    }
+    final typo = EmailValidator.suggestFix(email);
+    if (typo != null) {
+      setState(() => _emailError = 'Sepertinya typo. Maksud kamu $typo?');
+      return;
+    }
+    if (password.length < 6) {
+      setState(() => _passwordError = 'Password minimal 6 karakter');
+      return;
+    }
+    if (password != confirm) {
+      setState(() => _confirmError = 'Konfirmasi password tidak cocok');
+      return;
+    }
+    if (!_agreedToTerms) {
+      showAuthSnack(context, 'Setujui Ketentuan Layanan dulu ya.');
+      return;
+    }
+    setState(() {
+      _nameError = null;
+      _emailError = null;
+      _passwordError = null;
+      _confirmError = null;
+    });
+
     setState(() => _isLoading = true);
     try {
-      await Supabase.instance.client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: 'tenmu://login-callback',
-      );
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop(true);
-      }
-    } on AuthException catch (e) {
-      _toast(e.message, isError: true);
-    } catch (_) {
-      _toast('Gagal daftar dengan Google. Coba lagi.', isError: true);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _signUp() async {
-    if (_namaController.text.trim().isEmpty ||
-        _emailController.text.trim().isEmpty ||
-        _passwordController.text.trim().isEmpty) {
-      _toast('Semua field wajib diisi!', isError: true);
-      return;
-    }
-    if (_passwordController.text != _confirmPasswordController.text) {
-      _toast('Password dan konfirmasi tidak cocok!', isError: true);
-      return;
-    }
-    if (_passwordController.text.trim().length < 6) {
-      _toast('Password minimal 6 karakter!', isError: true);
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    try {
-      final email = _emailController.text.trim();
-      final password = _passwordController.text.trim();
-
-      await Supabase.instance.client.auth.signUp(
+      final res = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
-        data: {
-          'full_name': _namaController.text.trim(),
-          'nama': _namaController.text.trim(),
-          if (_selectedRole == 'owner') 'pending_role': 'owner',
-        },
-        emailRedirectTo: 'tenmu://login-callback',
+        data: {'full_name': name, 'name': name},
       );
 
-      if (mounted) {
-        setState(() {
-          _isVerifying = true;
-          _registeredEmail = email;
-        });
-        _toast('Email verifikasi telah dikirim! Silakan periksa inbox Anda.');
-        _checkVerification(email, password);
+      if (!mounted) return;
+      if (res.session != null) {
+        // Langsung masuk
+        Navigator.of(context).pop(true);
+      } else {
+        // Konfirmasi email diaktifkan di server
+        showAuthErrorDialog(
+          context,
+          title: 'Cek Email Kamu',
+          message:
+              'Akun dibuat. Kami mengirim tautan verifikasi ke $email. Buka email untuk mengaktifkan akun, lalu masuk.',
+        );
       }
     } on AuthException catch (e) {
-      _toast(e.message, isError: true);
+      if (!mounted) return;
+      final msg = e.message.toLowerCase();
+      if (msg.contains('already registered') || msg.contains('already been registered')) {
+        showAuthSnack(context, 'Email ini sudah terdaftar. Coba masuk atau lupa password.');
+      } else if (msg.contains('weak') || msg.contains('password')) {
+        showAuthSnack(context, 'Password terlalu lemah. Gunakan minimal 6 karakter.');
+      } else {
+        showAuthSnack(context, e.message);
+      }
     } catch (_) {
-      _toast('Terjadi kesalahan yang tidak terduga.', isError: true);
+      if (mounted) showAuthSnack(context, 'Gagal mendaftar. Periksa koneksi lalu coba lagi.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  Future<void> _checkVerification(String email, String password) async {
-    while (mounted && _isVerifying) {
-      setState(() => _isCheckingVerification = true);
-
-      try {
-        await Supabase.instance.client.auth.signInWithPassword(
-          email: email,
-          password: password,
-        );
-
-        final user = Supabase.instance.client.auth.currentUser;
-        if (user != null && user.emailConfirmedAt != null) {
-          if (mounted) {
-            _toast('Email berhasil diverifikasi! Silakan login.');
-            await Supabase.instance.client.auth.signOut();
-            if (mounted) Navigator.pop(context);
-          }
-          return;
-        }
-
-        await Supabase.instance.client.auth.signOut();
-      } catch (_) {
-        // Login gagal, coba lagi nanti
-      }
-
-      if (mounted) {
-        setState(() => _isCheckingVerification = false);
-      }
-
-      await Future.delayed(const Duration(seconds: 5));
-    }
-  }
-
-  void _toast(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          msg,
-          style: const TextStyle(color: AppColors.textPrimary),
-        ),
-        backgroundColor: isError
-            ? const Color(0xFF2A1A1A)
-            : const Color(0xFF1A2A1A),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(
-            color: isError
-                ? Colors.red.withValues(alpha: 0.5)
-                : Colors.green.withValues(alpha: 0.5),
-          ),
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Jika sedang verifikasi, tampilkan verification screen
-    if (_isVerifying && _registeredEmail != null) {
-      return _buildVerificationScreen();
-    }
 
-    // Otherwise, show registration form
     return Scaffold(
-      backgroundColor: AppColors.bgBase,
+      backgroundColor: AuthPalette.bg,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AuthPalette.ink),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
-
-              // ── HEADER NAVIGASI ───────────────────────────────────────────
-              FadeTransition(
-                opacity: _fadeAnim,
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: AppColors.bgElevated,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_ios_new,
-                          color: AppColors.textPrimary,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Buat Akun',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          'TenMu',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.bgElevated,
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const Icon(
-                        Icons.storefront_rounded,
-                        color: AppColors.iconColor,
-                        size: 22,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 36),
-
-              // ── STEP INDICATOR ────────────────────────────────────────────
-              FadeTransition(
-                opacity: _fadeAnim,
-                child: Row(
-                  children: [
-                    _stepDot(active: true, label: 'Data Diri'),
-                    _stepLine(),
-                    _stepDot(active: false, label: 'Verifikasi'),
-                    _stepLine(),
-                    _stepDot(active: false, label: 'Selesai'),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // ── FORM CARD ─────────────────────────────────────────────────
-              SlideTransition(
-                position: _slideAnim,
-                child: FadeTransition(
-                  opacity: _fadeAnim,
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgSurface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // NAMA
-                        _label('Nama Lengkap'),
-                        const SizedBox(height: 8),
-                        _field(
-                          controller: _namaController,
-                          hint: 'Masukkan nama lengkap',
-                          icon: Icons.person_outline,
-                        ),
-                        const SizedBox(height: 18),
-
-                        // EMAIL
-                        _label('Email'),
-                        const SizedBox(height: 8),
-                        _field(
-                          controller: _emailController,
-                          hint: 'contoh@email.com',
-                          icon: Icons.alternate_email,
-                          keyboardType: TextInputType.emailAddress,
-                        ),
-                        const SizedBox(height: 18),
-
-                        // DIVIDER
-                        const Divider(color: AppColors.border, height: 1),
-                        const SizedBox(height: 18),
-
-                        // PASSWORD
-                        _label('Password'),
-                        const SizedBox(height: 8),
-                        _field(
-                          controller: _passwordController,
-                          hint: 'Minimal 6 karakter',
-                          icon: Icons.lock_outline,
-                          isPassword: true,
-                          obscure: _obscurePassword,
-                          onToggle: () => setState(
-                            () => _obscurePassword = !_obscurePassword,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-
-                        // KONFIRMASI PASSWORD
-                        _label('Konfirmasi Password'),
-                        const SizedBox(height: 8),
-                        _field(
-                          controller: _confirmPasswordController,
-                          hint: 'Ulangi password',
-                          icon: Icons.lock_outline,
-                          isPassword: true,
-                          obscure: _obscureConfirmPassword,
-                          onToggle: () => setState(
-                            () => _obscureConfirmPassword =
-                                !_obscureConfirmPassword,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-
-                        // DIVIDER
-                        const Divider(color: AppColors.border, height: 1),
-                        const SizedBox(height: 18),
-
-                        // PILIH ROLE
-                        _label('Daftar Sebagai'),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _roleChip(
-                                icon: Icons.person_outline,
-                                label: 'User Biasa',
-                                isSelected: _selectedRole == 'user',
-                                onTap: () => setState(() => _selectedRole = 'user'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _roleChip(
-                                icon: Icons.storefront_outlined,
-                                label: 'Pemilik UMKM',
-                                isSelected: _selectedRole == 'owner',
-                                onTap: () => setState(() => _selectedRole = 'owner'),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 32),
-
-                        // TOMBOL BUAT AKUN
-                        _primaryButton(
-                          label: 'Buat Akun',
-                          onTap: _isLoading ? null : _signUp,
-                          isLoading: _isLoading,
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Divider
-                        Row(
-                          children: [
-                            const Expanded(child: Divider(color: AppColors.border)),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: Text(
-                                'atau daftar dengan',
-                                style: TextStyle(
-                                  color: AppColors.textHint,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            const Expanded(child: Divider(color: AppColors.border)),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Tombol Google
-                        _googleButton(),
-                      ],
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Buat Akun Baru',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: AuthPalette.ink,
                     ),
                   ),
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // ── LINK LOGIN ────────────────────────────────────────────────
-              FadeTransition(
-                opacity: _fadeAnim,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 32),
-                  child: Row(
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Isi data di bawah untuk mendaftar dengan email & password.',
+                    style: TextStyle(fontSize: 13.5, color: AuthPalette.grey, height: 1.5),
+                  ),
+                  const SizedBox(height: 24),
+                  AuthTextField(
+                    controller: _nameController,
+                    label: 'Nama Lengkap',
+                    hint: 'Contoh: Alex Pratama',
+                    icon: Icons.person_outline_rounded,
+                    textCapitalization: TextCapitalization.words,
+                    autofillHints: const [AutofillHints.name],
+                    errorText: _nameError,
+                    enabled: !_isLoading,
+                    onChanged: (_) {
+                      if (_nameError != null) setState(() => _nameError = null);
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  AuthTextField(
+                    controller: _emailController,
+                    label: 'Email',
+                    hint: 'nama@email.com',
+                    icon: Icons.mail_outline_rounded,
+                    keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [AutofillHints.email],
+                    errorText: _emailError,
+                    enabled: !_isLoading,
+                    onChanged: (_) {
+                      if (_emailError != null) setState(() => _emailError = null);
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  AuthTextField(
+                    controller: _passwordController,
+                    label: 'Password',
+                    hint: 'Minimal 6 karakter',
+                    icon: Icons.lock_outline_rounded,
+                    obscure: _obscurePassword,
+                    autofillHints: const [AutofillHints.newPassword],
+                    errorText: _passwordError,
+                    enabled: !_isLoading,
+                    onChanged: (_) {
+                      if (_passwordError != null) setState(() => _passwordError = null);
+                    },
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: AuthPalette.grey,
+                        size: 20,
+                      ),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  AuthTextField(
+                    controller: _confirmController,
+                    label: 'Konfirmasi Password',
+                    hint: 'Ulangi password',
+                    icon: Icons.lock_outline_rounded,
+                    obscure: _obscureConfirm,
+                    textInputAction: TextInputAction.done,
+                    errorText: _confirmError,
+                    enabled: !_isLoading,
+                    onChanged: (_) {
+                      if (_confirmError != null) setState(() => _confirmError = null);
+                    },
+                    onSubmitted: (_) => _register(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirm
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: AuthPalette.grey,
+                        size: 20,
+                      ),
+                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  AuthTermsCheckbox(
+                    value: _agreedToTerms,
+                    onChanged: _isLoading
+                        ? null
+                        : (v) => setState(() => _agreedToTerms = v ?? false),
+                  ),
+                  const SizedBox(height: 18),
+                  AuthPrimaryButton(
+                    label: 'Daftar',
+                    loadingLabel: 'Mendaftar...',
+                    isLoading: _isLoading,
+                    onPressed: _register,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
-                        'Sudah punya akun?  ',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 14,
-                        ),
+                        'Sudah punya akun? ',
+                        style: TextStyle(color: AuthPalette.grey, fontSize: 13.5),
                       ),
                       GestureDetector(
-                        onTap: () => Navigator.pop(context),
+                        onTap: _isLoading ? null : () => Navigator.of(context).pop(),
                         child: const Text(
-                          'Masuk Sekarang',
+                          'Masuk',
                           style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            decoration: TextDecoration.underline,
-                            decorationColor: AppColors.textSecondary,
+                            color: AuthPalette.btn,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVerificationScreen() {
-    return PopScope(
-      canPop: false, // Prevent back navigation
-      child: Scaffold(
-        backgroundColor: AppColors.bgBase,
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 40),
-
-                // Illustration / Icon
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: AppColors.bgElevated,
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: AppColors.btnPrimary, width: 2),
-                  ),
-                  child: const Icon(
-                    Icons.mark_email_unread_outlined,
-                    size: 60,
-                    color: AppColors.btnPrimary,
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Title
-                const Text(
-                  'Verifikasi Email',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Subtitle
-                const Text(
-                  'Kami telah mengirimkan email verifikasi ke:',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 14,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Email address
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgElevated,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border, width: 1),
-                  ),
-                  child: Text(
-                    _registeredEmail ?? '',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.btnPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Instructions
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgElevated,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border, width: 1),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'Langkah-langkah:',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 12),
-                      _InstructionItem(number: '1', text: 'Buka email Anda'),
-                      SizedBox(height: 8),
-                      _InstructionItem(
-                        number: '2',
-                        text: 'Klik tombol "Verifikasi Email" dalam email',
-                      ),
-                      SizedBox(height: 8),
-                      _InstructionItem(
-                        number: '3',
-                        text: 'Verifikasi akan selesai secara otomatis',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Checking status
-                if (_isCheckingVerification)
-                  Column(
-                    children: const [
-                      SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: CircularProgressIndicator(
-                          valueColor:
-                              AlwaysStoppedAnimation(AppColors.btnPrimary),
-                        ),
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'Memeriksa verifikasi email...',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  )
-                else
-                  const Text(
-                    'Menunggu verifikasi email...',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
-                const SizedBox(height: 32),
-
-                // Sudah Verifikasi button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    icon: const Icon(Icons.login, color: AppColors.btnLabel),
-                    label: const Text(
-                      'Sudah Verifikasi? Login',
-                      style: TextStyle(color: AppColors.btnLabel, fontWeight: FontWeight.w600),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.btnPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Cancel button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _isVerifying = false;
-                        _registeredEmail = null;
-                      });
-                    },
-                    icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-                    label: const Text(
-                      'Kembali ke Pendaftaran',
-                      style: TextStyle(color: AppColors.textPrimary),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.border, width: 1),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Help text
-                const Text(
-                  'Email tidak masuk? Periksa folder spam atau kembali dan coba daftar dengan email berbeda.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.textHint,
-                    fontSize: 12,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Helper Widgets ────────────────────────────────────────────────────────
-
-  Widget _stepDot({required bool active, required String label}) {
-    return Column(
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: active ? AppColors.textPrimary : AppColors.bgElevated,
-            border: Border.all(
-              color: active ? AppColors.textPrimary : AppColors.border,
-              width: 1.5,
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            color: active ? AppColors.textSecondary : AppColors.textHint,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _stepLine() => Expanded(
-    child: Container(
-      height: 1,
-      margin: const EdgeInsets.only(bottom: 18),
-      color: AppColors.border,
-    ),
-  );
-
-  Widget _label(String text) => Text(
-    text,
-    style: const TextStyle(
-      color: AppColors.textSecondary,
-      fontWeight: FontWeight.w600,
-      fontSize: 12,
-      letterSpacing: 0.5,
-    ),
-  );
-
-  Widget _field({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    TextInputType keyboardType = TextInputType.text,
-    bool isPassword = false,
-    bool obscure = false,
-    VoidCallback? onToggle,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      obscureText: isPassword ? obscure : false,
-      style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
-      cursorColor: AppColors.borderFocus,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 15),
-        prefixIcon: Icon(icon, color: AppColors.iconColor, size: 20),
-        suffixIcon: isPassword
-            ? IconButton(
-                icon: Icon(
-                  obscure
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                  color: AppColors.textHint,
-                  size: 20,
-                ),
-                onPressed: onToggle,
-              )
-            : null,
-        filled: true,
-        fillColor: AppColors.bgElevated,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: AppColors.borderFocus,
-            width: 1.5,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _roleChip({
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.btnPrimary : AppColors.bgElevated,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? AppColors.btnPrimary : AppColors.border,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: isSelected ? AppColors.btnLabel : AppColors.iconColor,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? AppColors.btnLabel : AppColors.textPrimary,
+                ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _googleButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: OutlinedButton.icon(
-        onPressed: _isLoading ? null : _signUpWithGoogle,
-        icon: SvgPicture.asset(
-          'assets/branding/google-logo.svg',
-          height: 22,
-          width: 22,
-        ),
-        label: const Text(
-          'Daftar dengan Google',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
           ),
         ),
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: AppColors.border, width: 1.5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-        ),
       ),
     );
   }
-
-  Widget _primaryButton({
-    required String label,
-    required VoidCallback? onTap,
-    bool isLoading = false,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: isLoading
-          ? const Center(
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  color: AppColors.textSecondary,
-                  strokeWidth: 2,
-                ),
-              ),
-            )
-          : ElevatedButton(
-              onPressed: onTap,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.btnPrimary,
-                foregroundColor: AppColors.btnLabel,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-              child: Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-               ),
-             ),
-     );
-   }
- }
-
- class _InstructionItem extends StatelessWidget {
-   final String number;
-   final String text;
-
-   const _InstructionItem({
-     required this.number,
-     required this.text,
-   });
-
-   @override
-   Widget build(BuildContext context) {
-     return Row(
-       crossAxisAlignment: CrossAxisAlignment.start,
-       children: [
-         Container(
-           width: 28,
-           height: 28,
-           decoration: BoxDecoration(
-             color: AppColors.btnPrimary,
-             borderRadius: BorderRadius.circular(8),
-           ),
-           child: Center(
-             child: Text(
-               number,
-               style: const TextStyle(
-                 color: AppColors.btnLabel,
-                 fontWeight: FontWeight.bold,
-                 fontSize: 12,
-               ),
-             ),
-           ),
-         ),
-         const SizedBox(width: 12),
-         Expanded(
-           child: Padding(
-             padding: const EdgeInsets.only(top: 4),
-             child: Text(
-               text,
-               style: const TextStyle(
-                 color: AppColors.textSecondary,
-                 fontSize: 13,
-               ),
-             ),
-           ),
-         ),
-       ],
-     );
-   }
- }
+}

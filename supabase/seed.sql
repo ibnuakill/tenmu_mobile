@@ -1,16 +1,14 @@
 -- =============================================================================
 -- Seed data — kategori POI (referensi)
--- Idempoten: menggunakan INSERT ... ON CONFLICT (nama) DO NOTHING.
+-- 5 sektor universal UMKM. Idempoten: ON CONFLICT (nama) DO NOTHING.
 -- Tidak berisi data user / credential apa pun.
 -- =============================================================================
 
 INSERT INTO public.kategori (nama, emoji, deskripsi)
 VALUES
-  ('Wisata & Budaya',        '🏰', 'Tempat wisata, budaya, dan situs sejarah'),
-  ('Kuliner & Cafe',         '🍜', 'Restoran, warung, cafe, dan destinasi kuliner lainnya'),
-  ('Oleh-oleh & Kerajinan',  '🛍️', 'Toko oleh-oleh, gerai kerajinan, batik, rotan, gerabah'),
-  ('Penginapan & Hotel',     '🏨', 'Hotel, villa, homestay, guest house, dan penginapan'),
-  ('Pertokoan & UMKM',       '🛒', 'Toko, kios, dan unit usaha mikro, kecil, dan menengah'),
-  ('Jasa & Layanan',         '🔧', 'Jasa perbaikan, layanan publik, servis dan lainnya'),
-  ('Lainnya',                '✨', 'Kategori lainnya yang tidak termasuk kategori umum')
+  ('Kuliner (Makanan & Olahan)',        '🍽️', 'Usaha makanan dan olahan: rumah makan, kafe, jajanan pasar, katering, frozen food.'),
+  ('Kerajinan & Manufaktur Tradisional', '🎨', 'Batik, tenun, anyaman, gerabah, meubel, konveksi dan kerajinan tangan khas Cirebon.'),
+  ('Perdagangan & Retail',               '🏪', 'Warung, toko, pasar dan penjualan barang: kelontong, elektronik, pakaian, aksesoris.'),
+  ('Agribisnis',                         '🌾', 'Pertanian, perikanan dan peternakan: sayur organik, daging dan ikan segar, tanaman dan ternak lokal.'),
+  ('Jasa',                               '🔧', 'Layanan harian: bengkel, laundry, pengiriman, fotografi, beauty care dan kesehatan.')
 ON CONFLICT (nama) DO NOTHING;

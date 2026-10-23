@@ -126,8 +126,8 @@ class _PoiDetailScreenState extends State<PoiDetailScreen>
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>();
-    final topPad = MediaQuery.of(context).padding.top;
-    final bottomPad = MediaQuery.of(context).padding.bottom;
+    final topPad = MediaQuery.paddingOf(context).top;
+    final bottomPad = MediaQuery.paddingOf(context).bottom;
     final imageUrls = PoiImageHelper.extractImageUrls(widget.place);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -155,6 +155,8 @@ class _PoiDetailScreenState extends State<PoiDetailScreen>
                         topPadding: topPad,
                         onBack: _onBack,
                         onTapFavorite: _ctrl.toggleFavorite,
+                        hasPhone: _ctrl.hasPhone,
+                        onWhatsApp: () => _launchWhatsApp(theme),
                         onShowImagePreview: (i) =>
                             DetailImagePreview.show(
                           context,
@@ -224,6 +226,8 @@ class _PoiDetailScreenState extends State<PoiDetailScreen>
                       isLoadingFavorite: _ctrl.isLoadingFavorite,
                       onBack: _onBack,
                       onTapFavorite: _ctrl.toggleFavorite,
+                      hasPhone: _ctrl.hasPhone,
+                      onWhatsApp: () => _launchWhatsApp(theme),
                     ),
                   ),
                 Positioned(
@@ -233,9 +237,7 @@ class _PoiDetailScreenState extends State<PoiDetailScreen>
                   child: DetailBottomActionBar(
                     theme: theme,
                     bottomPad: bottomPad,
-                    hasPhone: _ctrl.hasPhone,
                     hasLocation: _ctrl.hasLocation,
-                    onWhatsApp: () => _launchWhatsApp(theme),
                     onRoute: _goToRoute,
                   ),
                 ),

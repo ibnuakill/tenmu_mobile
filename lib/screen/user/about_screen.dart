@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme_provider.dart';
+import '../../core/lucide_icons.dart';
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
@@ -22,7 +23,7 @@ class AboutScreen extends StatelessWidget {
           ),
         ),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: theme.textPrimary),
+          icon: LucideIcon('arrow-left', color: theme.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -43,7 +44,7 @@ class AboutScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: theme.border, width: 2),
                     ),
-                    child: Icon(Icons.store, size: 60, color: theme.btnPrimary),
+                    child: LucideIcon('store', size: 60, color: theme.btnPrimary),
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -95,25 +96,25 @@ class AboutScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             _FeatureItem(
-              icon: Icons.location_on_outlined,
+              icon: 'map-pin',
               title: 'Penemuan Geografis',
               description: 'Temukan UMKM berdasarkan lokasi Anda',
               theme: theme,
             ),
             _FeatureItem(
-              icon: Icons.search_outlined,
+              icon: 'search',
               title: 'Pencarian & Filter',
               description: 'Cari UMKM berdasarkan kategori, harga, dan jarak',
               theme: theme,
             ),
             _FeatureItem(
-              icon: Icons.map_outlined,
+              icon: 'map',
               title: 'Navigasi Peta',
               description: 'Navigasi ke lokasi UMKM dengan mudah',
               theme: theme,
             ),
             _FeatureItem(
-              icon: Icons.star_outline,
+              icon: 'star',
               title: 'Ulasan & Rating',
               description: 'Baca ulasan dan berikan rating untuk UMKM',
               theme: theme,
@@ -181,7 +182,7 @@ class AboutScreen extends StatelessWidget {
 }
 
 class _FeatureItem extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final String title;
   final String description;
   final ThemeProvider theme;
@@ -208,7 +209,7 @@ class _FeatureItem extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: theme.border, width: 1),
             ),
-            child: Icon(icon, color: theme.btnPrimary, size: 24),
+            child: LucideIcon(icon, color: theme.btnPrimary, size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(

@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme_provider.dart';
 import '../../core/poi_image_helper.dart';
 import 'detail/poi_detail_screen.dart';
+import '../../core/lucide_icons.dart';
 
 class FavoriteScreen extends StatefulWidget {
   const FavoriteScreen({super.key});
@@ -80,8 +81,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.bookmark_border,
+                        LucideIcon('bookmark',
                           size: 64,
                           color: theme.textHint,
                         ),
@@ -153,7 +153,7 @@ class _FavoriteCard extends StatelessWidget {
                   width: 100,
                   height: 100,
                   color: theme.bgElevated,
-                  child: Icon(Icons.broken_image, color: theme.textHint),
+                  child: LucideIcon('image-off', color: theme.textHint),
                 ),
               )
             else
@@ -161,7 +161,7 @@ class _FavoriteCard extends StatelessWidget {
                 width: 100,
                 height: 100,
                 color: theme.bgElevated,
-                child: Icon(Icons.storefront, color: theme.textHint),
+                child: LucideIcon('store', color: theme.textHint),
               ),
 
             Expanded(
@@ -181,8 +181,7 @@ class _FavoriteCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Icon(
-                          Icons.location_on,
+                        LucideIcon('map-pin',
                           size: 14,
                           color: theme.iconColor,
                         ),

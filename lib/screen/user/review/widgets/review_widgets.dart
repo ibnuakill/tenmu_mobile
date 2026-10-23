@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme_provider.dart';
+import '../../../../core/lucide_icons.dart';
 
 /// Deretan bintang (display only).
 class ReviewStarRow extends StatelessWidget {
@@ -15,8 +16,8 @@ class ReviewStarRow extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (i) {
-        return Icon(
-          i < rating ? Icons.star_rounded : Icons.star_outline_rounded,
+        return LucideIcon(
+          i < rating ? 'star' : 'star',
           size: size,
           color: i < rating ? const Color(0xFFFFB800) : theme.textHint,
         );
@@ -181,7 +182,7 @@ class ReviewTile extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     side: BorderSide(color: theme.border),
                   ),
-                  icon: Icon(Icons.more_vert, color: theme.iconColor, size: 18),
+                  icon: LucideIcon('ellipsis-vertical', color: theme.iconColor, size: 18),
                   onSelected: (value) {
                     if (value == 'edit') onEdit?.call();
                     if (value == 'delete') onDelete?.call();
@@ -191,8 +192,7 @@ class ReviewTile extends StatelessWidget {
                       value: 'edit',
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.edit_outlined,
+                          LucideIcon('pencil',
                             size: 16,
                             color: theme.iconColor,
                           ),
@@ -208,8 +208,7 @@ class ReviewTile extends StatelessWidget {
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.delete_outline,
+                          LucideIcon('trash',
                             size: 16,
                             color: Color(0xFF8B2020),
                           ),

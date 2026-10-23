@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/theme_provider.dart';
+import '../../../../core/lucide_icons.dart';
 
 /// Floating appbar yang fade-in saat scroll.
 /// Ditampilkan oleh parent hanya kalau opacity > 0.
@@ -12,6 +14,8 @@ class DetailFadeAppBar extends StatelessWidget {
   final bool isLoadingFavorite;
   final VoidCallback onBack;
   final VoidCallback onTapFavorite;
+  final bool hasPhone;
+  final VoidCallback onWhatsApp;
 
   const DetailFadeAppBar({
     super.key,
@@ -23,6 +27,8 @@ class DetailFadeAppBar extends StatelessWidget {
     required this.isLoadingFavorite,
     required this.onBack,
     required this.onTapFavorite,
+    required this.hasPhone,
+    required this.onWhatsApp,
   });
 
   @override
@@ -39,8 +45,7 @@ class DetailFadeAppBar extends StatelessWidget {
             children: [
               const SizedBox(width: 8),
               IconButton(
-                icon: Icon(
-                  Icons.arrow_back_ios_new_rounded,
+                icon: LucideIcon('chevron-left',
                   size: 18,
                   color: theme.textPrimary,
                 ),
@@ -58,13 +63,41 @@ class DetailFadeAppBar extends StatelessWidget {
                   maxLines: 1,
                 ),
               ),
+              if (hasPhone)
+                Padding(
+                  padding: const EdgeInsets.only(right: 2),
+                  child: GestureDetector(
+                    onTap: onWhatsApp,
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF25D366),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: SvgPicture.asset(
+                          'assets/icons/brands/whatsapp.svg',
+                          width: 17,
+                          height: 17,
+                          colorFilter: const ColorFilter.mode(
+                            Colors.white,
+                            BlendMode.srcIn,
+                          ),
+                          semanticsLabel: 'WhatsApp',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               if (!isLoadingFavorite)
                 IconButton(
-                  icon: Icon(
+                  icon: LucideIcon(
                     isFavorite
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
+                        ? 'heart'
+                        : 'heart',
                     color: isFavorite ? Colors.redAccent : theme.textPrimary,
+                    size: 22,
                   ),
                   onPressed: onTapFavorite,
                 ),

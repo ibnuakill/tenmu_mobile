@@ -1,6 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/app_colors_light.dart';
 import '../../../core/poi_image_helper.dart';
@@ -143,7 +142,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
         automaticallyImplyLeading: false,
         title: Text(
           'Manajemen UMKM',
-          style: GoogleFonts.poppins(
+          style: TextStyle(fontFamily: 'Nunito', 
             fontSize: 17,
             fontWeight: FontWeight.w700,
             color: _kTextPrimary,
@@ -180,7 +179,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
                         alignment: Alignment.centerLeft,
                         child: Text(
                           '${_filteredPlaces.length} tempat ditemukan',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: TextStyle(fontFamily: 'Nunito', 
                             fontSize: 12,
                             color: _kTextMuted,
                           ),
@@ -216,7 +215,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
             const SizedBox(height: 16),
             Text(
               'Gagal memuat data UMKM',
-              style: GoogleFonts.poppins(
+              style: TextStyle(fontFamily: 'Nunito', 
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: _kTextPrimary,
@@ -228,7 +227,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
               textAlign: TextAlign.center,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _kTextMuted),
+              style: TextStyle(fontFamily: 'Nunito', fontSize: 12, color: _kTextMuted),
             ),
             const SizedBox(height: 20),
             GestureDetector(
@@ -247,7 +246,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
                     const SizedBox(width: 6),
                     Text(
                       'Coba Lagi',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(fontFamily: 'Nunito', 
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
@@ -289,14 +288,14 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
                   prefixIcon: const Icon(Icons.search_rounded,
                       size: 18, color: _kTextMuted),
                   hintText: 'Cari UMKM...',
-                  hintStyle: GoogleFonts.plusJakartaSans(
+                  hintStyle: TextStyle(fontFamily: 'Nunito', 
                       fontSize: 13, color: _kTextMuted),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding:
                       const EdgeInsets.symmetric(vertical: 13),
                 ),
-                style: GoogleFonts.plusJakartaSans(
+                style: TextStyle(fontFamily: 'Nunito', 
                     fontSize: 13, color: _kTextPrimary),
               ),
             ),
@@ -332,7 +331,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
                   const SizedBox(width: 6),
                   Text(
                     'Tambah',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: TextStyle(fontFamily: 'Nunito', 
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: Colors.black,
@@ -385,7 +384,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
               ),
               child: Text(
                 c.$2,
-                style: GoogleFonts.plusJakartaSans(
+                style: TextStyle(fontFamily: 'Nunito', 
                   fontSize: 12,
                   fontWeight:
                       isActive ? FontWeight.w700 : FontWeight.w500,
@@ -419,7 +418,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
             const SizedBox(height: 16),
             Text(
               'Tidak ada UMKM ditemukan',
-              style: GoogleFonts.poppins(
+              style: TextStyle(fontFamily: 'Nunito', 
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: _kTextPrimary,
@@ -429,7 +428,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
             Text(
               'Coba ubah filter atau tambah UMKM baru.',
               style:
-                  GoogleFonts.plusJakartaSans(fontSize: 12, color: _kTextMuted),
+                  TextStyle(fontFamily: 'Nunito', fontSize: 12, color: _kTextMuted),
             ),
             const SizedBox(height: 20),
             GestureDetector(
@@ -455,7 +454,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
                     const SizedBox(width: 6),
                     Text(
                       'Tambah UMKM',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(fontFamily: 'Nunito', 
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: Colors.black,
@@ -489,7 +488,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
                 child: Center(
                   child: Text(
                     'Semua data sudah ditampilkan',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: TextStyle(fontFamily: 'Nunito', 
                         fontSize: 12, color: _kTextMuted),
                   ),
                 ),
@@ -513,7 +512,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
                     ),
                     child: Text(
                       'Muat Lebih Banyak',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(fontFamily: 'Nunito', 
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: _kTextPrimary,
@@ -580,7 +579,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
                           name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(fontFamily: 'Nunito', 
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: _kTextPrimary,
@@ -603,7 +602,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
                     ),
                     child: Text(
                       category,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(fontFamily: 'Nunito', 
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         color: _kTextSecondary,
@@ -622,7 +621,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
                             address,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: TextStyle(fontFamily: 'Nunito', 
                                 fontSize: 11, color: _kTextMuted),
                           ),
                         ),
@@ -661,7 +660,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
                               const SizedBox(width: 4),
                               Text(
                                 'Edit',
-                                style: GoogleFonts.plusJakartaSans(
+                                style: TextStyle(fontFamily: 'Nunito', 
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
@@ -693,7 +692,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
                               const SizedBox(width: 4),
                               Text(
                                 'Hapus',
-                                style: GoogleFonts.plusJakartaSans(
+                                style: TextStyle(fontFamily: 'Nunito', 
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
                                   color: _kAccentRed,
@@ -727,19 +726,19 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
         ),
         title: Text(
           'Hapus UMKM',
-          style: GoogleFonts.poppins(
+          style: TextStyle(fontFamily: 'Nunito', 
               fontWeight: FontWeight.w700, color: _kTextPrimary),
         ),
         content: Text(
           'Yakin ingin menghapus "$name"? Tindakan ini tidak dapat dibatalkan.',
-          style: GoogleFonts.plusJakartaSans(
+          style: TextStyle(fontFamily: 'Nunito', 
               fontSize: 13, color: _kTextSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text('Batal',
-                style: GoogleFonts.plusJakartaSans(color: _kTextSecondary)),
+                style: TextStyle(fontFamily: 'Nunito', color: _kTextSecondary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -751,7 +750,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text('Hapus',
-                style: GoogleFonts.plusJakartaSans(
+                style: TextStyle(fontFamily: 'Nunito', 
                     fontWeight: FontWeight.w700)),
           ),
         ],
@@ -767,7 +766,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Gagal menghapus: $e',
-                  style: GoogleFonts.plusJakartaSans()),
+                  style: TextStyle(fontFamily: 'Nunito', )),
               backgroundColor: _kAccentRed,
             ),
           );
@@ -788,7 +787,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
       child: Center(
         child: Text(
           _initials(name),
-          style: GoogleFonts.poppins(
+          style: TextStyle(fontFamily: 'Nunito', 
             fontWeight: FontWeight.w800,
             color: _kAccentGreen,
             fontSize: 16,
@@ -838,7 +837,7 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
           const SizedBox(width: 3),
           Text(
             label,
-            style: GoogleFonts.plusJakartaSans(
+            style: TextStyle(fontFamily: 'Nunito', 
               color: textColor,
               fontSize: 10,
               fontWeight: FontWeight.w700,

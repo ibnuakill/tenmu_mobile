@@ -85,6 +85,60 @@ class AuthRateLimit {
     await prefs.remove('forgot_locked_until_$email');
   }
 
+  static Future<int> getForgotRemainingLockSeconds(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    final lockedUntil = prefs.getInt('forgot_locked_until_$email');
+    if (lockedUntil == null) return 0;
+    final remaining = (lockedUntil - DateTime.now().millisecondsSinceEpoch) ~/ 1000;
+    return remaining > 0 ? remaining : 0;
+  }
+
+  // ── Email OTP (Magic Link / kode login) ──────────────────────────────
+
+  /// Verifikasi kode OTP: 5 salah → lock 30 menit.
+  static const int _maxOtpAttempts = 5;
+  static const Duration _otpLockDuration = Duration(minutes: 30);
+
+  static Future<bool> isOtpLocked(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    final lockedUntil = prefs.getInt('otp_locked_until_$email');
+    if (lockedUntil == null) return false;
+    if (DateTime.now().millisecondsSinceEpoch >= lockedUntil) {
+      await prefs.remove('otp_locked_until_$email');
+      await prefs.remove('otp_attempts_$email');
+      return false;
+    }
+    return true;
+  }
+
+  static Future<int> incrementOtpAttempt(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'otp_attempts_$email';
+    final attempts = (prefs.getInt(key) ?? 0) + 1;
+    await prefs.setInt(key, attempts);
+
+    if (attempts >= _maxOtpAttempts) {
+      final until =
+          DateTime.now().millisecondsSinceEpoch + _otpLockDuration.inMilliseconds;
+      await prefs.setInt('otp_locked_until_$email', until);
+    }
+    return attempts;
+  }
+
+  static Future<void> resetOtpAttempts(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('otp_attempts_$email');
+    await prefs.remove('otp_locked_until_$email');
+  }
+
+  static Future<int> getOtpRemainingLockSeconds(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    final lockedUntil = prefs.getInt('otp_locked_until_$email');
+    if (lockedUntil == null) return 0;
+    final remaining = (lockedUntil - DateTime.now().millisecondsSinceEpoch) ~/ 1000;
+    return remaining > 0 ? remaining : 0;
+  }
+
   // ── Helper ───────────────────────────────────────────────────────────
 
   static String formatDuration(int totalSeconds) {

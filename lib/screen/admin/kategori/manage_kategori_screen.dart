@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'widgets/kategori_sheets.dart';
@@ -40,15 +39,6 @@ class _ManageKategoriScreenState extends State<ManageKategoriScreen> {
     }
   }
 
-  void _openAddSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => AddKategoriSheet(onAdded: _loadKategori),
-    );
-  }
-
   void _openEditSheet(Map<String, dynamic> kategori) {
     showModalBottomSheet(
       context: context,
@@ -67,16 +57,17 @@ class _ManageKategoriScreenState extends State<ManageKategoriScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Hapus Kategori?',
-          style: GoogleFonts.poppins(color: kTextPrimary, fontWeight: FontWeight.w700, fontSize: 16),
+          style: TextStyle(fontFamily: 'Nunito', color: kTextPrimary, fontWeight: FontWeight.w700, fontSize: 16),
         ),
         content: Text(
-          'Kamu yakin ingin menghapus kategori "${kategori['nama']}"?',
-          style: GoogleFonts.plusJakartaSans(color: kTextSecondary, height: 1.5, fontSize: 13),
+          'Kategori "${kategori['nama']}" adalah sektor baku dan tidak bisa dihapus. '
+          'Hanya deskripsi dan emoji yang bisa diubah.',
+          style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary, height: 1.5, fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Batal', style: GoogleFonts.plusJakartaSans(color: kTextSecondary)),
+            child: Text('Batal', style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -85,27 +76,21 @@ class _ManageKategoriScreenState extends State<ManageKategoriScreen> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
             ),
-            child: Text('Hapus', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+            child: Text('Mengerti', style: TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w600)),
           ),
         ],
       ),
     );
 
     if (confirm == true) {
-      try {
-        await _client.from('kategori').delete().eq('id', kategori['id']);
-        await _loadKategori();
-        _snack('Kategori berhasil dihapus.', isError: false);
-      } catch (e) {
-        _snack('Gagal menghapus: $e', isError: true);
-      }
+      _snack('5 kategori sektor bersifat baku dan tidak bisa dihapus.', isError: true);
     }
   }
 
   void _snack(String msg, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg, style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13)),
+        content: Text(msg, style: TextStyle(fontFamily: 'Nunito', color: Colors.white, fontSize: 13)),
         backgroundColor: isError ? kAccentRed : kPrimary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -125,7 +110,7 @@ class _ManageKategoriScreenState extends State<ManageKategoriScreen> {
         automaticallyImplyLeading: false,
         title: Text(
           'Kelola Kategori',
-          style: GoogleFonts.poppins(
+          style: TextStyle(fontFamily: 'Nunito', 
             color: kTextPrimary,
             fontWeight: FontWeight.w600,
             fontSize: 17,
@@ -134,21 +119,21 @@ class _ManageKategoriScreenState extends State<ManageKategoriScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: GestureDetector(
-              onTap: _openAddSheet,
+            child: Tooltip(
+              message: '5 kategori sektor bersifat baku',
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: kPrimary,
+                  color: kPrimary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(999),
-                  boxShadow: [BoxShadow(color: kPrimary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3))],
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.add_rounded, color: Colors.white, size: 16),
+                    const Icon(Icons.lock_outline_rounded, color: kPrimary, size: 14),
                     const SizedBox(width: 4),
-                    Text('Tambah', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
+                    Text('5 Sektor Baku',
+                        style: TextStyle(fontFamily: 'Nunito', color: kPrimary, fontWeight: FontWeight.w600, fontSize: 12)),
                   ],
                 ),
               ),
@@ -173,7 +158,7 @@ class _ManageKategoriScreenState extends State<ManageKategoriScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text('Belum ada kategori.',
-                    style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontWeight: FontWeight.w600)),
+                    style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary, fontWeight: FontWeight.w600)),
                 ],
               ),
             )
@@ -208,7 +193,7 @@ class _ManageKategoriScreenState extends State<ManageKategoriScreen> {
                     ),
                     title: Text(
                       kat['nama'] ?? '-',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(fontFamily: 'Nunito', 
                         fontWeight: FontWeight.w700, color: kTextPrimary, fontSize: 14),
                     ),
                     subtitle: kat['deskripsi'] != null && (kat['deskripsi'] as String).isNotEmpty
@@ -216,7 +201,7 @@ class _ManageKategoriScreenState extends State<ManageKategoriScreen> {
                             kat['deskripsi'],
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 12),
+                            style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary, fontSize: 12),
                           )
                         : null,
                     trailing: Row(

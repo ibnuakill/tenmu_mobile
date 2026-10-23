@@ -1,113 +1,146 @@
 // Supabase Edge Function — kirim push notif via OneSignal
-// Dipanggil dari client setelah admin approve place
-// OneSignal REST API key disimpan sebagai secret — aman di server
+// Dipakai untuk:
+//   1) notifikasi tempat (admin approve / owner submit)
+//   2) broadcast pesan dari admin ke user (in-app + push)
+// OneSignal REST API key disimpan sebagai secret — aman di server.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 
 interface NotificationPayload {
-  placeId: number
-  placeName: string
-  /** If provided, push only to these OneSignal user IDs (targeted). Otherwise broadcast to All. */
+  /** Mode broadcast admin */
+  title?: string
+  body?: string
+  /** Mode notifikasi tempat (legacy) */
+  placeId?: number
+  placeName?: string
+  /** Kalau diisi → kirim hanya ke user ini (OneSignal external_id = auth user id). Kosong → broadcast. */
   targetUserIds?: string[]
-  /** 'new_place' = broadcast (admin approve), 'new_submission' = notify admins (owner add) */
-  type?: 'new_place' | 'new_submission'
+  type?: string
+}
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+}
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  })
 }
 
 serve(async (req) => {
-  // ── CORS ──────────────────────────────────────────────
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      },
-    })
-  }
-
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
   // ── Parse body ───────────────────────────────────────
   let body: NotificationPayload
   try {
     body = await req.json()
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return json({ error: 'Invalid JSON' }, 400)
   }
 
-  const { placeId, placeName, targetUserIds, type } = body
-  if (!placeId || !placeName) {
-    return new Response(JSON.stringify({ error: 'placeId and placeName required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
+  const { title, body: message, placeId, placeName, targetUserIds, type } = body
+
+  // Mode broadcast admin butuh title + body; mode tempat butuh placeId + placeName.
+  const isBroadcast = !!(title && message)
+  if (!isBroadcast && (!placeId || !placeName)) {
+    return json({ error: 'title+body atau placeId+placeName wajib diisi' }, 400)
   }
 
-  // ── Secrets dari Supabase ────────────────────────────
+  // ── Secrets ──────────────────────────────────────────
   const appId = Deno.env.get('ONESIGNAL_APP_ID')
   const restApiKey = Deno.env.get('ONESIGNAL_REST_API_KEY')
-
   if (!appId || !restApiKey) {
     console.error('[send-notification] OneSignal credentials not configured')
-    return new Response(JSON.stringify({ error: 'Server configuration error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return json({ error: 'Server configuration error' }, 500)
   }
 
-  const isTargeted = targetUserIds && targetUserIds.length > 0
+  const ids = (targetUserIds ?? []).filter((v) => typeof v === 'string' && v.length > 0)
+  const isTargeted = ids.length > 0
 
-  const payload: Record<string, unknown> = {
+  const headings = isBroadcast
+    ? title!
+    : isTargeted
+      ? '📋 Tempat Baru Butuh Verifikasi'
+      : '🏪 Tempat Baru di TenMu!'
+  const contents = isBroadcast
+    ? message!
+    : isTargeted
+      ? `${placeName} baru saja ditambahkan. Yuk verifikasi sekarang!`
+      : `${placeName} sudah terverifikasi dan siap dikunjungi. Yuk lihat!`
+
+  const data: Record<string, unknown> = {
+    type: type ?? (isBroadcast ? 'admin' : 'new_place'),
+  }
+  if (placeId) data.place_id = placeId
+
+  const base = {
     app_id: appId,
-    headings: { en: isTargeted ? '📋 Tempat Baru Butuh Verifikasi' : '🏪 Tempat Baru di TenMu!' },
-    contents: {
-      en: isTargeted
-        ? `${placeName} baru saja ditambahkan. Yuk verifikasi sekarang!`
-        : `${placeName} sudah terverifikasi dan siap dikunjungi. Yuk lihat!`,
-    },
-    data: {
-      type: type ?? 'new_place',
-      place_id: placeId,
-    },
+    headings: { en: headings },
+    contents: { en: contents },
+    data,
     priority: 10,
   }
 
-  if (isTargeted) {
-    payload.include_external_user_ids = targetUserIds
-  } else {
-    payload.included_segments = ['All']
-  }
-
-  // ── Panggil OneSignal API ────────────────────────────
-  const oneSignalRes = await fetch('https://onesignal.com/api/v1/notifications', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      Authorization: `Basic ${restApiKey}`,
-    },
-    body: JSON.stringify(payload),
-  })
-
-  const result = await oneSignalRes.json()
-  console.log('[send-notification] OneSignal response:', JSON.stringify(result))
-
-  if (!oneSignalRes.ok) {
-    return new Response(JSON.stringify({ error: 'OneSignal API error', detail: result }), {
-      status: 502,
-      headers: { 'Content-Type': 'application/json' },
+  // ── Kirim: coba API baru (include_aliases), fallback ke legacy v1 ──
+  async function sendModern() {
+    const payload: Record<string, unknown> = { ...base, target_channel: 'push' }
+    if (isTargeted) {
+      payload.include_aliases = { external_id: ids }
+    } else {
+      payload.included_segments = ['Subscribed Users']
+    }
+    const res = await fetch('https://api.onesignal.com/notifications', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        Authorization: `Key ${restApiKey}`,
+      },
+      body: JSON.stringify(payload),
     })
+    return { res, result: await res.json() }
   }
 
-  return new Response(JSON.stringify({ success: true, data: result }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
+  async function sendLegacy() {
+    const payload: Record<string, unknown> = { ...base }
+    if (isTargeted) {
+      payload.include_external_user_ids = ids
+    } else {
+      payload.included_segments = ['All']
+    }
+    const res = await fetch('https://onesignal.com/api/v1/notifications', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        Authorization: `Basic ${restApiKey}`,
+      },
+      body: JSON.stringify(payload),
+    })
+    return { res, result: await res.json() }
+  }
+
+  let { res, result } = await sendModern()
+  console.log('[send-notification] modern:', res.status, JSON.stringify(result))
+
+  if (!res.ok) {
+    const retry = await sendLegacy()
+    console.log('[send-notification] legacy:', retry.res.status, JSON.stringify(retry.result))
+    res = retry.res
+    result = retry.result
+  }
+
+  if (!res.ok) {
+    return json({ error: 'OneSignal API error', detail: result }, 502)
+  }
+
+  return json({
+    success: true,
+    targeted: isTargeted,
+    recipients: ids.length,
+    data: result,
   })
 })

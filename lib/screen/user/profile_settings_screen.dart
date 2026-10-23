@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'dart:typed_data';
 import '../../core/theme_provider.dart';
+import '../../core/lucide_icons.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
   const ProfileSettingsScreen({super.key});
@@ -18,7 +19,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
   bool _isLoading = false;
   bool _isUploadingImage = false;
-  File? _selectedImage;
+  Uint8List? _selectedImageBytes;
 
   String? _currentRole;
 
@@ -69,9 +70,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     );
 
     if (pickedFile == null) return;
+    final bytes = await pickedFile.readAsBytes();
 
     setState(() {
-      _selectedImage = File(pickedFile.path);
+      _selectedImageBytes = bytes;
       _isUploadingImage = true;
     });
 
@@ -85,7 +87,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       // Upload ke bucket profiles
       await Supabase.instance.client.storage
           .from('profiles')
-          .upload(fileName, _selectedImage!);
+          .uploadBinary(fileName, _selectedImageBytes!,
+              fileOptions: FileOptions(contentType: 'image/jpeg'));
 
       final imageUrl = Supabase.instance.client.storage
           .from('profiles')
@@ -187,14 +190,14 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                   CircleAvatar(
                     radius: 50,
                     backgroundColor: theme.bgElevated,
-                    backgroundImage: _selectedImage != null
-                        ? FileImage(_selectedImage!)
+                    backgroundImage: _selectedImageBytes != null
+                        ? MemoryImage(_selectedImageBytes!)
                         : (currentAvatar != null
                                   ? NetworkImage(currentAvatar)
                                   : null)
                               as ImageProvider?,
-                    child: _selectedImage == null && currentAvatar == null
-                        ? Icon(Icons.person, size: 50, color: theme.iconColor)
+                    child: _selectedImageBytes == null && currentAvatar == null
+                        ? LucideIcon('user', size: 50, color: theme.iconColor)
                         : null,
                   ),
                   Positioned(
@@ -217,8 +220,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Icon(
-                                Icons.camera_alt,
+                            : const LucideIcon('camera',
                                 color: Colors.white,
                                 size: 16,
                               ),
@@ -236,7 +238,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
               decoration: InputDecoration(
                 labelText: 'Email',
                 labelStyle: TextStyle(color: theme.textHint),
-                prefixIcon: Icon(Icons.email, color: theme.iconColor),
+                prefixIcon: LucideIcon('mail', color: theme.iconColor),
                 filled: true,
                 fillColor: theme.bgElevated,
                 border: OutlineInputBorder(
@@ -252,7 +254,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
               decoration: InputDecoration(
                 labelText: 'Nama Lengkap',
                 labelStyle: TextStyle(color: theme.textSecondary),
-                prefixIcon: Icon(Icons.person, color: theme.iconColor),
+                prefixIcon: LucideIcon('user', color: theme.iconColor),
                 filled: true,
                 fillColor: theme.bgSurface,
                 border: OutlineInputBorder(
@@ -293,10 +295,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(
+                  LucideIcon(
                     _currentRole == 'owner'
-                        ? Icons.storefront_outlined
-                        : Icons.person_outline,
+                        ? 'store'
+                        : 'user',
                     color: theme.iconColor,
                   ),
                   const SizedBox(width: 12),
@@ -320,7 +322,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
               decoration: InputDecoration(
                 labelText: 'Password Baru (Kosongkan jika tidak diubah)',
                 labelStyle: TextStyle(color: theme.textSecondary),
-                prefixIcon: Icon(Icons.lock, color: theme.iconColor),
+                prefixIcon: LucideIcon('lock', color: theme.iconColor),
                 filled: true,
                 fillColor: theme.bgSurface,
                 border: OutlineInputBorder(

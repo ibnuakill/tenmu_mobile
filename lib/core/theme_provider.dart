@@ -4,7 +4,7 @@ import 'app_colors.dart';
 import 'app_colors_light.dart';
 
 class ThemeProvider extends ChangeNotifier {
-  bool _isDarkMode = true;
+  bool _isDarkMode = false;
   final bool _forceDark;
   static const String _themeKey = 'isDarkMode';
 
@@ -41,7 +41,7 @@ class ThemeProvider extends ChangeNotifier {
 
   Future<void> _loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
-    _isDarkMode = prefs.getBool(_themeKey) ?? true;
+    _isDarkMode = prefs.getBool(_themeKey) ?? false;
     notifyListeners();
   }
 

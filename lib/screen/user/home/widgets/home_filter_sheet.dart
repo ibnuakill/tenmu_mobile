@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme_provider.dart';
-import '../../widgets/category_filter_widget.dart';
 import '../../widgets/sort_filter_widget.dart';
+import '../../../../core/lucide_icons.dart';
+import '../../../../core/poi_category.dart';
 
 /// Modal sheet "Cari & Filter" yang dipakai home_screen.
 /// State lokal (query, kategori, sort) → di-push ke parent via callback.
@@ -10,8 +11,8 @@ class HomeFilterSheet extends StatefulWidget {
   final ThemeProvider theme;
   final Color accent;
   final String initialQuery;
-  final Set<String> initialCategories;
   final SortOption initialSort;
+  final Set<String> initialCategories;
   final ValueChanged<String> onQueryChanged;
   final ValueChanged<Set<String>> onCategoriesChanged;
   final ValueChanged<SortOption> onSortChanged;
@@ -22,8 +23,8 @@ class HomeFilterSheet extends StatefulWidget {
     required this.theme,
     required this.accent,
     required this.initialQuery,
-    required this.initialCategories,
     required this.initialSort,
+    this.initialCategories = const {},
     required this.onQueryChanged,
     required this.onCategoriesChanged,
     required this.onSortChanged,
@@ -33,8 +34,8 @@ class HomeFilterSheet extends StatefulWidget {
   static Future<void> show(
     BuildContext context, {
     required String initialQuery,
-    required Set<String> initialCategories,
     required SortOption initialSort,
+    Set<String> initialCategories = const {},
     required ValueChanged<String> onQueryChanged,
     required ValueChanged<Set<String>> onCategoriesChanged,
     required ValueChanged<SortOption> onSortChanged,
@@ -51,8 +52,8 @@ class HomeFilterSheet extends StatefulWidget {
           theme: theme,
           accent: accent,
           initialQuery: initialQuery,
-          initialCategories: initialCategories,
           initialSort: initialSort,
+          initialCategories: initialCategories,
           onQueryChanged: onQueryChanged,
           onCategoriesChanged: onCategoriesChanged,
           onSortChanged: onSortChanged,
@@ -68,19 +69,33 @@ class HomeFilterSheet extends StatefulWidget {
 
 class _HomeFilterSheetState extends State<HomeFilterSheet> {
   late String _query;
-  late Set<String> _cats;
   late SortOption _sort;
+  late Set<String> _selectedCategories;
 
   @override
   void initState() {
     super.initState();
     _query = widget.initialQuery;
-    _cats = Set.from(widget.initialCategories);
     _sort = widget.initialSort;
+    _selectedCategories = Set.from(widget.initialCategories);
   }
 
   bool get _isDirty =>
-      _query.isNotEmpty || _cats.isNotEmpty || _sort != SortOption.terbaru;
+      _query.isNotEmpty ||
+      _selectedCategories.isNotEmpty ||
+      _sort != SortOption.terbaru;
+
+  void _toggleCategory(String cat) {
+    setState(() {
+      if (_selectedCategories.contains(cat)) {
+        _selectedCategories.remove(cat);
+      } else {
+        // Pilih satu kategori saja (single select)
+        _selectedCategories = {cat};
+      }
+      widget.onCategoriesChanged(_selectedCategories);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -127,7 +142,6 @@ class _HomeFilterSheetState extends State<HomeFilterSheet> {
                         onTap: () {
                           setState(() {
                             _query = '';
-                            _cats = {};
                             _sort = SortOption.terbaru;
                           });
                           widget.onReset();
@@ -168,20 +182,19 @@ class _HomeFilterSheetState extends State<HomeFilterSheet> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Divider(color: widget.theme.border, height: 1),
                     ),
-                    CategoryFilterWidget(
-                      selectedCategories: _cats,
-                      onCategoriesChanged: (s) {
-                        setState(() => _cats = s);
-                        widget.onCategoriesChanged(s);
-                      },
-                    ),
-                    const SizedBox(height: 20),
                     SortFilterWidget(
                       selectedSort: _sort,
                       onSortChanged: (s) {
                         setState(() => _sort = s);
                         widget.onSortChanged(s);
                       },
+                    ),
+                    const SizedBox(height: 16),
+                    _CategorySection(
+                      theme: widget.theme,
+                      accent: widget.accent,
+                      selectedCategories: _selectedCategories,
+                      onToggleCategory: _toggleCategory,
                     ),
                   ],
                 ),
@@ -255,8 +268,7 @@ class _SearchFieldState extends State<_SearchField> {
           decoration: InputDecoration(
             hintText: 'Cari tempat wisata, kuliner...',
             hintStyle: TextStyle(color: widget.theme.textHint, fontSize: 13),
-            prefixIcon: Icon(
-              Icons.search_rounded,
+            prefixIcon: LucideIcon('search',
               color: _ctrl.text.isNotEmpty
                   ? widget.accent
                   : widget.theme.textSecondary,
@@ -265,8 +277,7 @@ class _SearchFieldState extends State<_SearchField> {
             suffixIcon: _ctrl.text.isNotEmpty
                 ? GestureDetector(
                     onTap: widget.onClear,
-                    child: Icon(
-                      Icons.close_rounded,
+                    child: LucideIcon('x',
                       color: widget.theme.textSecondary,
                       size: 18,
                     ),
@@ -278,6 +289,89 @@ class _SearchFieldState extends State<_SearchField> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Section kategori: daftar 5 sektor (single-select, tanpa sub-kategori).
+class _CategorySection extends StatelessWidget {
+  final ThemeProvider theme;
+  final Color accent;
+  final Set<String> selectedCategories;
+  final ValueChanged<String> onToggleCategory;
+
+  const _CategorySection({
+    required this.theme,
+    required this.accent,
+    required this.selectedCategories,
+    required this.onToggleCategory,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Text(
+            'Kategori',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: theme.textPrimary,
+            ),
+          ),
+        ),
+        ...PoiCategory.allCategories.map((cat) {
+          final isSelected = selectedCategories.contains(cat);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: InkWell(
+              onTap: () => onToggleCategory(cat),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? accent.withValues(alpha: 0.10)
+                      : theme.bgSurface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected ? accent : theme.border,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      PoiCategory.getCategoryIcon(cat),
+                      size: 20,
+                      color: isSelected ? accent : theme.textSecondary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        cat,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isSelected ? accent : theme.textPrimary,
+                        ),
+                      ),
+                    ),
+                    if (isSelected)
+                      Icon(Icons.check, size: 18, color: accent),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme_provider.dart';
+import '../../core/lucide_icons.dart';
 
 class UserNotificationScreen extends StatefulWidget {
   const UserNotificationScreen({super.key});
@@ -153,16 +154,16 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
     return DateFormat('d MMM yyyy', 'id').format(dt);
   }
 
-  IconData _typeIcon(String? type) {
+  String _typeIcon(String? type) {
     switch (type) {
       case 'promo':
-        return Icons.local_offer_outlined;
+        return 'tag';
       case 'verifikasi':
-        return Icons.verified_outlined;
+        return 'badge-check';
       case 'warning':
-        return Icons.warning_amber_rounded;
+        return 'triangle-alert';
       default:
-        return Icons.notifications_outlined;
+        return 'bell';
     }
   }
 
@@ -199,8 +200,7 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
               color: theme.bgElevated,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              Icons.arrow_back_ios_new,
+            child: LucideIcon('chevron-left',
               color: theme.textPrimary,
               size: 16,
             ),
@@ -234,7 +234,7 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
             if (_unreadCount > 0)
               TextButton.icon(
                 onPressed: _markAllRead,
-                icon: const Icon(Icons.done_all_rounded, size: 16),
+                icon: const LucideIcon('check-check', size: 16),
                 label: const Text('Baca semua', style: TextStyle(fontSize: 12)),
                 style: TextButton.styleFrom(
                   foregroundColor: const Color(0xFF1A7A6E),
@@ -243,7 +243,7 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
             // Hapus semua
             IconButton(
               onPressed: _deleteAll,
-              icon: Icon(Icons.delete_sweep_outlined, color: theme.textSecondary),
+              icon: LucideIcon('trash', color: theme.textSecondary),
               tooltip: 'Hapus semua',
             ),
           ],
@@ -256,8 +256,7 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.notifications_none_rounded,
+                      LucideIcon('bell',
                         size: 72,
                         color: theme.textHint,
                       ),
@@ -319,7 +318,7 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
           color: Colors.red.shade400,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: const Icon(Icons.delete_rounded, color: Colors.white),
+        child: const LucideIcon('trash', color: Colors.white),
       ),
       onDismissed: (_) => _deleteOne(id),
       child: GestureDetector(
@@ -355,7 +354,7 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
                   color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: color, size: 20),
+                child: LucideIcon(icon, color: color, size: 20),
               ),
               const SizedBox(width: 12),
               // Content

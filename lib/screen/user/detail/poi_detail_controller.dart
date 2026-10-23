@@ -73,8 +73,9 @@ class PoiDetailController extends ChangeNotifier {
   // ═══════════════════════════════════════
 
   Future<void> bootstrap(ThemeProvider theme) async {
-    await checkFavoriteStatus();
+    // Semua berjalan paralel — jarak/durasi tidak lagi menunggu query favorit.
     await Future.wait([
+      checkFavoriteStatus(),
       fetchDistance(),
       fetchReviewStats(),
     ]);
@@ -154,74 +155,120 @@ class PoiDetailController extends ChangeNotifier {
   // Distance / duration
   // ═══════════════════════════════════════
 
+  // Cache rute per tempat (memori, 10 menit) — buka ulang POI = angka instan.
+  static final Map<String, _CachedRoute> _routeCache = {};
+  static const Duration _routeCacheTtl = Duration(minutes: 10);
+
   Future<void> fetchDistance() async {
-    try {
-      final toLat = lat;
-      final toLng = lng;
-      if (toLat == null || toLng == null) return;
+    final toLat = lat;
+    final toLng = lng;
+    if (toLat == null || toLng == null) return;
 
-      final permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        return;
-      }
+    final cacheKey = '${place['id'] ?? '$toLat,$toLng'}';
 
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.low,
-          timeLimit: Duration(seconds: 5),
-        ),
-      );
-
-      // Default fallback (Haversine)
-      final fallbackDistKm =
-          Haversine.distance(pos.latitude, pos.longitude, toLat, toLng);
-      String dist = Haversine.formatDistance(fallbackDistKm);
-      final fallbackMins = (fallbackDistKm / 40.0 * 60).round();
-      String durText = fallbackMins < 60
-          ? '${fallbackMins > 0 ? fallbackMins : 1} mnt'
-          : '${fallbackMins ~/ 60} jam ${fallbackMins % 60 > 0 ? '${fallbackMins % 60} mnt' : ''}'
-              .trim();
-
-      // Try OSRM actual route
-      try {
-        final url = Uri.parse(
-          'https://router.project-osrm.org/route/v1/driving/'
-          '${pos.longitude},${pos.latitude};$toLng,$toLat?overview=false',
-        );
-        final res = await http.get(url).timeout(const Duration(seconds: 4));
-        if (res.statusCode == 200) {
-          final data = json.decode(res.body);
-          if (data['code'] == 'Ok' && (data['routes'] as List).isNotEmpty) {
-            final route = data['routes'][0];
-            final double distanceMeters =
-                (route['distance'] as num).toDouble();
-            final double durationSeconds =
-                (route['duration'] as num).toDouble();
-
-            final routeDistKm = distanceMeters / 1000.0;
-            dist = Haversine.formatDistance(routeDistKm);
-
-            final minutes = (durationSeconds / 60.0).round();
-            if (minutes < 60) {
-              durText = '${minutes > 0 ? minutes : 1} mnt';
-            } else {
-              final hours = minutes ~/ 60;
-              final mins = minutes % 60;
-              durText = mins > 0 ? '$hours jam $mins mnt' : '$hours jam';
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('OSRM fetch fallback to Haversine: $e');
-      }
-
-      _distanceText = dist;
-      _durationText = durText;
+    // 1) Cache: langsung tampil tanpa GPS/network.
+    final cached = _routeCache[cacheKey];
+    final cacheFresh =
+        cached != null && DateTime.now().difference(cached.at) < _routeCacheTtl;
+    if (cacheFresh) {
+      _distanceText = cached.distance;
+      _durationText = cached.duration;
       notifyListeners();
-    } catch (_) {
-      // GPS unavailable
+      if (cached.fromRoute) return; // sudah akurat, tak perlu hitung ulang
     }
+
+    final pos = await _resolvePosition();
+    if (pos == null) return;
+
+    // 2) Garis lurus (Haversine) — tampilan awal, instan.
+    _applyStraightLine(pos, toLat, toLng, cacheKey);
+
+    // 3) Rute asli OSRM — hanya menyempurnakan angka yang sudah tampil.
+    _fetchOsmRoute(pos, toLat, toLng, cacheKey);
+  }
+
+  Future<Position?> _resolvePosition() async {
+    final permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return null;
+    }
+
+    Position? pos;
+    try {
+      pos = await Geolocator.getLastKnownPosition();
+    } catch (_) {}
+
+    if (pos == null) {
+      try {
+        pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.low,
+            timeLimit: Duration(seconds: 4),
+          ),
+        );
+      } catch (_) {}
+    }
+    return pos;
+  }
+
+  Future<void> _fetchOsmRoute(
+    Position pos,
+    double toLat,
+    double toLng,
+    String cacheKey,
+  ) async {
+    try {
+      final url = Uri.parse(
+        'https://router.project-osrm.org/route/v1/driving/'
+        '${pos.longitude},${pos.latitude};$toLng,$toLat?overview=false',
+      );
+      final res = await http.get(url).timeout(const Duration(seconds: 3));
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        if (data['code'] == 'Ok' && (data['routes'] as List).isNotEmpty) {
+          final route = data['routes'][0];
+          final double distanceMeters =
+              (route['distance'] as num).toDouble();
+          final double durationSeconds =
+              (route['duration'] as num).toDouble();
+
+          final dist = Haversine.formatDistance(distanceMeters / 1000.0);
+          final dur = _formatDuration((durationSeconds / 60.0).round());
+
+          _distanceText = dist;
+          _durationText = dur;
+          _routeCache[cacheKey] =
+              _CachedRoute(dist, dur, DateTime.now(), fromRoute: true);
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('OSRM fetch fallback to Haversine: $e');
+    }
+  }
+
+  /// Isi angka jarak/durasi dari garis lurus (Haversine) — cepat, tanpa network.
+  void _applyStraightLine(
+    Position pos,
+    double toLat,
+    double toLng,
+    String cacheKey,
+  ) {
+    final km = Haversine.distance(pos.latitude, pos.longitude, toLat, toLng);
+    final dist = Haversine.formatDistance(km);
+    final dur = _formatDuration((km / 40.0 * 60).round());
+    _distanceText = dist;
+    _durationText = dur;
+    _routeCache[cacheKey] = _CachedRoute(dist, dur, DateTime.now());
+    notifyListeners();
+  }
+
+  String _formatDuration(int minutes) {
+    if (minutes < 60) return '${minutes > 0 ? minutes : 1} mnt';
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    return m > 0 ? '$h jam $m mnt' : '$h jam';
   }
 
   // ═══════════════════════════════════════
@@ -250,4 +297,14 @@ class PoiDetailController extends ChangeNotifier {
       notifyListeners();
     } catch (_) {}
   }
+}
+
+/// Hasil jarak/durasi yang di-cache sebentar supaya buka ulang POI instan.
+class _CachedRoute {
+  final String distance;
+  final String duration;
+  final DateTime at;
+  final bool fromRoute;
+
+  _CachedRoute(this.distance, this.duration, this.at, {this.fromRoute = false});
 }

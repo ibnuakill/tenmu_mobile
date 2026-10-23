@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme_provider.dart';
+import '../../../core/lucide_icons.dart';
 
 enum SortOption { terbaru, terdekat, rating }
 
@@ -38,11 +39,11 @@ class SortFilterWidget extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             children: [
-              _buildSortChip(theme, SortOption.terbaru, 'Terbaru', Icons.access_time),
+              _buildSortChip(theme, SortOption.terbaru, 'Terbaru', 'clock'),
               const SizedBox(width: 8),
-              _buildSortChip(theme, SortOption.terdekat, 'Terdekat (GPS)', Icons.location_on),
+              _buildSortChip(theme, SortOption.terdekat, 'Terdekat (GPS)', 'map-pin'),
               const SizedBox(width: 8),
-              _buildSortChip(theme, SortOption.rating, 'Rating Tertinggi', Icons.star),
+              _buildSortChip(theme, SortOption.rating, 'Rating Tertinggi', 'star'),
             ],
           ),
         ),
@@ -50,7 +51,7 @@ class SortFilterWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildSortChip(ThemeProvider theme, SortOption option, String label, IconData icon) {
+  Widget _buildSortChip(ThemeProvider theme, SortOption option, String label, String icon) {
     final isSelected = selectedSort == option;
     return GestureDetector(
       onTap: () => onSortChanged(option),
@@ -65,7 +66,7 @@ class SortFilterWidget extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
+            LucideIcon(
               icon,
               size: 16,
               color: isSelected ? theme.btnLabel : theme.iconColor,

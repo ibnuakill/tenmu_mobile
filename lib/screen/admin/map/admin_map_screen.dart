@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' as mgl;
 import 'package:flutter_svg/flutter_svg.dart';
@@ -65,13 +64,11 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
   }
 
   static const _pinColors = {
-    'Cafe': Color(0xFF8B4513),
-    'Fashion': Color(0xFFE91E63),
-    'Wisata': Color(0xFF2196F3),
-    'Kuliner': Color(0xFFE74C3C),
-    'Hotel': Color(0xFF1565C0),
-    'Oleh-Oleh': Color(0xFFFF6F61),
-    'UMKM': Color(0xFF1E7A52),
+    PoiCategory.kuliner: Color(0xFFE74C3C),
+    PoiCategory.kriya: Color(0xFFE91E63),
+    PoiCategory.ritel: Color(0xFF1E7A52),
+    PoiCategory.agribisnis: Color(0xFF8B4513),
+    PoiCategory.jasa: Color(0xFF2196F3),
   };
 
   Color _colorFor(String cat) => _pinColors[cat] ?? _kPrimary;
@@ -214,11 +211,11 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
     final fallbackImg = await MapMarkerPainter.buildCircleMarkerImage(
       bgColor: _kPrimary,
       iconCode: Icons.place_outlined.codePoint,
-      svgAssetPath: PoiCategory.getCategorySvgPath('Lainnya'),
+      svgAssetPath: PoiCategory.getCategorySvgPath(PoiCategory.ritel),
       size: 100,
     );
     try {
-      await c.addImage('pin_lainnya', fallbackImg);
+      await c.addImage('pin_ritel', fallbackImg);
     } catch (_) {}
 
     final currentImg = await MapMarkerPainter.buildCircleMarkerImage(
@@ -451,7 +448,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
           // ── LOCATION FAILED BANNER ──
           if (_locationFailed)
             Positioned(
-              top: MediaQuery.of(context).padding.top + 70,
+              top: MediaQuery.paddingOf(context).top + 70,
               left: 20, right: 20,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -467,7 +464,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text('Lokasi tidak tersedia. Aktifkan GPS.',
-                        style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _kTextSecondary)),
+                        style: TextStyle(fontFamily: 'Nunito', fontSize: 12, color: _kTextSecondary)),
                     ),
                   ],
                 ),
@@ -476,7 +473,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
 
           // ── FLOATING SEARCH ──
           Positioned(
-            top: MediaQuery.of(context).padding.top + 16,
+            top: MediaQuery.paddingOf(context).top + 16,
             left: 20, right: 20,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -499,12 +496,12 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                       },
                       decoration: InputDecoration(
                         hintText: 'Cari tempat di peta...',
-                        hintStyle: GoogleFonts.plusJakartaSans(color: _kTextMuted, fontSize: 13),
+                        hintStyle: TextStyle(fontFamily: 'Nunito', color: _kTextMuted, fontSize: 13),
                         border: InputBorder.none,
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _kTextPrimary),
+                      style: TextStyle(fontFamily: 'Nunito', fontSize: 13, color: _kTextPrimary),
                     ),
                   ),
                   Container(width: 1, height: 20, color: _kBorderColor),
@@ -521,7 +518,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
           // ── MAP CONTROLS ──
           Positioned(
             right: 16,
-            top: MediaQuery.of(context).size.height * 0.35,
+            top: MediaQuery.sizeOf(context).height * 0.35,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -645,7 +642,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                     children: [
                       Text(
                         name,
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(fontFamily: 'Nunito', 
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: _kTextPrimary,
@@ -654,7 +651,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                       const SizedBox(height: 2),
                       Text(
                         cat,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: TextStyle(fontFamily: 'Nunito', 
                           fontSize: 12,
                           color: _kTextSecondary,
                         ),

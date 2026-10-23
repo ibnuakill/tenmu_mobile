@@ -1,23 +1,21 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/theme_provider.dart';
+import '../../../../core/lucide_icons.dart';
 
-/// Bottom action bar: WhatsApp pill button + slide-to-start thumb (or "no location" state).
+/// Bottom action bar: slide-to-start thumb untuk membuka rute (atau state "lokasi belum ada").
 class DetailBottomActionBar extends StatefulWidget {
   final ThemeProvider theme;
   final double bottomPad;
-  final bool hasPhone;
   final bool hasLocation;
-  final VoidCallback onWhatsApp;
   final VoidCallback onRoute;
 
   const DetailBottomActionBar({
     super.key,
     required this.theme,
     required this.bottomPad,
-    required this.hasPhone,
     required this.hasLocation,
-    required this.onWhatsApp,
     required this.onRoute,
   });
 
@@ -28,6 +26,7 @@ class DetailBottomActionBar extends StatefulWidget {
 class _DetailBottomActionBarState extends State<DetailBottomActionBar> {
   double _dragPosition = 0.0;
   bool _isActionTriggered = false;
+  bool _isDragging = false;
 
   @override
   Widget build(BuildContext context) {
@@ -44,31 +43,17 @@ class _DetailBottomActionBarState extends State<DetailBottomActionBar> {
           ),
           child: Row(
             children: [
-              if (widget.hasPhone) ...[
-                GestureDetector(
-                  onTap: widget.onWhatsApp,
-                  child: Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: widget.theme.btnPrimary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.chat_bubble_outline_rounded,
-                      color: widget.theme.btnLabel,
-                      size: 22,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
               Expanded(
                 child: widget.hasLocation
                     ? _SlideToStart(
                         theme: widget.theme,
                         dragPosition: _dragPosition,
                         isTriggered: _isActionTriggered,
+                        isDragging: _isDragging,
+                        onDragStart: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => _isDragging = true);
+                        },
                         onDragUpdate: (dx) {
                           if (_isActionTriggered) return;
                           setState(() => _dragPosition += dx);
@@ -76,9 +61,11 @@ class _DetailBottomActionBarState extends State<DetailBottomActionBar> {
                         onDragEnd: (max) {
                           if (_isActionTriggered) return;
                           if (_dragPosition >= max * 0.8) {
+                            HapticFeedback.mediumImpact();
                             setState(() {
                               _dragPosition = max;
                               _isActionTriggered = true;
+                              _isDragging = false;
                             });
                             widget.onRoute();
                             Future.delayed(
@@ -93,7 +80,10 @@ class _DetailBottomActionBarState extends State<DetailBottomActionBar> {
                               },
                             );
                           } else {
-                            setState(() => _dragPosition = 0.0);
+                            setState(() {
+                              _dragPosition = 0.0;
+                              _isDragging = false;
+                            });
                           }
                         },
                       )
@@ -128,6 +118,8 @@ class _SlideToStart extends StatelessWidget {
   final ThemeProvider theme;
   final double dragPosition;
   final bool isTriggered;
+  final bool isDragging;
+  final VoidCallback onDragStart;
   final ValueChanged<double> onDragUpdate;
   final ValueChanged<double> onDragEnd;
 
@@ -135,6 +127,8 @@ class _SlideToStart extends StatelessWidget {
     required this.theme,
     required this.dragPosition,
     required this.isTriggered,
+    required this.isDragging,
+    required this.onDragStart,
     required this.onDragUpdate,
     required this.onDragEnd,
   });
@@ -147,6 +141,7 @@ class _SlideToStart extends StatelessWidget {
       builder: (context, constraints) {
         final max = constraints.maxWidth - _thumbSize - 8.0;
         final clamped = dragPosition.clamp(0.0, max);
+        final progress = max <= 0 ? 0.0 : (clamped / max).clamp(0.0, 1.0);
         return Container(
           height: 52,
           decoration: BoxDecoration(
@@ -157,6 +152,21 @@ class _SlideToStart extends StatelessWidget {
           child: Stack(
             alignment: Alignment.centerLeft,
             children: [
+              // Efek 1: track terisi hijau seiring thumb digeser
+              Positioned.fill(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: progress,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: theme.btnPrimary.withValues(alpha: 0.20),
+                        borderRadius: BorderRadius.circular(26),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               Center(
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 150),
@@ -173,8 +183,7 @@ class _SlideToStart extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      Icon(
-                        Icons.keyboard_double_arrow_right_rounded,
+                      LucideIcon('chevrons-right',
                         size: 18,
                         color: theme.textHint,
                       ),
@@ -185,26 +194,35 @@ class _SlideToStart extends StatelessWidget {
               Positioned(
                 left: 4.0 + clamped,
                 child: GestureDetector(
+                  onHorizontalDragStart: (_) => onDragStart(),
                   onHorizontalDragUpdate: (d) => onDragUpdate(d.delta.dx),
                   onHorizontalDragEnd: (_) => onDragEnd(max),
-                  child: Container(
-                    width: _thumbSize,
-                    height: _thumbSize,
-                    decoration: BoxDecoration(
-                      color: theme.btnPrimary,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      Icons.arrow_forward_rounded,
-                      color: theme.btnLabel,
-                      size: 22,
+                  child: AnimatedScale(
+                    scale: isDragging ? 1.12 : 1.0,
+                    duration: const Duration(milliseconds: 150),
+                    curve: Curves.easeOut,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      width: _thumbSize,
+                      height: _thumbSize,
+                      decoration: BoxDecoration(
+                        color: theme.btnPrimary,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDragging
+                                ? theme.btnPrimary.withValues(alpha: 0.55)
+                                : Colors.black.withValues(alpha: 0.15),
+                            blurRadius: isDragging ? 16 : 6,
+                            spreadRadius: isDragging ? 1 : 0,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: LucideIcon('arrow-right',
+                        color: theme.btnLabel,
+                        size: 22,
+                      ),
                     ),
                   ),
                 ),

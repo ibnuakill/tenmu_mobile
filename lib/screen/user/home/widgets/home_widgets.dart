@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../../../core/theme_provider.dart';
@@ -8,6 +9,7 @@ import '../../../../core/poi_image_helper.dart';
 import '../../../../core/poi_category.dart';
 import '../../../../core/haversine.dart';
 import '../../detail/poi_detail_screen.dart';
+import '../../../../core/lucide_icons.dart';
 
 /// Greeting header (Halo, nama + lokasi + notif).
 class HomeGreetingHeader extends StatelessWidget {
@@ -60,8 +62,7 @@ class HomeGreetingHeader extends StatelessWidget {
                     onTap: onTapLocation,
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.location_on_rounded,
+                        LucideIcon('map-pin',
                           size: 14,
                           color: theme.btnPrimary,
                         ),
@@ -126,8 +127,7 @@ class _NotificationBell extends StatelessWidget {
               color: theme.bgElevated,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(
-              Icons.notifications_outlined,
+            child: LucideIcon('bell',
               color: theme.textPrimary,
               size: 22,
             ),
@@ -194,13 +194,17 @@ class HomeSearchBar extends StatelessWidget {
               child: Container(
                 height: 52,
                 decoration: BoxDecoration(
-                  color: theme.bgElevated,
+                  color: theme.bgSurface,
                   borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: theme.border.withValues(alpha: 0.7),
+                    width: 1,
+                  ),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    Icon(Icons.search_rounded, color: theme.textHint, size: 20),
+                    LucideIcon('search', color: theme.textHint, size: 20),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -220,8 +224,7 @@ class HomeSearchBar extends StatelessWidget {
                     if (searchQuery.isNotEmpty)
                       GestureDetector(
                         onTap: onClearSearch,
-                        child: Icon(
-                          Icons.close_rounded,
+                        child: LucideIcon('x',
                           size: 18,
                           color: theme.textHint,
                         ),
@@ -239,17 +242,20 @@ class HomeSearchBar extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: hasActiveFilter ? accent : theme.textPrimary,
+                color: hasActiveFilter
+                    ? accent
+                    : (theme.isDarkMode ? theme.bgSurface : accent),
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.textPrimary.withValues(alpha: 0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                border: theme.isDarkMode && !hasActiveFilter
+                    ? Border.all(color: theme.border, width: 1)
+                    : null,
               ),
-              child: Icon(Icons.tune_rounded, color: theme.bgBase, size: 22),
+              child: LucideIcon('sliders-horizontal',
+                color: hasActiveFilter
+                    ? Colors.white
+                    : (theme.isDarkMode ? theme.textPrimary : Colors.white),
+                size: 22,
+              ),
             ),
           ),
         ],
@@ -322,18 +328,43 @@ class HomeCategoryChips extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               decoration: BoxDecoration(
-                color: isSelected ? theme.textPrimary : theme.bgElevated,
+                color: isSelected
+                    ? (theme.isDarkMode ? theme.textPrimary : accent)
+                    : theme.bgSurface,
                 borderRadius: BorderRadius.circular(999),
+                border: isSelected
+                    ? null
+                    : Border.all(
+                        color: theme.isDarkMode
+                            ? theme.border.withValues(alpha: 0.5)
+                            : theme.border,
+                        width: 1,
+                      ),
               ),
-              child: Text(
-                cat == 'Semua'
-                    ? cat
-                    : '${PoiCategory.getCategoryEmoji(cat)} $cat',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? theme.bgBase : theme.textSecondary,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (cat != 'Semua') ...[
+                    LucideIcon(
+                      PoiCategory.getCategoryLucide(cat),
+                      size: 14,
+                      color: isSelected
+                          ? (theme.isDarkMode ? theme.bgBase : Colors.white)
+                          : theme.textSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Text(
+                    cat,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected
+                          ? (theme.isDarkMode ? theme.bgBase : Colors.white)
+                          : theme.textSecondary,
+                    ),
+                  ),
+                ],
               ),
             ),
           );
@@ -379,8 +410,8 @@ class HomeFeaturedCarousel extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
           child: Row(
             children: [
-              Icon(
-                isFallback ? Icons.schedule_rounded : Icons.star_rounded,
+              LucideIcon(
+                isFallback ? 'clock' : 'star',
                 size: 16,
                 color: isFallback
                     ? theme.textSecondary
@@ -496,9 +527,9 @@ class _FeaturedCardItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final imageUrl = PoiImageHelper.primaryImageUrl(place);
-    final category = (place['category']?.toString().trim().isNotEmpty ?? false)
-        ? PoiCategory.normalizeCategory(place['category'])
-        : PoiCategory.lainnya;
+    final category = PoiCategory.normalizeCategory(
+      place['category']?.toString().trim() ?? '',
+    );
 
     return GestureDetector(
       onTap: () => Navigator.push(
@@ -509,13 +540,6 @@ class _FeaturedCardItem extends StatelessWidget {
         height: 400,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.22),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
         ),
         clipBehavior: Clip.antiAlias,
         child: Stack(
@@ -529,16 +553,14 @@ class _FeaturedCardItem extends StatelessWidget {
                 fadeInDuration: const Duration(milliseconds: 300),
                 placeholder: (_, _) => Container(
                   color: theme.bgElevated,
-                  child: Icon(
-                    Icons.image_outlined,
+                  child: LucideIcon('image',
                     size: 48,
                     color: theme.textHint,
                   ),
                 ),
                 errorWidget: (_, _, _) => Container(
                   color: theme.bgElevated,
-                  child: Icon(
-                    Icons.broken_image_outlined,
+                  child: LucideIcon('image-off',
                     size: 48,
                     color: theme.textHint,
                   ),
@@ -547,8 +569,7 @@ class _FeaturedCardItem extends StatelessWidget {
             else
               Container(
                 color: accent.withValues(alpha: 0.15),
-                child: Icon(
-                  Icons.storefront_rounded,
+                child: LucideIcon('store',
                   size: 64,
                   color: accent.withValues(alpha: 0.4),
                 ),
@@ -575,9 +596,12 @@ class _FeaturedCardItem extends StatelessWidget {
               right: 16,
               child: Row(
                 children: [
-                  _GlassChip(emoji: PoiCategory.getCategoryEmoji(category), label: category),
+                  _GlassChip(
+                    icon: PoiCategory.getCategoryLucide(category),
+                    label: category,
+                  ),
                   const Spacer(),
-                  _GlassCircle(child: const Icon(Icons.favorite_border_rounded, color: Colors.white, size: 18)),
+                  _GlassCircle(child: const LucideIcon('heart', color: Colors.white, size: 18)),
                 ],
               ),
             ),
@@ -593,7 +617,7 @@ class _FeaturedCardItem extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.location_on_rounded, size: 13, color: Colors.white70),
+                        const LucideIcon('map-pin', size: 13, color: Colors.white70),
                         const SizedBox(width: 3),
                         Expanded(
                           child: Text(
@@ -621,7 +645,7 @@ class _FeaturedCardItem extends StatelessWidget {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        const Icon(Icons.star_rounded, color: Color(0xFFFFC107), size: 15),
+                        const LucideIcon('star', color: Color(0xFFFFC107), size: 15),
                         const SizedBox(width: 3),
                         Text(
                           rating > 0 ? rating.toStringAsFixed(1) : 'Baru',
@@ -650,7 +674,7 @@ class _FeaturedCardItem extends StatelessWidget {
                                 ),
                               ),
                               SizedBox(width: 4),
-                              Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.black87),
+                              LucideIcon('arrow-right', size: 14, color: Colors.black87),
                             ],
                           ),
                         ),
@@ -668,9 +692,9 @@ class _FeaturedCardItem extends StatelessWidget {
 }
 
 class _GlassChip extends StatelessWidget {
-  final String emoji;
+  final String icon;
   final String label;
-  const _GlassChip({required this.emoji, required this.label});
+  const _GlassChip({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -684,8 +708,8 @@ class _GlassChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 13)),
-          const SizedBox(width: 4),
+          LucideIcon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
           Text(
             label,
             style: const TextStyle(
@@ -719,8 +743,8 @@ class _GlassCircle extends StatelessWidget {
   }
 }
 
-/// Compact list item card (horizontal image + info).
-class HomePoiListCard extends StatelessWidget {
+/// 2-column grid product-style card.
+class HomePoiGridCard extends StatelessWidget {
   final Map<String, dynamic> place;
   final double rating;
   final ThemeProvider theme;
@@ -728,7 +752,7 @@ class HomePoiListCard extends StatelessWidget {
   final int index;
   final Position? userPosition;
 
-  const HomePoiListCard({
+  const HomePoiGridCard({
     super.key,
     required this.place,
     required this.rating,
@@ -741,9 +765,9 @@ class HomePoiListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final imageUrl = PoiImageHelper.primaryImageUrl(place);
-    final category = (place['category']?.toString().trim().isNotEmpty ?? false)
-        ? PoiCategory.normalizeCategory(place['category'])
-        : PoiCategory.lainnya;
+    final category = PoiCategory.normalizeCategory(
+      place['category']?.toString().trim() ?? '',
+    );
     String? distanceText;
     if (userPosition != null) {
       final lat = (place['latitude'] as num?)?.toDouble();
@@ -759,14 +783,16 @@ class HomePoiListCard extends StatelessWidget {
       }
     }
 
+    final isNew = rating == 0;
+
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: Duration(milliseconds: 400 + (index * 60)),
+      duration: Duration(milliseconds: 350 + (index * 50)),
       curve: Curves.easeOutCubic,
       builder: (_, v, child) => Opacity(
         opacity: v,
         child: Transform.translate(
-          offset: Offset(0, 20 * (1 - v)),
+          offset: Offset(0, 16 * (1 - v)),
           child: child,
         ),
       ),
@@ -776,136 +802,178 @@ class HomePoiListCard extends StatelessWidget {
           MaterialPageRoute(builder: (_) => PoiDetailScreen(place: place)),
         ),
         child: Container(
-          margin: const EdgeInsets.fromLTRB(24, 0, 24, 14),
           decoration: BoxDecoration(
             color: theme.bgSurface,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.07),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(16),
           ),
           clipBehavior: Clip.antiAlias,
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                width: 100,
-                height: 100,
-                child: imageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: imageUrl,
-                        fit: BoxFit.cover,
-                        memCacheWidth: 200,
-                        placeholder: (_, _) => Container(
-                          color: theme.bgElevated,
-                          child: Icon(
-                            Icons.image_outlined,
-                            color: theme.textHint,
-                            size: 24,
-                          ),
-                        ),
-                        errorWidget: (_, _, _) => Container(
-                          color: theme.bgElevated,
-                          child: Icon(
-                            Icons.broken_image_outlined,
-                            color: theme.textHint,
-                            size: 24,
-                          ),
-                        ),
-                      )
-                    : Container(
-                        color: theme.bgElevated,
-                        child: Icon(
-                          Icons.storefront_outlined,
-                          color: theme.textHint,
-                          size: 24,
-                        ),
-                      ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${PoiCategory.getCategoryEmoji(category)} $category',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: accent,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        place['nama_tempat'] ?? 'Tanpa Nama',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: theme.textPrimary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        place['alamat'] ?? '',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: theme.textSecondary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.star_rounded,
-                            size: 13,
-                            color: Color(0xFFFFC107),
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            rating > 0 ? rating.toStringAsFixed(1) : 'Baru',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: theme.textPrimary,
-                            ),
-                          ),
-                          if (distanceText != null) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 3,
-                              height: 3,
-                              decoration: BoxDecoration(
-                                color: theme.textHint,
-                                shape: BoxShape.circle,
+              // ── Image area ──────────────────────────
+              Stack(
+                children: [
+                  AspectRatio(
+                    aspectRatio: 1.0,
+                    child: imageUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: imageUrl,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 300,
+                            placeholder: (_, _) => Container(
+                              color: theme.bgElevated,
+                              child: Center(
+                                child: LucideIcon('image',
+                                    color: theme.textHint, size: 28),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Icon(Icons.near_me_rounded, size: 12, color: accent),
-                            const SizedBox(width: 3),
-                            Text(
+                            errorWidget: (_, _, _) => Container(
+                              color: theme.bgElevated,
+                              child: Center(
+                                child: LucideIcon('store',
+                                    color: theme.textHint, size: 28),
+                              ),
+                            ),
+                          )
+                        : Container(
+                            color: theme.bgElevated,
+                            child: Center(
+                              child: LucideIcon('store',
+                                  color: theme.textHint, size: 32),
+                            ),
+                          ),
+                  ),
+                  // "Baru" badge top-left
+                  if (isNew)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: accent,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Baru!',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  // Verified badge top-right
+                  if (place['verification_status'] == 'verified')
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: theme.isDarkMode ? theme.bgElevated : Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: LucideIcon('badge-check',
+                            size: 16, color: accent),
+                      ),
+                    ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Category label — uppercase, semi-bold, clear badge feel
+                    Row(
+                      children: [
+                        LucideIcon(
+                          PoiCategory.getCategoryLucide(category),
+                          size: 12,
+                          color: accent,
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            category.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: accent,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.6,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    // Place name — Bold, dominant hierarchy
+                    Text(
+                      place['nama_tempat'] ?? 'Tanpa Nama',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: theme.textPrimary,
+                        letterSpacing: -0.2,
+                        height: 1.25,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    // Rating (Bold) + Distance (Regular) row
+                    Row(
+                      children: [
+                        const LucideIcon('star',
+                          size: 14,
+                          color: Color(0xFFFFC107),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          rating > 0 ? rating.toStringAsFixed(1) : 'Baru',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: theme.textPrimary,
+                          ),
+                        ),
+                        if (distanceText != null) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 3,
+                            height: 3,
+                            decoration: BoxDecoration(
+                              color: theme.textHint.withValues(alpha: 0.6),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          LucideIcon('navigation',
+                            size: 11,
+                            color: theme.textSecondary,
+                          ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
                               distanceText,
                               style: TextStyle(
                                 fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: accent,
+                                fontWeight: FontWeight.w400,
+                                color: theme.textSecondary,
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ],
-                          const Spacer(),
-                          if (place['verification_status'] == 'verified')
-                            Icon(Icons.verified_rounded, size: 14, color: accent),
+                          ),
                         ],
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -975,12 +1043,12 @@ class HomeEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.1),
+      padding: EdgeInsets.only(top: MediaQuery.sizeOf(context).height * 0.1),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.explore_outlined, size: 72, color: accent.withValues(alpha: 0.4)),
+            LucideIcon('compass', size: 72, color: accent.withValues(alpha: 0.4)),
             const SizedBox(height: 16),
             Text(
               searchQuery.isNotEmpty
@@ -1025,12 +1093,12 @@ class HomeErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.15),
+      padding: EdgeInsets.only(top: MediaQuery.sizeOf(context).height * 0.15),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.wifi_off_rounded, size: 56, color: theme.textHint),
+            LucideIcon('wifi-off', size: 56, color: theme.textHint),
             const SizedBox(height: 16),
             Text(
               'Gagal memuat data',
@@ -1048,7 +1116,7 @@ class HomeErrorState extends StatelessWidget {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
+              icon: const LucideIcon('refresh-cw'),
               label: const Text('Coba Lagi'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: accent,
@@ -1082,19 +1150,19 @@ class HomePillBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = theme.isDarkMode;
-    final bgColor = isDark ? const Color(0xFF151515) : const Color(0xFF111111);
+    final bgColor = isDark ? const Color(0xFF151515) : Colors.white;
     final borderColor = isDark
         ? Colors.white.withValues(alpha: 0.07)
-        : Colors.white.withValues(alpha: 0.09);
+        : const Color(0xFFE5E7EB);
 
     final items = <_NavItem>[
-      const _NavItem(icon: Icons.home_rounded, label: 'Beranda', index: 0),
-      const _NavItem(icon: Icons.map_rounded, label: 'Peta', index: 1),
+      const _NavItem(icon: 'house', label: 'Beranda', index: 0),
+      const _NavItem(icon: 'map', label: 'Peta', index: 1),
       if (isOwner)
-        const _NavItem(icon: Icons.add_circle_rounded, label: 'Tambah', index: 2),
-      const _NavItem(icon: Icons.auto_awesome_rounded, label: 'AI', index: 3),
-      const _NavItem(icon: Icons.smart_display_rounded, label: 'Video', index: 5),
-      const _NavItem(icon: Icons.person_rounded, label: 'Profil', index: 4),
+        const _NavItem(icon: 'circle-plus', label: 'Tambah', index: 2),
+      const _NavItem(icon: 'sparkles', label: 'AI', index: 3),
+      const _NavItem(icon: 'images', label: 'Postingan', index: 5),
+      const _NavItem(icon: 'user', label: 'Profil', index: 4),
     ];
 
     return Container(
@@ -1126,7 +1194,7 @@ class HomePillBottomNav extends StatelessWidget {
 }
 
 class _NavItem {
-  final IconData icon;
+  final String icon;
   final String label;
   final int index;
   const _NavItem({
@@ -1153,16 +1221,23 @@ class _NavBarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>();
+    final isDark = theme.isDarkMode;
+    final defaultInactiveColor = isDark
+        ? Colors.white.withValues(alpha: 0.4)
+        : const Color(0xFF9E9E9E);
+    final defaultActiveColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+
     final iconColor = isAddButton
         ? accent
         : isActive
-            ? Colors.white
-            : Colors.white.withValues(alpha: 0.4);
+            ? (isDark ? Colors.white : accent)
+            : defaultInactiveColor;
     final labelColor = isAddButton
         ? accent
         : isActive
-            ? Colors.white
-            : Colors.white.withValues(alpha: 0.4);
+            ? defaultActiveColor
+            : defaultInactiveColor;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -1181,7 +1256,7 @@ class _NavBarItem extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          Icon(item.icon, size: isAddButton ? 26 : 22, color: iconColor),
+          LucideIcon(item.icon, size: isAddButton ? 26 : 22, color: iconColor),
           const SizedBox(height: 3),
           Text(
             item.label,

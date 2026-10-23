@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/session_timeout_service.dart';
 import '../../core/user_role.dart';
 import '../admin/dashboard/admin_home_screen.dart';
 import '../user/home/home_screen.dart';
@@ -33,15 +35,27 @@ class _RoleCheckerState extends State<RoleChecker> {
 
     final response = await Supabase.instance.client
         .from('profiles')
-        .select('role, status')
+        .select('nama, role, status')
         .eq('id', user.id)
         .maybeSingle();
 
+    // Cek apakah ada nama tersimpan dari proses input Magic Link
+    String? pendingNama;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      pendingNama = prefs.getString('pending_magic_link_nama');
+      if (pendingNama != null && pendingNama.isNotEmpty) {
+        await prefs.remove('pending_magic_link_nama');
+      }
+    } catch (_) {}
+
     if (response == null) {
       final metadata = user.userMetadata ?? {};
-      final fullName = metadata['full_name']?.toString() ??
-          metadata['name']?.toString() ??
-          'User';
+      final fullName = (pendingNama != null && pendingNama.isNotEmpty)
+          ? pendingNama
+          : (metadata['full_name']?.toString() ??
+              metadata['name']?.toString() ??
+              'User');
       final avatarUrl = metadata['avatar_url']?.toString() ??
           metadata['picture']?.toString();
 
@@ -55,6 +69,19 @@ class _RoleCheckerState extends State<RoleChecker> {
       });
 
       return parseUserRole('user');
+    }
+
+    // Jika profile sudah ada tapi namanya masih kosong atau user memasukkan nama baru dari magic link
+    final currentNama = response['nama']?.toString();
+    if (pendingNama != null &&
+        pendingNama.isNotEmpty &&
+        (currentNama == null || currentNama.isEmpty || currentNama == 'User' || currentNama.contains('@'))) {
+      try {
+        await Supabase.instance.client.from('profiles').update({
+          'nama': pendingNama,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', user.id);
+      } catch (_) {}
     }
 
     final role = response['role']?.toString() ?? 'user';
@@ -106,6 +133,21 @@ class _RoleCheckerState extends State<RoleChecker> {
 
         // Error
         if (snapshot.hasError || !snapshot.hasData) {
+          final errStr = snapshot.error?.toString() ?? '';
+          if (errStr.contains('23503') ||
+              errStr.contains('profiles_id_fkey') ||
+              errStr.contains('Key is not present in table "users"')) {
+            // Sesi user sudah tidak valid di database auth.users, otomatis sign out
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              await Supabase.instance.client.auth.signOut();
+            });
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+
           final message = snapshot.error?.toString().replaceFirst(
             'Exception: ',
             '',
@@ -130,9 +172,21 @@ class _RoleCheckerState extends State<RoleChecker> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _reloadRole,
-                      child: const Text('Coba Lagi'),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () async {
+                            await Supabase.instance.client.auth.signOut();
+                          },
+                          child: const Text('Keluar'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: _reloadRole,
+                          child: const Text('Coba Lagi'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -242,6 +296,7 @@ class _BannedScreen extends StatelessWidget {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () async {
+                    await SessionTimeoutService.clearActivity();
                     await Supabase.instance.client.auth.signOut();
                   },
                   icon: const Icon(Icons.logout_rounded, size: 18, color: Colors.white70),

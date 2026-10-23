@@ -9,6 +9,7 @@ import '../../../core/poi_category.dart';
 import 'route_map_controller.dart';
 import 'widgets/map_marker_painter.dart';
 import 'widgets/map_navigation_sheet.dart';
+import '../../../core/lucide_icons.dart';
 
 class RouteMapScreen extends StatefulWidget {
   final List<Map<String, dynamic>>? placesList;
@@ -82,7 +83,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         actions: [
           if (_ctrl.isShowingRoute && widget.placesList != null)
             IconButton(
-              icon: const Icon(Icons.close),
+              icon: const LucideIcon('x'),
               tooltip: 'Tutup Rute',
               onPressed: () {
                 _ctrl.closeRoute();
@@ -145,7 +146,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
               Positioned(
                 right: 16,
                 bottom:
-                    200 + MediaQuery.of(context).padding.bottom,
+                    200 + MediaQuery.paddingOf(context).bottom,
                 child: MapFabStack(controller: _ctrl),
               ),
 
@@ -218,25 +219,21 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     );
     await c.addImage('marker_current', currentPosImg);
 
-    // Material icon codepoints per kategori
+    // Material icon codepoints per kategori (5 sektor)
     final Map<String, int> categoryIcons = {
-      'Wisata Budaya': Icons.landscape_outlined.codePoint,
-      'Kuliner & Cafe': Icons.restaurant_outlined.codePoint,
-      'Oleh-oleh & Kerajinan': Icons.palette_outlined.codePoint,
-      'Penginapan & Hotel': Icons.hotel_outlined.codePoint,
-      'Pertokoan & UMKM': Icons.storefront_outlined.codePoint,
-      'Jasa & Layanan': Icons.build_outlined.codePoint,
-      'Lainnya': Icons.place_outlined.codePoint,
+      PoiCategory.kuliner: Icons.restaurant_outlined.codePoint,
+      PoiCategory.kriya: Icons.palette_outlined.codePoint,
+      PoiCategory.ritel: Icons.storefront_outlined.codePoint,
+      PoiCategory.agribisnis: Icons.grass_outlined.codePoint,
+      PoiCategory.jasa: Icons.build_outlined.codePoint,
     };
 
     final Map<String, Color> categoryColors = {
-      'Wisata Budaya': const Color(0xFF4CAF50),
-      'Kuliner & Cafe': const Color(0xFFFF7043),
-      'Oleh-oleh & Kerajinan': const Color(0xFF9C27B0),
-      'Penginapan & Hotel': const Color(0xFF2196F3),
-      'Pertokoan & UMKM': const Color(0xFFFFC107),
-      'Jasa & Layanan': const Color(0xFF009688),
-      'Lainnya': const Color(0xFF607D8B),
+      PoiCategory.kuliner: const Color(0xFFFF7043),
+      PoiCategory.kriya: const Color(0xFF9C27B0),
+      PoiCategory.ritel: const Color(0xFFFFC107),
+      PoiCategory.agribisnis: const Color(0xFF4CAF50),
+      PoiCategory.jasa: const Color(0xFF009688),
     };
 
     for (final cat in PoiCategory.allCategories) {
@@ -425,7 +422,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     final rawCat = _ctrl.destinationCategory ?? '';
     final cat = rawCat.isNotEmpty
         ? PoiCategory.normalizeCategory(rawCat)
-        : PoiCategory.lainnya;
+        : PoiCategory.ritel;
     // Use category image if available, otherwise fallback to destination marker
     final imageId = PoiCategory.allCategories.contains(cat)
         ? RouteMapController.catKey(cat)
@@ -453,7 +450,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   // ═══════════════════════════════════════════
 
   Widget _buildBottomPanel(ThemeProvider theme) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
     final isPreviewing = _ctrl.selectedPlace != null && !_ctrl.isShowingRoute;
     final isNavigating = _ctrl.isShowingRoute;
 

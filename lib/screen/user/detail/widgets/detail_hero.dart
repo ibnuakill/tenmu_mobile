@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme_provider.dart';
 import 'detail_helpers.dart';
+import '../../../../core/lucide_icons.dart';
 
 /// Full-bleed hero image block: photo carousel + gradient + back/fav buttons
 /// + featured badge + place name overlay + dot indicators.
@@ -16,6 +17,8 @@ class DetailHero extends StatefulWidget {
   final double topPadding;
   final VoidCallback onBack;
   final VoidCallback onTapFavorite;
+  final bool hasPhone;
+  final VoidCallback onWhatsApp;
   final void Function(int index) onShowImagePreview;
 
   const DetailHero({
@@ -30,6 +33,8 @@ class DetailHero extends StatefulWidget {
     required this.topPadding,
     required this.onBack,
     required this.onTapFavorite,
+    required this.hasPhone,
+    required this.onWhatsApp,
     required this.onShowImagePreview,
   });
 
@@ -73,8 +78,7 @@ class _DetailHeroState extends State<DetailHero> {
                     errorWidget: (_, _, _) => Container(
                       color: theme.bgSurface,
                       child: Center(
-                        child: Icon(
-                          Icons.broken_image_outlined,
+                        child: LucideIcon('image-off',
                           color: theme.textHint,
                           size: 42,
                         ),
@@ -85,8 +89,7 @@ class _DetailHeroState extends State<DetailHero> {
               : Container(
                   color: theme.bgSurface,
                   child: Center(
-                    child: Icon(
-                      Icons.storefront_outlined,
+                    child: LucideIcon('store',
                       size: 72,
                       color: theme.textHint,
                     ),
@@ -142,15 +145,23 @@ class _DetailHeroState extends State<DetailHero> {
             child: Row(
               children: [
                 GlassCircleButton(
-                  icon: Icons.arrow_back_ios_new_rounded,
+                  icon: 'chevron-left',
                   onTap: widget.onBack,
                 ),
                 const Spacer(),
+                if (widget.hasPhone) ...[
+                  SvgCircleButton(
+                    asset: 'assets/icons/brands/whatsapp.svg',
+                    semanticsLabel: 'WhatsApp',
+                    onTap: widget.onWhatsApp,
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 if (!widget.isLoadingFavorite)
                   GlassCircleButton(
                     icon: widget.isFavorite
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
+                        ? 'heart'
+                        : 'heart',
                     iconColor:
                         widget.isFavorite ? Colors.redAccent : Colors.white,
                     onTap: widget.onTapFavorite,
@@ -181,8 +192,7 @@ class _DetailHeroState extends State<DetailHero> {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.star_rounded,
+                        LucideIcon('star',
                           size: 12,
                           color: Colors.white,
                         ),
@@ -202,8 +212,7 @@ class _DetailHeroState extends State<DetailHero> {
                 ],
                 Row(
                   children: [
-                    const Icon(
-                      Icons.location_on_rounded,
+                    const LucideIcon('map-pin',
                       size: 13,
                       color: Colors.white70,
                     ),

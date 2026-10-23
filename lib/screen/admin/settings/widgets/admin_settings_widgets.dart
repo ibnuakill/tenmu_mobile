@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 // Quixotic Palette
 const kPrimary      = Color(0xFF1E7A52);
@@ -50,7 +49,7 @@ class AdminInfoCard extends StatelessWidget {
               children: [
                 Text(
                   'Admin TenMu',
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(fontFamily: 'Nunito', 
                     fontWeight: FontWeight.w700,
                     color: kTextPrimary,
                     fontSize: 16,
@@ -59,7 +58,7 @@ class AdminInfoCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   email,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: TextStyle(fontFamily: 'Nunito', 
                     fontSize: 13,
                     color: kTextSecondary,
                   ),
@@ -83,7 +82,7 @@ class SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: GoogleFonts.plusJakartaSans(
+      style: TextStyle(fontFamily: 'Nunito', 
         color: kTextMuted,
         fontWeight: FontWeight.w700,
         fontSize: 11,
@@ -143,10 +142,10 @@ class SettingsNavTile extends StatelessWidget {
         child: Icon(icon, color: iconColor, size: 20),
       ),
       title: Text(title,
-        style: GoogleFonts.plusJakartaSans(
+        style: TextStyle(fontFamily: 'Nunito', 
           color: kTextPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
       subtitle: Text(subtitle,
-        style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 12)),
+        style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary, fontSize: 12)),
       trailing: const Icon(Icons.chevron_right_rounded, color: kTextMuted, size: 20),
     );
   }
@@ -185,10 +184,10 @@ class SettingsActionTile extends StatelessWidget {
         child: Icon(icon, color: iconColor, size: 20),
       ),
       title: Text(title,
-        style: GoogleFonts.plusJakartaSans(
+        style: TextStyle(fontFamily: 'Nunito', 
           color: kTextPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
       subtitle: Text(subtitle,
-        style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 12)),
+        style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary, fontSize: 12)),
       trailing: isLoading
           ? const SizedBox(
               width: 18, height: 18,

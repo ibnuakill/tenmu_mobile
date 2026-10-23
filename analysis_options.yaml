@@ -10,19 +10,78 @@
 include: package:flutter_lints/flutter.yaml
 
 linter:
-  # The lint rules applied to this project can be customized in the
-  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
-  # included above or to enable additional rules. A list of all available lints
-  # and their documentation is published at https://dart.dev/lints.
-  #
-  # Instead of disabling a lint rule for the entire project in the
-  # section below, it can also be suppressed for a single line of code
-  # or a specific dart file by using the `// ignore: name_of_lint` and
-  # `// ignore_for_file: name_of_lint` syntax on the line or in the file
-  # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    # ── Clean Code: return types & annotations ──
+    always_declare_return_types: true
+    type_annotate_public_apis: true
+
+    # ── Clean Code: immutability ──
+    prefer_final_fields: true
+    prefer_final_locals: true
+    prefer_initializing_formals: true
+    use_super_parameters: true
+
+    # ── Clean Code: widgets ──
+    use_key_in_widget_constructors: true
+    sort_child_properties_last: true
+
+    # ── Clean Code: null safety & style ──
+    avoid_init_to_null: true
+    avoid_redundant_argument_values: true
+    avoid_void_async: true
+    cancel_subscriptions: true
+    close_sinks: true
+    directives_ordering: true
+    empty_constructor_bodies: true
+    file_names: true
+    implementation_imports: true
+    library_prefixes: true
+    lines_longer_than_80_chars: false
+    missing_whitespace_between_adjacent_strings: true
+    one_member_abstracts: true
+    only_throw_errors: true
+    overridden_fields: true
+    prefer_adjacent_string_concatenation: true
+    prefer_contains: true
+    prefer_equal_for_default_values: true
+    prefer_final_in_for_each: true
+    prefer_function_declarations_over_variables: true
+    prefer_generic_function_type_aliases: true
+    prefer_if_elements_to_conditional_expressions: true
+    prefer_inlined_adds: true
+    prefer_interpolation_to_compose_strings: true
+    prefer_is_not_empty: true
+    prefer_iterable_whereType: true
+    prefer_list_is_empty: true
+    prefer_null_aware_operators: true
+    prefer_typing_uninitialized_variables: true
+    prefer_void_to_null: true
+    provide_deprecation_message: true
+    secure_pubspec_urls: true
+    sort_constructors_first: true
+    sort_pub_dependencies: true
+    sort_unnamed_constructors_first: true
+    unnecessary_brace_in_string_interps: true
+    unnecessary_const: true
+    unnecessary_lambdas: true
+    unnecessary_null_aware_assignments: true
+    unnecessary_overrides: true
+    unnecessary_parenthesis: true
+    unnecessary_string_escapes: true
+    unnecessary_this: true
+    unrelated_type_equality_checks: true
+    unsafe_assertion: true
+    use_full_hex_values_for_flutter_colors: true
+    use_if_null_to_convert_nulls_to_bools: true
+    use_is_even_rather_than_modulo: true
+    use_late: true
+    use_named_constants: true
+    use_rethrow_when_possible: true
+    use_setters_to_change_properties: true
+    use_string_buffers: true
+    use_to_and_from_if_applicable: true
+    valid_regexps: true
+    void_checks: true
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

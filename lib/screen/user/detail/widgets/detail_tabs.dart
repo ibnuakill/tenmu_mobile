@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/poi_facility.dart';
+import '../../../../core/poi_category.dart';
 import '../../../../core/theme_provider.dart';
 import '../../review/review_section.dart';
-import '../../video/widgets/place_videos_section.dart';
+import '../../post/widgets/place_posts_section.dart';
+import '../../../../core/lucide_icons.dart';
 
 /// Tab content (Detail / Ulasan) — memilih tab via TabController.
 class DetailTabContent extends StatelessWidget {
@@ -66,10 +68,51 @@ class _DetailsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final facilities = PoiFacility.fromList(place['fasilitas']);
+    final category = PoiCategory.normalizeCategory(
+      place['category']?.toString().trim() ?? '',
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Kategori sektor (satu tingkat)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+          child: Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: theme.bgElevated,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: theme.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LucideIcon(
+                      PoiCategory.getCategoryLucide(category),
+                      size: 13,
+                      color: theme.textSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      category,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: theme.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+
         // About
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
@@ -202,8 +245,7 @@ class _DetailsTab extends StatelessWidget {
                       width: 120,
                       height: 120,
                       color: theme.bgSurface,
-                      child: Icon(
-                        Icons.broken_image_outlined,
+                      child: LucideIcon('image-off',
                         color: theme.textHint,
                       ),
                     ),
@@ -214,9 +256,9 @@ class _DetailsTab extends StatelessWidget {
           ),
         ],
 
-        // Videos
+        // Posts
         if (placeId != null)
-          PlaceVideosSection(
+          PlacePostsSection(
             placeId: placeId as int,
             placeName: place['nama_tempat'] ?? 'Tempat Ini',
           ),

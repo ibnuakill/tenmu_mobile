@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/theme_provider.dart';
+import '../../../../core/lucide_icons.dart';
+import '../chat_ai_service.dart';
 
 /// Input bar chat: text field + tombol kirim (loading state).
 class ChatInputBar extends StatelessWidget {
@@ -20,8 +23,8 @@ class ChatInputBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final bottomPad = MediaQuery.of(context).padding.bottom;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomPad = MediaQuery.paddingOf(context).bottom;
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -50,12 +53,17 @@ class ChatInputBar extends StatelessWidget {
                 cursorColor: theme.borderFocus,
                 maxLines: 3,
                 minLines: 1,
+                maxLength: ChatAIService.maxMessageChars,
+                inputFormatters: [
+                  LengthLimitingTextInputFormatter(ChatAIService.maxMessageChars),
+                ],
                 textInputAction: TextInputAction.send,
                 onSubmitted: isLoading ? null : onSend,
                 decoration: InputDecoration(
                   hintText: 'Tanya apa aja...',
                   hintStyle: TextStyle(color: theme.textHint, fontSize: 13),
                   border: InputBorder.none,
+                  counterText: '',
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 12,
@@ -84,8 +92,7 @@ class ChatInputBar extends StatelessWidget {
                         color: theme.btnLabel,
                       ),
                     )
-                  : Icon(
-                      Icons.send_rounded,
+                  : LucideIcon('send',
                       color: controller.text.trim().isEmpty
                           ? theme.textHint
                           : theme.btnLabel,

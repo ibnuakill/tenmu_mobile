@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/notification_service.dart';
+import '../../../core/notification_center.dart';
 import 'widgets/verify_place_widgets.dart';
 
 class VerifyPlaceScreen extends StatefulWidget {
@@ -117,6 +117,14 @@ class _VerifyPlaceScreenState extends State<VerifyPlaceScreen>
           placeId: placeId is int ? placeId : int.tryParse(placeId.toString()) ?? 0,
           placeName: place['nama_tempat'] ?? '',
         );
+        // Notifikasi in-app → muncul di lonceng + pop-up milik owner.
+        sendNotifications(
+          userIds: [ownerId.toString()],
+          title: 'UMKM kamu sudah terverifikasi',
+          body:
+              '"${place['nama_tempat']}" sekarang tampil di TenMu dan bisa ditemukan pengguna.',
+          type: 'success',
+        );
       }
 
       _loadPlaces();
@@ -127,16 +135,28 @@ class _VerifyPlaceScreenState extends State<VerifyPlaceScreen>
 
   Future<void> _rejectPlace(Map<String, dynamic> place, String reason) async {
     final placeId = place['id'];
+    final ownerId = place['owner_id'] != null && place['owner_id'] is Map
+        ? place['owner_id']['id']
+        : place['owner_id'];
+    final finalReason = reason.isEmpty ? 'Tidak memenuhi syarat' : reason;
 
     try {
       await _client.from('places').update({
         'verification_status': 'rejected',
-        'rejection_reason': reason.isEmpty ? 'Tidak memenuhi syarat' : reason,
+        'rejection_reason': finalReason,
       }).eq('id', placeId);
 
       _snack('Tempat "${place['nama_tempat']}" ditolak.', isError: false);
 
-      // Notifikasi penolakan (opsional)
+      if (ownerId != null && ownerId.toString().isNotEmpty) {
+        sendNotifications(
+          userIds: [ownerId.toString()],
+          title: 'Pengajuan UMKM ditolak',
+          body:
+              '"${place['nama_tempat']}" belum bisa ditampilkan. Alasan: $finalReason',
+          type: 'warning',
+        );
+      }
 
       _loadPlaces();
     } catch (e) {
@@ -178,7 +198,7 @@ class _VerifyPlaceScreenState extends State<VerifyPlaceScreen>
   void _snack(String msg, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg, style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13)),
+        content: Text(msg, style: TextStyle(fontFamily: 'Nunito', color: Colors.white, fontSize: 13)),
         backgroundColor: isError ? kAccentRed : kPrimary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -198,7 +218,7 @@ class _VerifyPlaceScreenState extends State<VerifyPlaceScreen>
         automaticallyImplyLeading: false,
         title: Text(
           'Verifikasi Tempat',
-          style: GoogleFonts.poppins(
+          style: TextStyle(fontFamily: 'Nunito', 
             color: kTextPrimary,
             fontWeight: FontWeight.w600,
             fontSize: 17,
@@ -210,8 +230,8 @@ class _VerifyPlaceScreenState extends State<VerifyPlaceScreen>
           indicatorWeight: 3,
           labelColor: kPrimary,
           unselectedLabelColor: kTextMuted,
-          labelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 13),
-          unselectedLabelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w500, fontSize: 13),
+          labelStyle: TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w700, fontSize: 13),
+          unselectedLabelStyle: TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w500, fontSize: 13),
           tabs: [
             Tab(text: 'Pending (${_pendingPlaces.length})'),
             Tab(text: 'Verified (${_verifiedPlaces.length})'),

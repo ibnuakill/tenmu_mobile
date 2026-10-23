@@ -1,3 +1,6 @@
+-- ⚠ DEPRECATED: migrasi lama (kategori 8 sektor / sub-kategori).
+-- Sudah digantikan oleh supabase/migrate_to_5_sectors.sql + drop_sub_category.sql.
+-- Jangan dijalankan ulang.
 -- ============================================================
 -- Migration: Create kategori table
 -- Deskripsi: Tabel untuk manage kategori UMKM secara dinamis

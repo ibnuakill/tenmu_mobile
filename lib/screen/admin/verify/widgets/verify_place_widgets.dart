@@ -1,6 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/poi_image_helper.dart';
 import '../../../owner/edit_place_screen.dart';
 
@@ -59,7 +58,7 @@ class PendingTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text('Tidak ada tempat menunggu verifikasi.',
-                    style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontWeight: FontWeight.w600)),
+                    style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary, fontWeight: FontWeight.w600)),
                 ],
               ),
             )
@@ -86,21 +85,21 @@ class PendingTab extends StatelessWidget {
         backgroundColor: kCardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Tolak Tempat',
-          style: GoogleFonts.poppins(color: kTextPrimary, fontWeight: FontWeight.w700, fontSize: 16)),
+          style: TextStyle(fontFamily: 'Nunito', color: kTextPrimary, fontWeight: FontWeight.w700, fontSize: 16)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Alasan penolakan:',
-              style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 12)),
+              style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary, fontSize: 12)),
             const SizedBox(height: 8),
             TextField(
               controller: reasonController,
-              style: GoogleFonts.plusJakartaSans(color: kTextPrimary),
+              style: TextStyle(fontFamily: 'Nunito', color: kTextPrimary),
               maxLines: 3,
               decoration: InputDecoration(
                 hintText: 'Jelaskan alasan penolakan...',
-                hintStyle: GoogleFonts.plusJakartaSans(color: kTextMuted, fontSize: 13),
+                hintStyle: TextStyle(fontFamily: 'Nunito', color: kTextMuted, fontSize: 13),
                 fillColor: kPageBg,
                 filled: true,
                 border: OutlineInputBorder(
@@ -118,7 +117,7 @@ class PendingTab extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Batal', style: GoogleFonts.plusJakartaSans(color: kTextSecondary)),
+            child: Text('Batal', style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -130,7 +129,7 @@ class PendingTab extends StatelessWidget {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
             ),
-            child: Text('Tolak', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+            child: Text('Tolak', style: TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -181,7 +180,7 @@ class VerifiedTabState extends State<VerifiedTab> {
                   ),
                   const SizedBox(height: 16),
                   Text('Belum ada tempat yang diverifikasi.',
-                    style: GoogleFonts.plusJakartaSans(color: kTextSecondary)),
+                    style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary)),
                 ],
               ),
             )
@@ -222,14 +221,14 @@ class VerifiedTabState extends State<VerifiedTab> {
                     ),
                     title: Text(
                       place['nama_tempat'] ?? 'Tanpa Nama',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(fontFamily: 'Nunito', 
                         fontWeight: FontWeight.w700, color: kTextPrimary, fontSize: 14),
                     ),
                     subtitle: Text(
                       place['alamat'] ?? '-',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 12),
+                      style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary, fontSize: 12),
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -313,7 +312,7 @@ class RejectedTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text('Belum ada tempat yang ditolak.',
-                    style: GoogleFonts.plusJakartaSans(color: kTextSecondary)),
+                    style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary)),
                 ],
               ),
             )
@@ -353,7 +352,7 @@ class RejectedTab extends StatelessWidget {
                     ),
                     title: Text(
                       place['nama_tempat'] ?? 'Tanpa Nama',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(fontFamily: 'Nunito', 
                         fontWeight: FontWeight.w700, color: kTextPrimary, fontSize: 14),
                     ),
                     subtitle: Column(
@@ -361,11 +360,11 @@ class RejectedTab extends StatelessWidget {
                       children: [
                         Text(place['alamat'] ?? '-',
                           maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 12)),
+                          style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary, fontSize: 12)),
                         if (place['rejection_reason'] != null)
                           Text('Alasan: ${place['rejection_reason']}',
                             maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.plusJakartaSans(color: kAccentRed, fontSize: 11)),
+                            style: TextStyle(fontFamily: 'Nunito', color: kAccentRed, fontSize: 11)),
                       ],
                     ),
                     trailing: Row(
@@ -452,21 +451,21 @@ class PlaceCard extends StatelessWidget {
               children: [
                 Text(
                   place['nama_tempat'] ?? 'Tanpa Nama',
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(fontFamily: 'Nunito', 
                     fontWeight: FontWeight.w700, color: kTextPrimary, fontSize: 16),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   place['alamat'] ?? '-',
                   maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 12),
+                  style: TextStyle(fontFamily: 'Nunito', color: kTextSecondary, fontSize: 12),
                 ),
                 if (place['deskripsi'] != null && (place['deskripsi'] as String).isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
                     place['deskripsi'],
                     maxLines: 2, overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(color: kTextMuted, fontSize: 12),
+                    style: TextStyle(fontFamily: 'Nunito', color: kTextMuted, fontSize: 12),
                   ),
                 ],
                 const SizedBox(height: 16),
@@ -479,7 +478,7 @@ class PlaceCard extends StatelessWidget {
                           MaterialPageRoute(builder: (_) => EditPlaceScreen(place: place)),
                         ),
                         icon: const Icon(Icons.edit_outlined, size: 15),
-                        label: Text('Edit', style: GoogleFonts.plusJakartaSans(fontSize: 12)),
+                        label: Text('Edit', style: TextStyle(fontFamily: 'Nunito', fontSize: 12)),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: kTextSecondary,
                           side: const BorderSide(color: kBorderColor),
@@ -492,7 +491,7 @@ class PlaceCard extends StatelessWidget {
                       child: ElevatedButton.icon(
                         onPressed: onReject,
                         icon: const Icon(Icons.close_rounded, size: 16),
-                        label: Text('Tolak', style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600)),
+                        label: Text('Tolak', style: TextStyle(fontFamily: 'Nunito', fontSize: 12, fontWeight: FontWeight.w600)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: kAccentRed.withValues(alpha: 0.1),
                           foregroundColor: kAccentRed,
@@ -509,7 +508,7 @@ class PlaceCard extends StatelessWidget {
                       child: ElevatedButton.icon(
                         onPressed: onApprove,
                         icon: const Icon(Icons.check_rounded, size: 16),
-                        label: Text('Setujui', style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600)),
+                        label: Text('Setujui', style: TextStyle(fontFamily: 'Nunito', fontSize: 12, fontWeight: FontWeight.w600)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: kPrimary,
                           foregroundColor: Colors.white,
