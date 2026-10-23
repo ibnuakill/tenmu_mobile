@@ -193,6 +193,9 @@ class AppUpdateService {
   ///
   /// Mengembalikan null bila sudah up-to-date atau pengecekan gagal.
   Future<AppVersion?> checkForUpdate() async {
+    // Updater ini khusus Android (sideload APK). Windows punya installer
+    // sendiri, jadi jangan tampilkan dialog update berbasis APK di sana.
+    if (!Platform.isAndroid) return null;
     try {
       final latest = await fetchLatestVersion();
       if (latest == null) return null;
