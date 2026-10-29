@@ -44,41 +44,42 @@ class _OwnerRequestScreenState extends State<OwnerRequestScreen> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
     try {
-      final data = await Supabase.instance.client
+      // Status ringan (tanpa PII) ada di profiles.
+      final profile = await Supabase.instance.client
           .from('profiles')
-          .select(
-            'role, owner_request_status, owner_request_nama_umkm, '
-            'owner_request_alamat, owner_request_phone, owner_request_note, '
-            'owner_requested_at, owner_request_rejection',
-          )
+          .select('role, owner_request_status')
           .eq('id', user.id)
+          .maybeSingle();
+
+      // Detail pengajuan (nama UMKM, alamat, telepon, catatan) ada di tabel
+      // terpisah yang hanya bisa dibaca oleh pemiliknya + admin.
+      final request = await Supabase.instance.client
+          .from('owner_requests')
+          .select(
+            'nama_umkm, alamat, phone, note, status, requested_at, rejection',
+          )
+          .eq('user_id', user.id)
           .maybeSingle();
 
       if (!mounted) return;
 
-      if (data != null) {
-        // Kalau sudah owner, anggap approved
-        final role = data['role']?.toString();
-        final status = role == 'owner'
-            ? 'approved'
-            : (data['owner_request_status']?.toString() ?? 'none');
+      final role = profile?['role']?.toString();
+      final status = role == 'owner'
+          ? 'approved'
+          : (profile?['owner_request_status']?.toString() ?? 'none');
 
-        setState(() {
-          _status = status;
-          _rejectionReason = data['owner_request_rejection']?.toString();
-          _requestedAt = DateTime.tryParse(
-            data['owner_requested_at']?.toString() ?? '',
-          );
-          _namaUmkmController.text =
-              data['owner_request_nama_umkm']?.toString() ?? '';
-          _alamatController.text = data['owner_request_alamat']?.toString() ?? '';
-          _phoneController.text = data['owner_request_phone']?.toString() ?? '';
-          _noteController.text = data['owner_request_note']?.toString() ?? '';
-          _isLoading = false;
-        });
-      } else {
-        setState(() => _isLoading = false);
-      }
+      setState(() {
+        _status = status;
+        _rejectionReason = request?['rejection']?.toString();
+        _requestedAt = DateTime.tryParse(
+          request?['requested_at']?.toString() ?? '',
+        );
+        _namaUmkmController.text = request?['nama_umkm']?.toString() ?? '';
+        _alamatController.text = request?['alamat']?.toString() ?? '';
+        _phoneController.text = request?['phone']?.toString() ?? '';
+        _noteController.text = request?['note']?.toString() ?? '';
+        _isLoading = false;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -111,15 +112,20 @@ class _OwnerRequestScreenState extends State<OwnerRequestScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      await Supabase.instance.client.from('profiles').update({
-        'owner_request_status': 'pending',
-        'owner_request_nama_umkm': namaUmkm,
-        'owner_request_alamat': alamat,
-        'owner_request_phone': phone,
-        'owner_request_note': _noteController.text.trim(),
-        'owner_requested_at': DateTime.now().toIso8601String(),
-        'owner_request_rejection': null,
-      }).eq('id', user.id);
+      // Data pengajuan disimpan di tabel terpisah (hanya pemilik + admin yang
+      // bisa membacanya). Trigger di database otomatis menyetel
+      // profiles.owner_request_status = 'pending'.
+      await Supabase.instance.client.from('owner_requests').upsert({
+        'user_id': user.id,
+        'nama_umkm': namaUmkm,
+        'alamat': alamat,
+        'phone': phone,
+        'note': _noteController.text.trim(),
+        'status': 'pending',
+        'requested_at': DateTime.now().toIso8601String(),
+        'rejection': null,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'user_id');
 
       if (!mounted) return;
       setState(() {
@@ -382,13 +388,13 @@ class _OwnerRequestScreenState extends State<OwnerRequestScreen> {
   }
 
   Widget _label(ThemeProvider theme, String text) => Text(
-        text,
-        style: TextStyle(
-          color: theme.textSecondary,
-          fontWeight: FontWeight.w600,
-          fontSize: 12.5,
-        ),
-      );
+    text,
+    style: TextStyle(
+      color: theme.textSecondary,
+      fontWeight: FontWeight.w600,
+      fontSize: 12.5,
+    ),
+  );
 
   Widget _field(
     ThemeProvider theme, {
@@ -433,8 +439,18 @@ class _OwnerRequestScreenState extends State<OwnerRequestScreen> {
   String _formatDate(DateTime? dt) {
     if (dt == null) return '-';
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
     ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }

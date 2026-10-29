@@ -6,14 +6,12 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/haversine.dart';
 import '../../../core/theme_provider.dart';
+import '../../../core/error_reporter.dart';
 
 /// State + side-effects untuk PoiDetailScreen — favorite, distance/duration,
 /// rating average, address, hours. UI lihat ini via AnimatedBuilder.
 class PoiDetailController extends ChangeNotifier {
-  PoiDetailController({
-    required this.context,
-    required this.place,
-  });
+  PoiDetailController({required this.context, required this.place});
 
   final BuildContext context;
   final Map<String, dynamic> place;
@@ -114,9 +112,7 @@ class PoiDetailController extends ChangeNotifier {
     if (user == null) {
       final messenger = ScaffoldMessenger.of(context);
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Silakan login untuk menyimpan favorit.'),
-        ),
+        const SnackBar(content: Text('Silakan login untuk menyimpan favorit.')),
       );
       return;
     }
@@ -197,7 +193,9 @@ class PoiDetailController extends ChangeNotifier {
     Position? pos;
     try {
       pos = await Geolocator.getLastKnownPosition();
-    } catch (_) {}
+    } catch (e, s) {
+      ErrorReporter.reportCaught(e, s, 'poi_detail_controller:200');
+    }
 
     if (pos == null) {
       try {
@@ -207,7 +205,9 @@ class PoiDetailController extends ChangeNotifier {
             timeLimit: Duration(seconds: 4),
           ),
         );
-      } catch (_) {}
+      } catch (e, s) {
+        ErrorReporter.reportCaught(e, s, 'poi_detail_controller:210');
+      }
     }
     return pos;
   }
@@ -228,18 +228,20 @@ class PoiDetailController extends ChangeNotifier {
         final data = json.decode(res.body);
         if (data['code'] == 'Ok' && (data['routes'] as List).isNotEmpty) {
           final route = data['routes'][0];
-          final double distanceMeters =
-              (route['distance'] as num).toDouble();
-          final double durationSeconds =
-              (route['duration'] as num).toDouble();
+          final double distanceMeters = (route['distance'] as num).toDouble();
+          final double durationSeconds = (route['duration'] as num).toDouble();
 
           final dist = Haversine.formatDistance(distanceMeters / 1000.0);
           final dur = _formatDuration((durationSeconds / 60.0).round());
 
           _distanceText = dist;
           _durationText = dur;
-          _routeCache[cacheKey] =
-              _CachedRoute(dist, dur, DateTime.now(), fromRoute: true);
+          _routeCache[cacheKey] = _CachedRoute(
+            dist,
+            dur,
+            DateTime.now(),
+            fromRoute: true,
+          );
           notifyListeners();
         }
       }
@@ -288,14 +290,17 @@ class PoiDetailController extends ChangeNotifier {
         notifyListeners();
         return;
       }
-      final avg = list
+      final avg =
+          list
               .map((r) => (r['rating'] as num).toDouble())
               .reduce((a, b) => a + b) /
           list.length;
       _avgRating = avg;
       _reviewCount = list.length;
       notifyListeners();
-    } catch (_) {}
+    } catch (e, s) {
+      ErrorReporter.reportCaught(e, s, 'poi_detail_controller:298');
+    }
   }
 }
 

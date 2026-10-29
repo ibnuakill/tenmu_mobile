@@ -78,6 +78,14 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
 
     String reply;
 
+    // Self-heal: kalau AI sempat ditandai mati, coba hidupkan lagi tiap kirim
+    // (ping murah). Sebelumnya satu kegagalan mematikan AI sampai sheet
+    // ditutup — user pun terus dapat pesan "AI offline" padahal cuma sesaat.
+    if (!_aiReady) {
+      _aiReady = await ChatAIService.ping();
+      if (!mounted) return;
+    }
+
     if (_aiReady) {
       try {
         final result = await ChatAIService.callEdgeAi(userText, _messages);
@@ -90,9 +98,17 @@ class _ChatBotSheetState extends State<ChatBotSheet> {
       } on ChatQuotaException catch (e) {
         // Kena batas anti-spam → jangan fallback (biar batasnya efektif).
         reply = e.friendlyMessage;
+      } on ChatAuthException catch (e) {
+        // Sesi habis → AI tidak bisa verifikasi user, bukan "offline".
+        reply = e.friendlyMessage;
+      } on ChatUnavailableException catch (e) {
+        // Server/Gemini bermasalah → tetap jujur, jangan pura-pura offline
+        // permanen; pesan berikutnya akan coba lagi.
+        debugPrint('Edge AI unavailable: $e');
+        reply = e.friendlyMessage;
       } catch (e) {
         debugPrint('Edge AI error: $e');
-        // Gagal → fallback lokal (AI mungkin mati; ping ulang nanti).
+        // Gagal jaringan/format → fallback lokal (ping ulang di kirim berikut).
         _aiReady = false;
         if (!mounted) return;
         final fallback = ChatAIService.localSearch(context, userText);

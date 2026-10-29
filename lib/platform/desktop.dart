@@ -4,6 +4,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
+import '../core/error_reporter.dart';
 
 /// Jendela desktop dibuka dalam mode fullscreen borderless (diterapkan di
 /// `windows/runner/flutter_window.cpp` SEBELUM view Flutter dibuat, supaya
@@ -29,7 +30,9 @@ Future<void> setupDesktop() async {
       unawaited(() async {
         try {
           await WindowManager.instance.setFullScreen(isFull);
-        } catch (_) {}
+        } catch (e, s) {
+          ErrorReporter.reportCaught(e, s, 'desktop:32');
+        }
       }());
     }
     return false;

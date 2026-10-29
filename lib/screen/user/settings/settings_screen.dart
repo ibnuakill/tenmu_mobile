@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme_provider.dart';
 import '../../../core/widgets/app_dialog.dart';
 import '../../../core/app_update_provider.dart';
+import '../../../core/app_info.dart';
 import '../../../core/places_provider.dart';
 import '../../../core/user_role.dart';
 import '../../../core/session_timeout_service.dart';
@@ -14,6 +15,7 @@ import '../../owner/manage_place_screen.dart';
 import '../../owner/add_place_screen.dart';
 import '../about_screen.dart';
 import '../favorite_screen.dart';
+import '../post/post_feed_screen.dart';
 import '../profile_settings_screen.dart';
 import 'owner_request_screen.dart';
 import '../help/help_center_screen.dart';
@@ -79,8 +81,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       // Clear Places provider cache
-      Provider.of<PlacesProvider>(context, listen: false)
-          .fetchPlaces(force: true);
+      Provider.of<PlacesProvider>(
+        context,
+        listen: false,
+      ).fetchPlaces(force: true);
 
       // Clear image cache
       PaintingBinding.instance.imageCache.clear();
@@ -152,8 +156,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ? Brightness.light
             : Brightness.dark,
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness:
-            theme.isDarkMode ? Brightness.light : Brightness.dark,
+        statusBarIconBrightness: theme.isDarkMode
+            ? Brightness.light
+            : Brightness.dark,
       ),
       child: Scaffold(
         backgroundColor: theme.bgBase,
@@ -172,21 +177,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: LucideIcon('arrow-left', color: theme.textPrimary),
             onPressed: () => Navigator.pop(context),
           ),
+          // Tombol ganti mode tampilan — ikon saja, sejajar dengan judul.
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(child: ThemeModeTile(theme: theme)),
+            ),
+          ],
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── TAMPILAN ───────────────────────────────────────────────
-              SettingsSectionHeader(title: 'Tampilan', theme: theme),
               const SizedBox(height: 8),
-              SettingsCard(
-                theme: theme,
-                children: [ThemeModeTile(theme: theme)],
-              ),
-
-              const SizedBox(height: 24),
 
               // ── NOTIFIKASI ──────────────────────────────────────────────
               SettingsSectionHeader(title: 'Notifikasi', theme: theme),
@@ -286,7 +290,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
               Center(
                 child: Text(
-                  'TenMu v1.0.0',
+                  'TenMu ${AppInfo.label}',
                   style: TextStyle(
                     color: theme.textHint,
                     fontSize: 12,
@@ -337,9 +341,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => ManagePlaceScreen(
-                isOwnerView: _userRole == UserRole.owner,
-              ),
+              builder: (_) =>
+                  ManagePlaceScreen(isOwnerView: _userRole == UserRole.owner),
             ),
           ),
         ),
@@ -372,8 +375,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           subtitle: 'Ubah nama, foto profil, dan password',
           theme: theme,
           onTap: () {
-            final isPrivileged = _userRole == UserRole.superadmin ||
-                _userRole == UserRole.owner;
+            final isPrivileged =
+                _userRole == UserRole.superadmin || _userRole == UserRole.owner;
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -389,6 +392,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     children.addAll([
+      SettingsNavTile(
+        icon: 'images',
+        iconColor: theme.textPrimary,
+        title: 'Postingan',
+        subtitle: 'Foto & cerita dari tempat sekitar',
+        theme: theme,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const PostFeedScreen()),
+        ),
+      ),
+      Divider(color: theme.border, height: 1, indent: 56),
       SettingsNavTile(
         icon: 'heart',
         iconColor: theme.textPrimary,

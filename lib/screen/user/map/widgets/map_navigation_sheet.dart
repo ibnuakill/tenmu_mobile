@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/poi_image_helper.dart';
 import '../../../../core/theme_provider.dart';
 import '../route_map_controller.dart';
 import '../../../../core/lucide_icons.dart';
+import '../../../../core/error_reporter.dart';
 
 /// Bottom sheet saat mode navigasi aktif (info card + mode switcher,
 /// atau arrival card saat sudah sampai).
@@ -123,10 +125,7 @@ class _InfoColumn extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          label,
-          style: TextStyle(color: theme.textSecondary, fontSize: 12),
-        ),
+        Text(label, style: TextStyle(color: theme.textSecondary, fontSize: 12)),
         Text(
           value,
           style: TextStyle(
@@ -156,10 +155,7 @@ class _TravelModeSelector extends StatelessWidget {
           return GestureDetector(
             onTap: () => controller.setTravelMode(mode),
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 8,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 color: isActive ? theme.btnPrimary : theme.bgElevated,
                 borderRadius: BorderRadius.circular(20),
@@ -170,21 +166,19 @@ class _TravelModeSelector extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  LucideIcon(
-                    switch (mode) {
-                      TravelMode.walking => 'footprints',
-                      TravelMode.motorcycle => 'bike',
-                      TravelMode.car => 'car',
-                    },
-                    size: 16,
-                  ),
+                  LucideIcon(switch (mode) {
+                    TravelMode.walking => 'footprints',
+                    TravelMode.motorcycle => 'bike',
+                    TravelMode.car => 'car',
+                  }, size: 16),
                   const SizedBox(width: 6),
                   Text(
                     mode.label,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight:
-                          isActive ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isActive
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                       color: isActive ? theme.btnLabel : theme.textPrimary,
                     ),
                   ),
@@ -224,10 +218,7 @@ class _ArrivalCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const LucideIcon('circle-check',
-              color: Colors.white,
-              size: 48,
-            ),
+            const LucideIcon('circle-check', color: Colors.white, size: 48),
             const SizedBox(height: 12),
             const Text(
               'Anda Telah Tiba!',
@@ -410,7 +401,8 @@ class MapUmkmPreview extends StatelessWidget {
                           width: 60,
                           height: 60,
                           fit: BoxFit.cover,
-                          errorWidget: (_, _, _) => _PlaceholderImage(theme: theme),
+                          errorWidget: (_, _, _) =>
+                              _PlaceholderImage(theme: theme),
                         )
                       : _PlaceholderImage(theme: theme),
                 ),
@@ -442,10 +434,7 @@ class MapUmkmPreview extends StatelessWidget {
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const LucideIcon('x'),
-                  onPressed: onClose,
-                ),
+                IconButton(icon: const LucideIcon('x'), onPressed: onClose),
               ],
             ),
           ),
@@ -495,15 +484,61 @@ class _PlaceholderImage extends StatelessWidget {
   }
 }
 
-/// Empty/error state (GPS off, izin ditolak, dst.).
-class MapErrorView extends StatelessWidget {
-  final String? message;
+/// Wajib aktifkan lokasi dulu — dipakai saat GPS nonaktif / izin ditolak.
+class LocationRequiredView extends StatefulWidget {
   final VoidCallback onRetry;
-  const MapErrorView({
-    super.key,
-    required this.message,
-    required this.onRetry,
-  });
+  final String? message;
+  const LocationRequiredView({super.key, required this.onRetry, this.message});
+
+  @override
+  State<LocationRequiredView> createState() => _LocationRequiredViewState();
+}
+
+class _LocationRequiredViewState extends State<LocationRequiredView>
+    with WidgetsBindingObserver {
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // User kembali dari pengaturan sistem → cek ulang otomatis
+    if (state == AppLifecycleState.resumed) {
+      widget.onRetry();
+    }
+  }
+
+  Future<void> _activate() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final serviceOn = await Geolocator.isLocationServiceEnabled();
+      if (!serviceOn) {
+        // GPS HP mati → buka halaman pengaturan lokasi (popup sistem)
+        await Geolocator.openLocationSettings();
+        return;
+      }
+      final perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.deniedForever) {
+        await Geolocator.openAppSettings();
+        return;
+      }
+      // Izin belum diberikan → popup izin sistem Android/iOS muncul di sini
+      widget.onRetry();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -515,33 +550,45 @@ class MapErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             LucideIcon('map-pin-off', size: 64, color: theme.textHint),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
-              message ?? 'Lokasi tidak tersedia.',
+              widget.message ??
+                  'Lokasi belum diaktifkan.\nAktifkan GPS dan izin lokasi dulu untuk memakai peta & navigasi.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: theme.textSecondary,
-                fontSize: 14,
+                fontSize: 15,
                 height: 1.6,
               ),
             ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: onRetry,
-              icon: const LucideIcon('refresh-cw'),
-              label: const Text('Coba Lagi'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.bgElevated,
-                foregroundColor: theme.textPrimary,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: theme.border),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: _busy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const LucideIcon('navigation', size: 18),
+                label: const Text('Aktifkan Lokasi'),
+                onPressed: _busy ? null : _activate,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.btnPrimary,
+                  foregroundColor: theme.btnLabel,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Peta akan terbuka otomatis setelah lokasi aktif.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: theme.textHint, fontSize: 12),
             ),
           ],
         ),
@@ -567,7 +614,9 @@ class MapFabStack extends StatelessWidget {
               await controller.mapController?.animateCamera(
                 CameraUpdate.bearingTo(0),
               );
-            } catch (_) {}
+            } catch (e, s) {
+              ErrorReporter.reportCaught(e, s, 'map_navigation_sheet:629');
+            }
           },
           backgroundColor: theme.bgSurface,
           elevation: 2,

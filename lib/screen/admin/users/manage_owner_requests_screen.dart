@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/admin_api.dart';
 import '../dashboard/widgets/admin_design.dart';
 
 /// Layar admin untuk meninjau dan memverifikasi pengajuan role Owner UMKM.
@@ -11,8 +12,7 @@ class ManageOwnerRequestsScreen extends StatefulWidget {
       _ManageOwnerRequestsScreenState();
 }
 
-class _ManageOwnerRequestsScreenState
-    extends State<ManageOwnerRequestsScreen> {
+class _ManageOwnerRequestsScreenState extends State<ManageOwnerRequestsScreen> {
   final _client = Supabase.instance.client;
   bool _isLoading = true;
   List<Map<String, dynamic>> _requests = [];
@@ -26,15 +26,16 @@ class _ManageOwnerRequestsScreenState
   Future<void> _loadRequests() async {
     setState(() => _isLoading = true);
     try {
+      // PII pengajuan ada di owner_requests (dilindungi RLS), profil hanya
+      // dipakai untuk nama + avatar pendaftar.
       final data = await _client
-          .from('profiles')
+          .from('owner_requests')
           .select(
-            'id, nama, avatar_url, role, owner_request_status, '
-            'owner_request_nama_umkm, owner_request_alamat, owner_request_phone, '
-            'owner_request_note, owner_requested_at, owner_request_rejection',
+            'user_id, nama_umkm, alamat, phone, note, status, requested_at, '
+            'profiles!owner_requests_user_id_fkey(nama, avatar_url)',
           )
-          .eq('owner_request_status', 'pending')
-          .order('owner_requested_at', ascending: false);
+          .eq('status', 'pending')
+          .order('requested_at', ascending: false);
 
       if (!mounted) return;
       setState(() {
@@ -49,24 +50,23 @@ class _ManageOwnerRequestsScreenState
   }
 
   Future<void> _approve(Map<String, dynamic> req) async {
-    final userId = req['id'];
-    final namaUmkm = req['owner_request_nama_umkm'] ?? 'UMKM';
+    final userId = req['user_id'];
+    final namaUmkm = req['nama_umkm'] ?? 'UMKM';
 
     try {
-      await _client.from('profiles').update({
-        'role': 'owner',
-        'owner_request_status': 'approved',
-      }).eq('id', userId);
+      await AdminApi.call('owner_approve', {'user_id': userId});
 
       _toast('Pengajuan "$namaUmkm" disetujui! User menjadi Pemilik UMKM.');
       _loadRequests();
+    } on AdminApiException catch (e) {
+      _toast('Gagal menyetujui: ${e.message}', isError: true);
     } catch (e) {
       _toast('Gagal menyetujui: $e', isError: true);
     }
   }
 
   Future<void> _reject(Map<String, dynamic> req) async {
-    final userId = req['id'];
+    final userId = req['user_id'];
     final reasonController = TextEditingController();
 
     final confirmed = await showDialog<bool>(
@@ -110,16 +110,15 @@ class _ManageOwnerRequestsScreenState
 
     if (confirmed == true) {
       try {
-        await _client.from('profiles').update({
-          'owner_request_status': 'rejected',
-          'owner_request_rejection':
-              reasonController.text.trim().isEmpty
-                  ? 'Data tidak memenuhi syarat.'
-                  : reasonController.text.trim(),
-        }).eq('id', userId);
+        await AdminApi.call('owner_reject', {
+          'user_id': userId,
+          'reason': reasonController.text.trim(),
+        });
 
         _toast('Pengajuan ditolak.');
         _loadRequests();
+      } on AdminApiException catch (e) {
+        _toast('Gagal menolak: ${e.message}', isError: true);
       } catch (e) {
         _toast('Gagal menolak: $e', isError: true);
       }
@@ -150,7 +149,8 @@ class _ManageOwnerRequestsScreenState
         automaticallyImplyLeading: false,
         title: Text(
           'Pengajuan Owner UMKM',
-          style: TextStyle(fontFamily: 'Nunito', 
+          style: TextStyle(
+            fontFamily: 'Nunito',
             color: kTextPrimary,
             fontWeight: FontWeight.w600,
             fontSize: 17,
@@ -166,12 +166,12 @@ class _ManageOwnerRequestsScreenState
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _requests.isEmpty
-              ? _buildEmpty()
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _requests.length,
-                  itemBuilder: (ctx, i) => _buildCard(_requests[i]),
-                ),
+          ? _buildEmpty()
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _requests.length,
+              itemBuilder: (ctx, i) => _buildCard(_requests[i]),
+            ),
     );
   }
 
@@ -184,7 +184,8 @@ class _ManageOwnerRequestsScreenState
           const SizedBox(height: 12),
           Text(
             'Tidak Ada Pengajuan Pending',
-            style: TextStyle(fontFamily: 'Nunito', 
+            style: TextStyle(
+              fontFamily: 'Nunito',
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: kTextPrimary,
@@ -193,7 +194,8 @@ class _ManageOwnerRequestsScreenState
           const SizedBox(height: 4),
           Text(
             'Semua pengajuan pendaftaran owner sudah diproses.',
-            style: TextStyle(fontFamily: 'Nunito', 
+            style: TextStyle(
+              fontFamily: 'Nunito',
               fontSize: 13,
               color: kTextSecondary,
             ),
@@ -204,11 +206,12 @@ class _ManageOwnerRequestsScreenState
   }
 
   Widget _buildCard(Map<String, dynamic> req) {
-    final nama = req['nama'] ?? 'User';
-    final namaUmkm = req['owner_request_nama_umkm'] ?? '-';
-    final alamat = req['owner_request_alamat'] ?? '-';
-    final phone = req['owner_request_phone'] ?? '-';
-    final note = req['owner_request_note'] ?? '';
+    final profile = req['profiles'] as Map<String, dynamic>?;
+    final nama = profile?['nama']?.toString() ?? 'User';
+    final namaUmkm = req['nama_umkm'] ?? '-';
+    final alamat = req['alamat'] ?? '-';
+    final phone = req['phone'] ?? '-';
+    final note = req['note'] ?? '';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -229,7 +232,8 @@ class _ManageOwnerRequestsScreenState
                 backgroundColor: kPrimary.withValues(alpha: 0.1),
                 child: Text(
                   nama.isNotEmpty ? nama[0].toUpperCase() : 'U',
-                  style: TextStyle(fontFamily: 'Nunito', 
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
                     color: kPrimary,
                     fontWeight: FontWeight.bold,
                   ),
@@ -242,7 +246,8 @@ class _ManageOwnerRequestsScreenState
                   children: [
                     Text(
                       nama,
-                      style: TextStyle(fontFamily: 'Nunito', 
+                      style: TextStyle(
+                        fontFamily: 'Nunito',
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
                         color: kTextPrimary,
@@ -250,7 +255,8 @@ class _ManageOwnerRequestsScreenState
                     ),
                     Text(
                       'Pendaftar',
-                      style: TextStyle(fontFamily: 'Nunito', 
+                      style: TextStyle(
+                        fontFamily: 'Nunito',
                         fontSize: 12,
                         color: kTextMuted,
                       ),
@@ -259,14 +265,18 @@ class _ManageOwnerRequestsScreenState
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: kAccentAmber.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   'PENDING',
-                  style: TextStyle(fontFamily: 'Nunito', 
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: kAccentAmber,
@@ -331,7 +341,8 @@ class _ManageOwnerRequestsScreenState
           width: 100,
           child: Text(
             label,
-            style: TextStyle(fontFamily: 'Nunito', 
+            style: TextStyle(
+              fontFamily: 'Nunito',
               fontSize: 12.5,
               color: kTextMuted,
               fontWeight: FontWeight.w500,
@@ -341,7 +352,8 @@ class _ManageOwnerRequestsScreenState
         Expanded(
           child: Text(
             value,
-            style: TextStyle(fontFamily: 'Nunito', 
+            style: TextStyle(
+              fontFamily: 'Nunito',
               fontSize: 12.5,
               color: kTextPrimary,
               fontWeight: FontWeight.w600,

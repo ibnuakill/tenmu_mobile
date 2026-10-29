@@ -17,6 +17,7 @@ import '../../core/poi_image_helper.dart';
 import '../../core/app_colors.dart';
 import '../../core/geocoding_service.dart';
 import 'widgets/place_form_style.dart';
+import '../../core/error_reporter.dart';
 
 class AddPlaceScreen extends StatefulWidget {
   const AddPlaceScreen({super.key});
@@ -68,8 +69,11 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
 
         await Supabase.instance.client.storage
             .from('umkm_images')
-            .uploadBinary(fileName, bytes,
-                fileOptions: FileOptions(contentType: pickedFile.mimeType));
+            .uploadBinary(
+              fileName,
+              bytes,
+              fileOptions: FileOptions(contentType: pickedFile.mimeType),
+            );
 
         final imageUrl = Supabase.instance.client.storage
             .from('umkm_images')
@@ -191,7 +195,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     throw Exception('Gagal menghubungi server pencarian peta.');
   }
 
-  Future<void> _showLocationPickerBottomSheet(List<Map<String, dynamic>> data) async {
+  Future<void> _showLocationPickerBottomSheet(
+    List<Map<String, dynamic>> data,
+  ) async {
     if (!mounted) return;
     final theme = Provider.of<ThemeProvider>(context, listen: false);
 
@@ -278,9 +284,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                             behavior: SnackBarBehavior.floating,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
-                              side: BorderSide(
-                                color: theme.snackSuccessBorder,
-                              ),
+                              side: BorderSide(color: theme.snackSuccessBorder),
                             ),
                           ),
                         );
@@ -363,7 +367,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
           }
         });
       }
-    } catch (_) {}
+    } catch (e, s) {
+      ErrorReporter.reportCaught(e, s, 'add_place_screen:366');
+    }
   }
 
   Future<void> _bukaPetaPilihLokasi() async {
@@ -675,9 +681,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     ValueChanged<String>? onSubmitted,
   }) {
     OutlineInputBorder b(Color c, [double w = 1]) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: c, width: w),
-        );
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: c, width: w),
+    );
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
@@ -687,8 +693,10 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
       cursorColor: AppColors.btnPrimary,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle:
-            const TextStyle(color: AppColors.textSecondary, fontSize: 13.5),
+        labelStyle: const TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 13.5,
+        ),
         hintText: hint,
         hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 13.5),
         prefixIcon: maxLines == 1
@@ -697,8 +705,10 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         suffixIcon: suffixIcon,
         filled: true,
         fillColor: AppColors.bgElevated,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: b(AppColors.border),
         enabledBorder: b(AppColors.border),
         focusedBorder: b(AppColors.textPrimary, 1.5),
@@ -935,8 +945,10 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                           hint: 'Contoh: Alun-alun Bandung',
                           icon: Icons.search,
                           suffixIcon: IconButton(
-                            icon: const Icon(Icons.search,
-                                color: AppColors.textSecondary),
+                            icon: const Icon(
+                              Icons.search,
+                              color: AppColors.textSecondary,
+                            ),
                             onPressed: _searchLocationOSM,
                             tooltip: 'Cari Lokasi',
                           ),
@@ -949,10 +961,14 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                               child: SizedBox(
                                 height: 46,
                                 child: ElevatedButton.icon(
-                                  onPressed:
-                                      _isLoading ? null : _getCurrentLocation,
-                                  icon: const Icon(Icons.my_location,
-                                      size: 17, color: AppColors.btnLabel),
+                                  onPressed: _isLoading
+                                      ? null
+                                      : _getCurrentLocation,
+                                  icon: const Icon(
+                                    Icons.my_location,
+                                    size: 17,
+                                    color: AppColors.btnLabel,
+                                  ),
                                   label: const Text(
                                     'Pakai GPS',
                                     style: TextStyle(
@@ -979,9 +995,11 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                                   onPressed: _isLoading
                                       ? null
                                       : _bukaPetaPilihLokasi,
-                                  icon: const Icon(Icons.map_outlined,
-                                      size: 17,
-                                      color: AppColors.textSecondary),
+                                  icon: const Icon(
+                                    Icons.map_outlined,
+                                    size: 17,
+                                    color: AppColors.textSecondary,
+                                  ),
                                   label: const Text(
                                     'Peta Manual',
                                     style: TextStyle(
@@ -992,8 +1010,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                                   ),
                                   style: OutlinedButton.styleFrom(
                                     backgroundColor: AppColors.bgElevated,
-                                    side:
-                                        const BorderSide(color: AppColors.border),
+                                    side: const BorderSide(
+                                      color: AppColors.border,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
@@ -1014,9 +1033,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                                 icon: Icons.my_location,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                  signed: true,
-                                ),
+                                      decimal: true,
+                                      signed: true,
+                                    ),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -1028,9 +1047,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                                 icon: Icons.my_location,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                  signed: true,
-                                ),
+                                      decimal: true,
+                                      signed: true,
+                                    ),
                               ),
                             ),
                           ],
@@ -1053,8 +1072,11 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                             hint: '08:00',
                             icon: Icons.access_time,
                             suffixIcon: IconButton(
-                              icon: const Icon(Icons.schedule,
-                                  color: AppColors.textSecondary, size: 20),
+                              icon: const Icon(
+                                Icons.schedule,
+                                color: AppColors.textSecondary,
+                                size: 20,
+                              ),
                               onPressed: () async {
                                 final picked = await showTimePicker(
                                   context: context,
@@ -1078,8 +1100,11 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                             hint: '22:00',
                             icon: Icons.access_time_filled,
                             suffixIcon: IconButton(
-                              icon: const Icon(Icons.schedule,
-                                  color: AppColors.textSecondary, size: 20),
+                              icon: const Icon(
+                                Icons.schedule,
+                                color: AppColors.textSecondary,
+                                size: 20,
+                              ),
                               onPressed: () async {
                                 final picked = await showTimePicker(
                                   context: context,
@@ -1130,31 +1155,45 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                       children: [
                         DropdownButtonFormField<String>(
                           initialValue:
-                              PoiCategory.allCategories.contains(_selectedCategory)
-                                  ? _selectedCategory
-                                  : PoiCategory.ritel,
+                              PoiCategory.allCategories.contains(
+                                _selectedCategory,
+                              )
+                              ? _selectedCategory
+                              : PoiCategory.ritel,
                           dropdownColor: AppColors.bgElevated,
                           style: const TextStyle(
-                              color: AppColors.textPrimary, fontSize: 14.5),
+                            color: AppColors.textPrimary,
+                            fontSize: 14.5,
+                          ),
                           decoration: InputDecoration(
                             labelText: 'Kategori Tempat',
                             labelStyle: const TextStyle(
-                                color: AppColors.textSecondary, fontSize: 13.5),
-                            prefixIcon: const Icon(Icons.category_outlined,
-                                color: AppColors.textSecondary, size: 20),
+                              color: AppColors.textSecondary,
+                              fontSize: 13.5,
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.category_outlined,
+                              color: AppColors.textSecondary,
+                              size: 20,
+                            ),
                             filled: true,
                             fillColor: AppColors.bgElevated,
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 14),
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide:
-                                  const BorderSide(color: AppColors.border),
+                              borderSide: const BorderSide(
+                                color: AppColors.border,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                               borderSide: const BorderSide(
-                                  color: AppColors.textPrimary, width: 1.5),
+                                color: AppColors.textPrimary,
+                                width: 1.5,
+                              ),
                             ),
                           ),
                           items: PoiCategory.allCategories.map((category) {
@@ -1204,7 +1243,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                               },
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 13, vertical: 8),
+                                  horizontal: 13,
+                                  vertical: 8,
+                                ),
                                 decoration: BoxDecoration(
                                   color: selected
                                       ? AppColors.btnPrimary

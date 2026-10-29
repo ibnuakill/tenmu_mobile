@@ -8,6 +8,7 @@ import '../../../core/places_provider.dart';
 import '../../../core/poi_category.dart';
 import '../../../core/user_role.dart';
 import '../widgets/sort_filter_widget.dart';
+import '../../../core/error_reporter.dart';
 
 /// State UI home (search, filter, sort, kategori, profil) + aksi-aksi
 /// (load profile, load role, GPS, location update). Side-effect ke
@@ -88,7 +89,9 @@ class HomeController extends ChangeNotifier {
           .eq('is_read', false);
       _unreadNotifCount = (data as List).length;
       notifyListeners();
-    } catch (_) {}
+    } catch (e, s) {
+      ErrorReporter.reportCaught(e, s, 'home_controller:91');
+    }
   }
 
   Future<void> loadUserProfile() async {
@@ -149,14 +152,17 @@ class HomeController extends ChangeNotifier {
       );
       if (status == LocationAccessStatus.granted) {
         final pos = await Geolocator.getCurrentPosition(
-          locationSettings:
-              const LocationSettings(accuracy: LocationAccuracy.high),
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
         );
         _currentPosition = pos;
         notifyListeners();
 
-        final address =
-            await GeocodingService.reverse(pos.latitude, pos.longitude);
+        final address = await GeocodingService.reverse(
+          pos.latitude,
+          pos.longitude,
+        );
         if (address != null) {
           _userLocation = _shortAddress(address);
           notifyListeners();
@@ -184,11 +190,14 @@ class HomeController extends ChangeNotifier {
       );
       if (status == LocationAccessStatus.granted) {
         final pos = await Geolocator.getCurrentPosition(
-          locationSettings:
-              const LocationSettings(accuracy: LocationAccuracy.high),
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
         );
-        final address =
-            await GeocodingService.reverse(pos.latitude, pos.longitude);
+        final address = await GeocodingService.reverse(
+          pos.latitude,
+          pos.longitude,
+        );
         if (address != null) {
           final short = _shortAddress(address);
           _userLocation = short;
@@ -319,8 +328,9 @@ class HomeController extends ChangeNotifier {
       );
       if (status == LocationAccessStatus.granted) {
         final pos = await Geolocator.getCurrentPosition(
-          locationSettings:
-              const LocationSettings(accuracy: LocationAccuracy.high),
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
         );
         _currentPosition = pos;
         notifyListeners();

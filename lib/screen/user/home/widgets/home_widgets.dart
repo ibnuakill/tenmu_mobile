@@ -35,7 +35,9 @@ class HomeGreetingHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final firstName = (userName.isEmpty ? 'Pengguna' : userName).split(' ').first;
+    final firstName = (userName.isEmpty ? 'Pengguna' : userName)
+        .split(' ')
+        .first;
     return SafeArea(
       bottom: false,
       child: Padding(
@@ -62,7 +64,8 @@ class HomeGreetingHeader extends StatelessWidget {
                     onTap: onTapLocation,
                     child: Row(
                       children: [
-                        LucideIcon('map-pin',
+                        LucideIcon(
+                          'map-pin',
                           size: 14,
                           color: theme.btnPrimary,
                         ),
@@ -127,10 +130,7 @@ class _NotificationBell extends StatelessWidget {
               color: theme.bgElevated,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: LucideIcon('bell',
-              color: theme.textPrimary,
-              size: 22,
-            ),
+            child: LucideIcon('bell', color: theme.textPrimary, size: 22),
           ),
           if (count > 0)
             Positioned(
@@ -159,7 +159,6 @@ class _NotificationBell extends StatelessWidget {
     );
   }
 }
-
 
 /// Search bar (tap-to-open filter sheet) + filter button.
 class HomeSearchBar extends StatelessWidget {
@@ -224,10 +223,7 @@ class HomeSearchBar extends StatelessWidget {
                     if (searchQuery.isNotEmpty)
                       GestureDetector(
                         onTap: onClearSearch,
-                        child: LucideIcon('x',
-                          size: 18,
-                          color: theme.textHint,
-                        ),
+                        child: LucideIcon('x', size: 18, color: theme.textHint),
                       ),
                   ],
                 ),
@@ -250,7 +246,8 @@ class HomeSearchBar extends StatelessWidget {
                     ? Border.all(color: theme.border, width: 1)
                     : null,
               ),
-              child: LucideIcon('sliders-horizontal',
+              child: LucideIcon(
+                'sliders-horizontal',
                 color: hasActiveFilter
                     ? Colors.white
                     : (theme.isDarkMode ? theme.textPrimary : Colors.white),
@@ -320,13 +317,11 @@ class HomeCategoryChips extends StatelessWidget {
               : selectedCategoryTab == cat;
 
           return GestureDetector(
-            onTap: () =>
-                onChanged(cat == 'Semua' ? null : cat),
+            onTap: () => onChanged(cat == 'Semua' ? null : cat),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOut,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               decoration: BoxDecoration(
                 color: isSelected
                     ? (theme.isDarkMode ? theme.textPrimary : accent)
@@ -358,7 +353,9 @@ class HomeCategoryChips extends StatelessWidget {
                     cat,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                       color: isSelected
                           ? (theme.isDarkMode ? theme.bgBase : Colors.white)
                           : theme.textSecondary,
@@ -498,8 +495,8 @@ class HomeFeaturedCarousel extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: active
                       ? (isFallback
-                          ? theme.textPrimary
-                          : const Color(0xFFF4B942))
+                            ? theme.textPrimary
+                            : const Color(0xFFF4B942))
                       : theme.textHint.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(999),
                 ),
@@ -538,9 +535,7 @@ class _FeaturedCardItem extends StatelessWidget {
       ),
       child: Container(
         height: 400,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-        ),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(28)),
         clipBehavior: Clip.antiAlias,
         child: Stack(
           fit: StackFit.expand,
@@ -553,14 +548,12 @@ class _FeaturedCardItem extends StatelessWidget {
                 fadeInDuration: const Duration(milliseconds: 300),
                 placeholder: (_, _) => Container(
                   color: theme.bgElevated,
-                  child: LucideIcon('image',
-                    size: 48,
-                    color: theme.textHint,
-                  ),
+                  child: LucideIcon('image', size: 48, color: theme.textHint),
                 ),
                 errorWidget: (_, _, _) => Container(
                   color: theme.bgElevated,
-                  child: LucideIcon('image-off',
+                  child: LucideIcon(
+                    'image-off',
                     size: 48,
                     color: theme.textHint,
                   ),
@@ -569,7 +562,8 @@ class _FeaturedCardItem extends StatelessWidget {
             else
               Container(
                 color: accent.withValues(alpha: 0.15),
-                child: LucideIcon('store',
+                child: LucideIcon(
+                  'store',
                   size: 64,
                   color: accent.withValues(alpha: 0.4),
                 ),
@@ -601,7 +595,13 @@ class _FeaturedCardItem extends StatelessWidget {
                     label: category,
                   ),
                   const Spacer(),
-                  _GlassCircle(child: const LucideIcon('heart', color: Colors.white, size: 18)),
+                  _GlassCircle(
+                    child: const LucideIcon(
+                      'heart',
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -617,12 +617,19 @@ class _FeaturedCardItem extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const LucideIcon('map-pin', size: 13, color: Colors.white70),
+                        const LucideIcon(
+                          'map-pin',
+                          size: 13,
+                          color: Colors.white70,
+                        ),
                         const SizedBox(width: 3),
                         Expanded(
                           child: Text(
                             place['alamat'] ?? 'Indonesia',
-                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -645,7 +652,11 @@ class _FeaturedCardItem extends StatelessWidget {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        const LucideIcon('star', color: Color(0xFFFFC107), size: 15),
+                        const LucideIcon(
+                          'star',
+                          color: Color(0xFFFFC107),
+                          size: 15,
+                        ),
                         const SizedBox(width: 3),
                         Text(
                           rating > 0 ? rating.toStringAsFixed(1) : 'Baru',
@@ -657,7 +668,10 @@ class _FeaturedCardItem extends StatelessWidget {
                         ),
                         const Spacer(),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(999),
@@ -674,7 +688,11 @@ class _FeaturedCardItem extends StatelessWidget {
                                 ),
                               ),
                               SizedBox(width: 4),
-                              LucideIcon('arrow-right', size: 14, color: Colors.black87),
+                              LucideIcon(
+                                'arrow-right',
+                                size: 14,
+                                color: Colors.black87,
+                              ),
                             ],
                           ),
                         ),
@@ -823,23 +841,32 @@ class HomePoiGridCard extends StatelessWidget {
                             placeholder: (_, _) => Container(
                               color: theme.bgElevated,
                               child: Center(
-                                child: LucideIcon('image',
-                                    color: theme.textHint, size: 28),
+                                child: LucideIcon(
+                                  'image',
+                                  color: theme.textHint,
+                                  size: 28,
+                                ),
                               ),
                             ),
                             errorWidget: (_, _, _) => Container(
                               color: theme.bgElevated,
                               child: Center(
-                                child: LucideIcon('store',
-                                    color: theme.textHint, size: 28),
+                                child: LucideIcon(
+                                  'store',
+                                  color: theme.textHint,
+                                  size: 28,
+                                ),
                               ),
                             ),
                           )
                         : Container(
                             color: theme.bgElevated,
                             child: Center(
-                              child: LucideIcon('store',
-                                  color: theme.textHint, size: 32),
+                              child: LucideIcon(
+                                'store',
+                                color: theme.textHint,
+                                size: 32,
+                              ),
                             ),
                           ),
                   ),
@@ -850,7 +877,9 @@ class HomePoiGridCard extends StatelessWidget {
                       left: 8,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: accent,
                           borderRadius: BorderRadius.circular(6),
@@ -874,11 +903,16 @@ class HomePoiGridCard extends StatelessWidget {
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color: theme.isDarkMode ? theme.bgElevated : Colors.white,
+                          color: theme.isDarkMode
+                              ? theme.bgElevated
+                              : Colors.white,
                           shape: BoxShape.circle,
                         ),
-                        child: LucideIcon('badge-check',
-                            size: 16, color: accent),
+                        child: LucideIcon(
+                          'badge-check',
+                          size: 16,
+                          color: accent,
+                        ),
                       ),
                     ),
                 ],
@@ -930,7 +964,8 @@ class HomePoiGridCard extends StatelessWidget {
                     // Rating (Bold) + Distance (Regular) row
                     Row(
                       children: [
-                        const LucideIcon('star',
+                        const LucideIcon(
+                          'star',
                           size: 14,
                           color: Color(0xFFFFC107),
                         ),
@@ -954,7 +989,8 @@ class HomePoiGridCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 6),
-                          LucideIcon('navigation',
+                          LucideIcon(
+                            'navigation',
                             size: 11,
                             color: theme.textSecondary,
                           ),
@@ -1048,7 +1084,11 @@ class HomeEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            LucideIcon('compass', size: 72, color: accent.withValues(alpha: 0.4)),
+            LucideIcon(
+              'compass',
+              size: 72,
+              color: accent.withValues(alpha: 0.4),
+            ),
             const SizedBox(height: 16),
             Text(
               searchQuery.isNotEmpty
@@ -1135,7 +1175,6 @@ class HomePillBottomNav extends StatelessWidget {
   final ThemeProvider theme;
   final Color accent;
   final int currentIndex;
-  final bool isOwner;
   final ValueChanged<int> onTap;
 
   const HomePillBottomNav({
@@ -1143,7 +1182,6 @@ class HomePillBottomNav extends StatelessWidget {
     required this.theme,
     required this.accent,
     required this.currentIndex,
-    required this.isOwner,
     required this.onTap,
   });
 
@@ -1155,13 +1193,13 @@ class HomePillBottomNav extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.07)
         : const Color(0xFFE5E7EB);
 
+    // 4 item: Beranda, Peta, AI, Profil.
+    // "Tambah tempat" (owner) dipindah ke FAB, "Postingan" dibuka dari strip
+    // di beranda + tombol "Lihat semua" — supaya nav tidak lebih dari 5 item.
     final items = <_NavItem>[
       const _NavItem(icon: 'house', label: 'Beranda', index: 0),
       const _NavItem(icon: 'map', label: 'Peta', index: 1),
-      if (isOwner)
-        const _NavItem(icon: 'circle-plus', label: 'Tambah', index: 2),
       const _NavItem(icon: 'sparkles', label: 'AI', index: 3),
-      const _NavItem(icon: 'images', label: 'Postingan', index: 5),
       const _NavItem(icon: 'user', label: 'Profil', index: 4),
     ];
 
@@ -1176,15 +1214,16 @@ class HomePillBottomNav extends StatelessWidget {
           height: 62,
           child: Row(
             children: items
-                .map((item) => Expanded(
-                      child: _NavBarItem(
-                        item: item,
-                        isActive: currentIndex == item.index,
-                        accent: accent,
-                        isAddButton: isOwner && item.index == 2,
-                        onTap: () => onTap(item.index),
-                      ),
-                    ))
+                .map(
+                  (item) => Expanded(
+                    child: _NavBarItem(
+                      item: item,
+                      isActive: currentIndex == item.index,
+                      accent: accent,
+                      onTap: () => onTap(item.index),
+                    ),
+                  ),
+                )
                 .toList(),
           ),
         ),
@@ -1208,14 +1247,12 @@ class _NavBarItem extends StatelessWidget {
   final _NavItem item;
   final bool isActive;
   final Color accent;
-  final bool isAddButton;
   final VoidCallback onTap;
 
   const _NavBarItem({
     required this.item,
     required this.isActive,
     required this.accent,
-    required this.isAddButton,
     required this.onTap,
   });
 
@@ -1228,16 +1265,10 @@ class _NavBarItem extends StatelessWidget {
         : const Color(0xFF9E9E9E);
     final defaultActiveColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
 
-    final iconColor = isAddButton
-        ? accent
-        : isActive
-            ? (isDark ? Colors.white : accent)
-            : defaultInactiveColor;
-    final labelColor = isAddButton
-        ? accent
-        : isActive
-            ? defaultActiveColor
-            : defaultInactiveColor;
+    final iconColor = isActive
+        ? (isDark ? Colors.white : accent)
+        : defaultInactiveColor;
+    final labelColor = isActive ? defaultActiveColor : defaultInactiveColor;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -1256,7 +1287,7 @@ class _NavBarItem extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          LucideIcon(item.icon, size: isAddButton ? 26 : 22, color: iconColor),
+          LucideIcon(item.icon, size: 22, color: iconColor),
           const SizedBox(height: 3),
           Text(
             item.label,

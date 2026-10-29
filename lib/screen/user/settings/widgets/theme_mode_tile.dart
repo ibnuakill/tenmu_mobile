@@ -2,152 +2,69 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme_provider.dart';
 import '../../../../core/lucide_icons.dart';
 
-/// Tile khusus untuk switch dark / white mode.
+/// Tombol ganti mode tampilan — ikon saja, tanpa teks.
+///
+/// Warna tombol mengikuti mode yang sedang aktif:
+/// - Dark mode  → lingkaran gelap, ikon bulan putih
+/// - White mode → lingkaran terang, ikon matahari kuning
+///
+/// Ketuk untuk berpindah mode. Pilihan disimpan otomatis oleh [ThemeProvider].
 class ThemeModeTile extends StatelessWidget {
   final ThemeProvider theme;
   const ThemeModeTile({super.key, required this.theme});
 
-  static const Color _accent = Color(0xFF6750A4);
-
   @override
   Widget build(BuildContext context) {
     final isDark = theme.isDarkMode;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
+
+    // Warna mengikuti mode aktif: gelap saat dark, terang saat white.
+    final Color bg = isDark ? const Color(0xFF141417) : const Color(0xFFFFFFFF);
+    final Color fg = isDark ? const Color(0xFFF2F2F7) : const Color(0xFFF5A524);
+    final Color border = isDark
+        ? Colors.white.withValues(alpha: 0.16)
+        : const Color(0xFFDFDFE6);
+
+    return Tooltip(
+      message: isDark ? 'Ganti ke mode terang' : 'Ganti ke mode gelap',
+      child: Semantics(
+        button: true,
+        label: isDark ? 'Mode gelap aktif' : 'Mode terang aktif',
+        child: GestureDetector(
+          onTap: () => theme.setTheme(!isDark),
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOut,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: _accent.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: LucideIcon(
-              isDark ? 'moon' : 'sun',
-              color: _accent,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Mode Tampilan',
-                  style: TextStyle(
-                    color: theme.textPrimary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isDark ? 'Dark Mode aktif' : 'White Mode aktif',
-                  style: TextStyle(color: theme.textSecondary, fontSize: 12),
+              color: bg,
+              shape: BoxShape.circle,
+              border: Border.all(color: border, width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.10),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
-          ),
-          _SegmentedToggle(
-            isDark: isDark,
-            theme: theme,
-            onChanged: (v) => theme.setTheme(v),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SegmentedToggle extends StatelessWidget {
-  final bool isDark;
-  final ThemeProvider theme;
-  final ValueChanged<bool> onChanged;
-  const _SegmentedToggle({
-    required this.isDark,
-    required this.theme,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.bgElevated,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.border.withValues(alpha: 0.4)),
-      ),
-      padding: const EdgeInsets.all(3),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _SegmentButton(
-            icon: 'moon',
-            label: 'Dark',
-            selected: isDark,
-            theme: theme,
-            onTap: () => onChanged(true),
-          ),
-          _SegmentButton(
-            icon: 'sun',
-            label: 'White',
-            selected: !isDark,
-            theme: theme,
-            onTap: () => onChanged(false),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SegmentButton extends StatelessWidget {
-  final String icon;
-  final String label;
-  final bool selected;
-  final ThemeProvider theme;
-  final VoidCallback onTap;
-  const _SegmentButton({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.theme,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? theme.btnPrimary : Colors.transparent,
-          borderRadius: BorderRadius.circular(9),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            LucideIcon(
-              icon,
-              size: 15,
-              color: selected ? theme.btnLabel : theme.textSecondary,
-            ),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: selected ? theme.btnLabel : theme.textSecondary,
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                transitionBuilder: (child, animation) => RotationTransition(
+                  turns: Tween<double>(begin: 0.75, end: 1).animate(animation),
+                  child: FadeTransition(opacity: animation, child: child),
+                ),
+                child: LucideIcon(
+                  isDark ? 'moon' : 'sun',
+                  key: ValueKey<bool>(isDark),
+                  size: 20,
+                  color: fg,
+                ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

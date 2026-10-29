@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../../core/theme_provider.dart';
 import '../../core/lucide_icons.dart';
+import 'settings/widgets/delete_account_section.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
   const ProfileSettingsScreen({super.key});
@@ -363,6 +364,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                       ),
               ),
             ),
+            const SizedBox(height: 32),
+            const DeleteAccountSection(),
           ],
         ),
       ),

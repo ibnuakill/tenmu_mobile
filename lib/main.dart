@@ -10,6 +10,8 @@ import 'package:tenmu/core/places_provider.dart';
 import 'package:tenmu/core/notification_service.dart';
 import 'package:tenmu/core/notification_center.dart';
 import 'package:tenmu/core/app_update_provider.dart';
+import 'package:tenmu/core/app_info.dart';
+import 'package:tenmu/core/error_reporter.dart';
 import 'package:tenmu/core/widgets/update_gate.dart';
 import 'package:tenmu/screen/auth/auth_gate.dart';
 import 'package:tenmu/screen/auth/forgot_password_screen.dart';
@@ -23,15 +25,24 @@ Future<void> main() async {
   // Memastikan bahwa framework Flutter sudah siap sebelum menjalankan kode lain
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Pasang penangkap error sedini mungkin — kalau inisialisasi di bawah gagal,
+  // kegagalannya tetap tercatat dan tidak hilang begitu saja.
+  ErrorReporter.install();
+
   await dotenv.load(fileName: '.env');
+
+  // Versi aplikasi diambil dari build APK (bukan hardcode), supaya angka di
+  // Pengaturan/Tentang selalu ikut versi yang benar-benar terpasang.
+  await AppInfo.load();
 
   await Supabase.initialize(
     url: dotenv.env['SUPABASE_URL']!,
     publishableKey: dotenv.env['SUPABASE_ANON_KEY']!,
-    authOptions: FlutterAuthClientOptions(
-      authFlowType: AuthFlowType.pkce,
-    ),
+    authOptions: FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce),
   );
+
+  // Supabase siap → error boleh dikirim ke tabel app_errors.
+  await ErrorReporter.markReady();
 
   // Init deep link handler untuk magic link & reset password
   _initDeepLinks();
@@ -44,19 +55,29 @@ Future<void> main() async {
   // (dulu bikin layar hitam karena exception sebelum runApp).
   try {
     await setupDesktop();
-  } catch (_) {}
+  } catch (e, s) {
+    ErrorReporter.reportCaught(e, s, 'setupDesktop');
+  }
 
-  // Menjalankan aplikasi
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => PlacesProvider()),
-        ChangeNotifierProvider(create: (_) => AppUpdateProvider()),
-        ChangeNotifierProvider(create: (_) => NotificationCenter()),
-      ],
-      child: const TenMuApp(),
-    ),
+  // Menjalankan aplikasi. Zona ini menangkap error async yang tidak tertangkap
+  // try/catch di mana pun, supaya tidak jadi crash senyap.
+  runZonedGuarded(
+    () {
+      runApp(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => ThemeProvider()),
+            ChangeNotifierProvider(create: (_) => PlacesProvider()),
+            ChangeNotifierProvider(create: (_) => AppUpdateProvider()),
+            ChangeNotifierProvider(create: (_) => NotificationCenter()),
+          ],
+          child: const TenMuApp(),
+        ),
+      );
+    },
+    (Object error, StackTrace stack) {
+      ErrorReporter.reportCaught(error, stack, 'runZonedGuarded');
+    },
   );
 }
 
@@ -65,14 +86,21 @@ void _initDeepLinks() {
   final appLinks = AppLinks();
 
   // Tangkap link saat app dibuka dari cold start via deep link
-  appLinks.getInitialLink().then((uri) {
-    if (uri != null) _handleDeepLink(uri);
-  }).catchError((_) {});
+  appLinks
+      .getInitialLink()
+      .then((uri) {
+        if (uri != null) _handleDeepLink(uri);
+      })
+      .catchError((Object e, StackTrace s) {
+        ErrorReporter.reportCaught(e, s, 'deepLink.initial');
+      });
 
   // Tangkap link saat app sudah di foreground/background
   appLinks.uriLinkStream.listen(
     (uri) => _handleDeepLink(uri),
-    onError: (_) {},
+    onError: (Object e, StackTrace s) {
+      ErrorReporter.reportCaught(e, s, 'deepLink.stream');
+    },
   );
 }
 
@@ -83,7 +111,9 @@ Future<void> _handleDeepLink(Uri uri) async {
       uriStr.contains('tenmu://reset-callback')) {
     try {
       await Supabase.instance.client.auth.getSessionFromUrl(uri);
-    } catch (_) {}
+    } catch (e, s) {
+      ErrorReporter.reportCaught(e, s, 'deepLink.session');
+    }
   }
 }
 
@@ -93,16 +123,18 @@ class TenMuApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: [
-      SystemUiOverlay.top,
-      SystemUiOverlay.bottom,
-    ]);
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      systemNavigationBarColor: Color(0xFF121212),
-      systemNavigationBarIconBrightness: Brightness.light,
-      systemNavigationBarDividerColor: Color(0xFF121212),
-      statusBarColor: Colors.transparent,
-    ));
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+    );
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        systemNavigationBarColor: Color(0xFF121212),
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarDividerColor: Color(0xFF121212),
+        statusBarColor: Colors.transparent,
+      ),
+    );
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'TenMu',

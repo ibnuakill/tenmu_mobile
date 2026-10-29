@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import 'app_update_service.dart';
 
 /// Service for OneSignal push notifications.
 ///
@@ -48,10 +51,81 @@ class NotificationService {
         event.notification.display();
       });
 
+      // Klik notifikasi → jalankan aksinya (mis. buka unduhan APK baru).
+      // Tanpa ini, mengetuk notifikasi "update tersedia" cuma membuka app.
+      OneSignal.Notifications.addClickListener(_handleNotificationClick);
+
       _sdkInitialized = true;
     } catch (e) {
-      debugPrint('[NotificationService] init error (likely unsupported platform): $e');
+      debugPrint(
+        '[NotificationService] init error (likely unsupported platform): $e',
+      );
       _sdkInitialized = true;
+    }
+  }
+
+  /// Menangani ketukan pada notifikasi.
+  ///
+  /// - Data `url` / `apk_url` / `link` → dibuka di browser.
+  /// - `type: update` (atau judul/isi menyebut pembaruan) tanpa URL → ambil
+  ///   versi aktif dari `app_versions`, lalu buka APK sesuai ABI perangkat.
+  /// - Notifikasi biasa (tanpa maksud pembaruan) → cukup buka aplikasi.
+  static void _handleNotificationClick(OSNotificationClickEvent event) {
+    _openNotificationAction(event).catchError((Object e) {
+      debugPrint('[NotificationService] click handler error: $e');
+    });
+  }
+
+  static Future<void> _openNotificationAction(
+    OSNotificationClickEvent event,
+  ) async {
+    final data = event.notification.additionalData;
+    final text =
+        '${event.notification.title ?? ''} ${event.notification.body ?? ''}'
+            .toLowerCase();
+
+    String? url =
+        _stringOf(data, 'url') ??
+        _stringOf(data, 'apk_url') ??
+        _stringOf(data, 'link');
+    final type = _stringOf(data, 'type') ?? '';
+
+    final isUpdate =
+        type == 'update' ||
+        url != null ||
+        text.contains('update') ||
+        text.contains('pembaruan') ||
+        text.contains('versi baru');
+
+    if (!isUpdate) return;
+
+    // Notifikasi pembaruan tanpa URL eksplisit → cari rilis aktif di DB.
+    url ??= await _latestApkUrl();
+    if (url == null || url.isEmpty) {
+      debugPrint('[NotificationService] click: tidak ada URL untuk dibuka');
+      return;
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    debugPrint('[NotificationService] click → buka $url (berhasil: $ok)');
+  }
+
+  static String? _stringOf(Map<dynamic, dynamic>? data, String key) {
+    final value = data?[key];
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
+  static Future<String?> _latestApkUrl() async {
+    try {
+      final latest = await AppUpdateService().fetchLatestVersion();
+      if (latest == null) return null;
+      return await latest.resolveApkUrl();
+    } catch (e) {
+      debugPrint('[NotificationService] gagal ambil versi terbaru: $e');
+      return null;
     }
   }
 
@@ -99,11 +173,7 @@ class NotificationService {
     try {
       final res = await Supabase.instance.client.functions.invoke(
         'send-notification',
-        body: {
-          'placeId': placeId,
-          'placeName': placeName,
-          'type': 'new_place',
-        },
+        body: {'placeId': placeId, 'placeName': placeName, 'type': 'new_place'},
       );
       debugPrint('[NotificationService] edge function OK: ${res.data}');
       return true;

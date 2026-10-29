@@ -7,6 +7,7 @@ import '../../core/session_timeout_service.dart';
 import '../../core/user_role.dart';
 import '../admin/dashboard/admin_home_screen.dart';
 import '../user/home/home_screen.dart';
+import '../../core/error_reporter.dart';
 
 // State jelas: success, banned, error
 enum _CheckResult { banned }
@@ -47,17 +48,19 @@ class _RoleCheckerState extends State<RoleChecker> {
       if (pendingNama != null && pendingNama.isNotEmpty) {
         await prefs.remove('pending_magic_link_nama');
       }
-    } catch (_) {}
+    } catch (e, s) {
+      ErrorReporter.reportCaught(e, s, 'role_checker:50');
+    }
 
     if (response == null) {
       final metadata = user.userMetadata ?? {};
       final fullName = (pendingNama != null && pendingNama.isNotEmpty)
           ? pendingNama
           : (metadata['full_name']?.toString() ??
-              metadata['name']?.toString() ??
-              'User');
-      final avatarUrl = metadata['avatar_url']?.toString() ??
-          metadata['picture']?.toString();
+                metadata['name']?.toString() ??
+                'User');
+      final avatarUrl =
+          metadata['avatar_url']?.toString() ?? metadata['picture']?.toString();
 
       await Supabase.instance.client.from('profiles').insert({
         'id': user.id,
@@ -75,13 +78,21 @@ class _RoleCheckerState extends State<RoleChecker> {
     final currentNama = response['nama']?.toString();
     if (pendingNama != null &&
         pendingNama.isNotEmpty &&
-        (currentNama == null || currentNama.isEmpty || currentNama == 'User' || currentNama.contains('@'))) {
+        (currentNama == null ||
+            currentNama.isEmpty ||
+            currentNama == 'User' ||
+            currentNama.contains('@'))) {
       try {
-        await Supabase.instance.client.from('profiles').update({
-          'nama': pendingNama,
-          'updated_at': DateTime.now().toIso8601String(),
-        }).eq('id', user.id);
-      } catch (_) {}
+        await Supabase.instance.client
+            .from('profiles')
+            .update({
+              'nama': pendingNama,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', user.id);
+      } catch (e, s) {
+        ErrorReporter.reportCaught(e, s, 'role_checker:84');
+      }
     }
 
     final role = response['role']?.toString() ?? 'user';
@@ -142,9 +153,7 @@ class _RoleCheckerState extends State<RoleChecker> {
               await Supabase.instance.client.auth.signOut();
             });
             return const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
+              body: Center(child: CircularProgressIndicator()),
             );
           }
 
@@ -159,7 +168,11 @@ class _RoleCheckerState extends State<RoleChecker> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline, color: Colors.red, size: 32),
+                    const Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 32,
+                    ),
                     const SizedBox(height: 12),
                     Text(
                       'Gagal memuat role akun.',
@@ -229,7 +242,11 @@ class _BannedScreen extends StatelessWidget {
                   color: const Color(0xFF8B0000).withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.gpp_bad_rounded, size: 40, color: Color(0xFF8B2020)),
+                child: const Icon(
+                  Icons.gpp_bad_rounded,
+                  size: 40,
+                  color: Color(0xFF8B2020),
+                ),
               ),
               const SizedBox(height: 24),
               const Text(
@@ -253,7 +270,10 @@ class _BannedScreen extends StatelessWidget {
               ),
               Container(
                 margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(10),
@@ -265,7 +285,8 @@ class _BannedScreen extends StatelessWidget {
                       path: 'sarkamganas406@gmail.com',
                       queryParameters: {
                         'subject': 'Banding - Akun Dinonaktifkan',
-                        'body': 'Halo admin, saya ingin mengajukan banding atas penonaktifan akun saya.\n\nID Akun: ${Supabase.instance.client.auth.currentUser?.id ?? '-'}',
+                        'body':
+                            'Halo admin, saya ingin mengajukan banding atas penonaktifan akun saya.\n\nID Akun: ${Supabase.instance.client.auth.currentUser?.id ?? '-'}',
                       },
                     );
                     if (await canLaunchUrl(uri)) {
@@ -276,7 +297,11 @@ class _BannedScreen extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.email_outlined, size: 16, color: Colors.grey.shade400),
+                      Icon(
+                        Icons.email_outlined,
+                        size: 16,
+                        color: Colors.grey.shade400,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'sarkamganas406@gmail.com',
@@ -299,7 +324,11 @@ class _BannedScreen extends StatelessWidget {
                     await SessionTimeoutService.clearActivity();
                     await Supabase.instance.client.auth.signOut();
                   },
-                  icon: const Icon(Icons.logout_rounded, size: 18, color: Colors.white70),
+                  icon: const Icon(
+                    Icons.logout_rounded,
+                    size: 18,
+                    color: Colors.white70,
+                  ),
                   label: const Text(
                     'Kembali ke Login',
                     style: TextStyle(color: Colors.white70),

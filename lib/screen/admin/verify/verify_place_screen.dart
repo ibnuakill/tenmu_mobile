@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/admin_api.dart';
 import '../../../core/notification_service.dart';
 import '../../../core/notification_center.dart';
 import 'widgets/verify_place_widgets.dart';
@@ -104,11 +105,7 @@ class _VerifyPlaceScreenState extends State<VerifyPlaceScreen>
         : place['owner_id'];
 
     try {
-      await _client.from('places').update({
-        'verification_status': 'verified',
-        'verified_at': DateTime.now().toIso8601String(),
-        'rejection_reason': null,
-      }).eq('id', placeId);
+      await AdminApi.call('place_verify', {'place_id': placeId});
 
       _snack('Tempat "${place['nama_tempat']}" berhasil diverifikasi!', isError: false);
 
@@ -141,10 +138,10 @@ class _VerifyPlaceScreenState extends State<VerifyPlaceScreen>
     final finalReason = reason.isEmpty ? 'Tidak memenuhi syarat' : reason;
 
     try {
-      await _client.from('places').update({
-        'verification_status': 'rejected',
-        'rejection_reason': finalReason,
-      }).eq('id', placeId);
+      await AdminApi.call('place_reject', {
+        'place_id': placeId,
+        'reason': finalReason,
+      });
 
       _snack('Tempat "${place['nama_tempat']}" ditolak.', isError: false);
 
@@ -175,10 +172,10 @@ class _VerifyPlaceScreenState extends State<VerifyPlaceScreen>
       }
     });
     try {
-      await _client
-          .from('places')
-          .update({'is_featured': newFeatured})
-          .eq('id', place['id']);
+      await AdminApi.call('place_feature', {
+        'place_id': place['id'],
+        'is_featured': newFeatured,
+      });
       _snack(
         newFeatured ? '⭐ Ditambahkan ke unggulan!' : 'Dihapus dari unggulan.',
         isError: false,

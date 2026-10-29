@@ -9,13 +9,18 @@ import '../../../core/notification_center.dart';
 import '../../../widgets/notification_popup.dart';
 import '../../owner/add_place_screen.dart';
 import '../map/route_map_screen.dart';
+import '../detail/poi_detail_screen.dart';
 import '../user_notification_screen.dart';
 import '../chat/chat_bot_sheet.dart';
 import '../post/post_feed_screen.dart';
+import '../post/post_models.dart';
+import '../post/post_provider.dart';
+import '../../../core/lucide_icons.dart';
 import '../widgets/sort_filter_widget.dart';
 import '../settings/settings_screen.dart';
 import 'home_controller.dart';
 import 'widgets/home_widgets.dart';
+import 'widgets/home_posts_strip.dart';
 import 'widgets/home_filter_sheet.dart';
 
 /// Orchestrator: composes header, search, categories, carousel, list, bottom nav.
@@ -41,10 +46,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   StreamSubscription<AppNotification>? _notifSub;
   bool _notifInited = false;
 
+  /// Sumber data strip "Postingan terbaru" di beranda (feed penuh punya
+  /// instance sendiri di [PostFeedScreen]).
+  late final PostProvider _postProvider;
+
   @override
   void initState() {
     super.initState();
     _ctrl = HomeController(context: context);
+    _postProvider = PostProvider();
     _scrollCtrl = ScrollController();
     _carouselCtrl = PageController(viewportFraction: 0.88);
     _carouselPage = ValueNotifier(0.0);
@@ -60,11 +70,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _fadeAnim = CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero)
         .animate(
-      CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOutCubic),
-    );
+          CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOutCubic),
+        );
 
-    _scrollCtrl.addListener(() =>
-        _ctrl.onScrollNearEnd(_scrollCtrl, context.read<PlacesProvider>()));
+    _scrollCtrl.addListener(
+      () => _ctrl.onScrollNearEnd(_scrollCtrl, context.read<PlacesProvider>()),
+    );
     _carouselCtrl.addListener(() {
       final raw = _carouselCtrl.page ?? 0.0;
       _carouselPage.value = raw;
@@ -88,6 +99,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _ctrl.loadUserRole();
       _ctrl.loadUserProfile();
       _ctrl.loadUnreadCount();
+      _postProvider.fetchFeed();
       _initNotifications();
     });
   }
@@ -99,11 +111,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final nc = context.read<NotificationCenter>();
     _notifSub ??= nc.onNew.listen((n) {
       if (!mounted) return;
-      showNotificationPopup(
-        context,
-        notification: n,
-        onTap: _openNotifScreen,
-      );
+      showNotificationPopup(context, notification: n, onTap: _openNotifScreen);
     });
     nc.start();
   }
@@ -120,6 +128,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void dispose() {
     _notifSub?.cancel();
+    _postProvider.dispose();
     _ctrl.dispose();
     _entranceCtrl.dispose();
     _cardCtrl.dispose();
@@ -162,14 +171,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     List<Map<String, dynamic>> allPlaces,
   ) {
     final source = featured.isNotEmpty ? featured : allPlaces;
-    final sorted = [...source]..sort((a, b) {
-      final da = DateTime.tryParse(a['created_at']?.toString() ?? '');
-      final db = DateTime.tryParse(b['created_at']?.toString() ?? '');
-      if (da == null && db == null) return 0;
-      if (da == null) return 1;
-      if (db == null) return -1;
-      return db.compareTo(da); // terbaru dulu
-    });
+    final sorted = [...source]
+      ..sort((a, b) {
+        final da = DateTime.tryParse(a['created_at']?.toString() ?? '');
+        final db = DateTime.tryParse(b['created_at']?.toString() ?? '');
+        if (da == null && db == null) return 0;
+        if (da == null) return 1;
+        if (db == null) return -1;
+        return db.compareTo(da); // terbaru dulu
+      });
     return sorted.take(10).toList();
   }
 
@@ -196,7 +206,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   userName: _ctrl.userName ?? 'Pengguna',
                   userLocation: _ctrl.userLocation,
                   isUpdatingLocation: _ctrl.isUpdatingLocation,
-                  unreadNotifCount: context.watch<NotificationCenter>().unreadCount,
+                  unreadNotifCount: context
+                      .watch<NotificationCenter>()
+                      .unreadCount,
                   onTapLocation: () => _ctrl.updateLocationFromGPS(
                     ScaffoldMessenger.of(context),
                   ),
@@ -215,6 +227,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
+              // Strip postingan: hanya saat tidak sedang mencari/memfilter,
+              // supaya hasil pencarian tidak terdorong ke bawah.
+              if (!_hasActiveFilter() && _ctrl.searchQuery.isEmpty)
+                SliverToBoxAdapter(
+                  child: ListenableBuilder(
+                    listenable: _postProvider,
+                    builder: (_, __) => HomePostsStrip(
+                      theme: theme,
+                      accent: accent,
+                      provider: _postProvider,
+                      onSeeAll: _openPostFeed,
+                      onTapPost: _openPostDetail,
+                    ),
+                  ),
+                ),
               SliverToBoxAdapter(
                 child: HomeSectionTitle(
                   theme: theme,
@@ -222,24 +249,45 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
               SliverToBoxAdapter(
-                child: _buildContent(theme, accent, provider, allPlaces, featured),
+                child: _buildContent(
+                  theme,
+                  accent,
+                  provider,
+                  allPlaces,
+                  featured,
+                ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
+              // Ruang ekstra agar item terakhir tidak tertutup FAB.
+              const SliverToBoxAdapter(child: SizedBox(height: 96)),
             ],
           ),
         ),
       ),
+      // FAB pengganti item "Tambah" di bottom nav: hanya untuk owner.
+      floatingActionButton: _ctrl.isOwner
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: FloatingActionButton(
+                onPressed: _openAddPlace,
+                backgroundColor: accent,
+                foregroundColor: Colors.white,
+                elevation: 3,
+                tooltip: 'Tambah tempat',
+                child: const LucideIcon('circle-plus', size: 24),
+              ),
+            )
+          : null,
       bottomNavigationBar: HomePillBottomNav(
         theme: theme,
         accent: accent,
         currentIndex: _ctrl.currentNavIndex,
-        isOwner: _ctrl.isOwner,
         onTap: _onNavTap,
       ),
     );
   }
 
-  bool _hasActiveFilter() => _ctrl.selectedCategories.isNotEmpty ||
+  bool _hasActiveFilter() =>
+      _ctrl.selectedCategories.isNotEmpty ||
       _ctrl.selectedSort != SortOption.terbaru;
 
   Widget _buildContent(
@@ -287,6 +335,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 20),
+          if (provider.isOffline) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_off_rounded, size: 16, color: accent),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Mode offline — menampilkan data tersimpan.',
+                        style: TextStyle(
+                          color: theme.textSecondary,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           HomeFeaturedCarousel(
             theme: theme,
             accent: accent,
@@ -383,16 +461,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _ctrl.setNavIndex(0);
       return;
     }
-    if (index == 2) {
-      if (!_ctrl.isOwner) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const AddPlaceScreen()),
-      ).then((_) {
-        if (mounted) _ctrl.setNavIndex(0);
-      });
-      return;
-    }
     if (index == 3) {
       showModalBottomSheet(
         context: context,
@@ -400,15 +468,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         backgroundColor: Colors.transparent,
         builder: (_) => const ChatBotSheet(),
       );
-      return;
-    }
-    if (index == 5) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const PostFeedScreen()),
-      ).then((_) {
-        if (mounted) _ctrl.setNavIndex(0);
-      });
       return;
     }
     _ctrl.setNavIndex(index);
@@ -432,5 +491,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           if (mounted) _ctrl.setNavIndex(0);
         });
     }
+  }
+
+  /// FAB owner: buka form tambah tempat.
+  Future<void> _openAddPlace() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddPlaceScreen()),
+    );
+    if (mounted) _ctrl.setNavIndex(0);
+  }
+
+  /// "Lihat semua" → layar feed penuh. Sekembalinya, segarkan strip karena
+  /// user mungkin baru membuat/menghapus postingan di sana.
+  Future<void> _openPostFeed() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PostFeedScreen()),
+    );
+    if (mounted) _postProvider.fetchFeed();
+  }
+
+  /// Tap kartu postingan: buka detail tempatnya bila tertaut, kalau tidak
+  /// (postingan tanpa tempat) buka feed penuh.
+  void _openPostDetail(PlacePost post) {
+    final place = post.place;
+    if (place == null) {
+      _openPostFeed();
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => PoiDetailScreen(place: place)),
+    );
   }
 }

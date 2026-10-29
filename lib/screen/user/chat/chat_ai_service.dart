@@ -31,12 +31,16 @@ class ChatAIService {
   /// Cek ringan apakah fungsi AI tersedia (tanpa membebani token Gemini).
   static Future<bool> ping() async {
     try {
-      await Supabase.instance.client.functions.invoke('chat-bot', body: {
-        'message': 'ping',
-      });
+      // `?ping=1` = jalur termurah di server (balas "pong" sebelum auth/DB),
+      // jadi tidak memotong kuota chat user.
+      await Supabase.instance.client.functions.invoke(
+        'chat-bot',
+        queryParameters: {'ping': '1'},
+        body: {'message': 'ping'},
+      );
       return true;
-    } catch (_) {
-      debugPrint('chat-bot ping failed — pakai fallback lokal');
+    } catch (e) {
+      debugPrint('chat-bot ping failed — pakai fallback lokal: $e');
       return false;
     }
   }
@@ -61,31 +65,72 @@ class ChatAIService {
         ? history.sublist(history.length - _maxContextMessages)
         : history;
 
-    final res = await Supabase.instance.client.functions.invoke(
-      'chat-bot',
-      body: {
-        'message': text,
-        'history': preview
-            .map((m) => {
-                  'role': m.isUser ? 'user' : 'model',
-                  'parts': [
-                    {'text': m.text},
-                  ],
-                })
-            .toList(),
-      },
-    );
-    if (res.status == 429) {
-      throw const ChatQuotaException(60, 'Kamu terlalu sering chat. Coba lagi sebentar ya 🙏');
+    final FunctionResponse res;
+    try {
+      res = await Supabase.instance.client.functions.invoke(
+        'chat-bot',
+        body: {
+          'message': text,
+          'history': preview
+              .map((m) => {
+                    'role': m.isUser ? 'user' : 'model',
+                    'parts': [
+                      {'text': m.text},
+                    ],
+                  })
+              .toList(),
+        },
+      );
+    } on FunctionException catch (e) {
+      // PENTING: functions_client melempar [FunctionException] untuk SEMUA
+      // status non-2xx — tidak pernah mengembalikan response error. Jadi
+      // pengecekan `res.status == 429` tidak akan pernah kena dan user selalu
+      // dapat pesan "AI offline" padahal cuma kena limit. Petakan di sini.
+      throw _mapFunctionError(e);
     }
-    if (res.status >= 400) throw Exception('AI tidak tersedia (${res.status})');
+
     final data = (res.data as Map?) ?? const {};
     final reply = (data['reply'] as String?) ?? '';
     final mentioned = (data['mentioned'] as List?)
             ?.map((e) => Map<String, dynamic>.from(e as Map))
             .toList() ??
         <Map<String, dynamic>>[];
+    if (reply.trim().isEmpty) {
+      throw const ChatUnavailableException();
+    }
     return (reply: reply, mentioned: mentioned);
+  }
+
+  /// Terjemahkan error HTTP Edge Function → exception yang bisa dipahami UI.
+  static Exception _mapFunctionError(FunctionException e) {
+    final body = e.details?.toString() ?? '';
+    final code = _jsonField(body, 'code');
+    final retryAfter = int.tryParse(_jsonField(body, 'retry_after') ?? '') ?? 0;
+    switch (e.status) {
+      case 429:
+        return ChatQuotaException(retryAfter > 0 ? retryAfter : 60);
+      case 401:
+      case 403:
+        return const ChatAuthException();
+      case 404:
+        return const ChatUnavailableException(
+            'Fitur AI belum aktif di server. Coba lagi nanti ya 🙏');
+    }
+    if (code == 'ai_unavailable') return const ChatUnavailableException();
+    return ChatUnavailableException(
+        'TenMu AI sedang sibuk (kode ${e.status}). Coba lagi sebentar ya 🙏');
+  }
+
+  static String? _jsonField(String raw, String key) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map && decoded[key] != null) {
+        return decoded[key].toString();
+      }
+    } catch (_) {
+      // body bukan JSON → abaikan
+    }
+    return null;
   }
 
   /// Bersihkan input user: buang karakter kontrol, rapikan spasi, batasi panjang.
@@ -298,6 +343,30 @@ class ChatQuotaException implements Exception {
 
   @override
   String toString() => 'ChatQuotaException($retryAfterSeconds)';
+}
+
+/// AI / Edge Function bermasalah di sisi server (bukan salah user, bukan limit).
+class ChatUnavailableException implements Exception {
+  final String message;
+  const ChatUnavailableException([this.message = '']);
+
+  String get friendlyMessage => message.isNotEmpty
+      ? message
+      : 'TenMu AI lagi sibuk, coba lagi sebentar ya 🙏';
+
+  @override
+  String toString() => 'ChatUnavailableException($message)';
+}
+
+/// Sesi login tidak valid / kedaluwarsa → AI tidak bisa memverifikasi user.
+class ChatAuthException implements Exception {
+  const ChatAuthException();
+
+  String get friendlyMessage =>
+      'Sesi kamu sudah berakhir. Coba login ulang biar AI-nya bisa dipakai 🙏';
+
+  @override
+  String toString() => 'ChatAuthException';
 }
 
 /// Pembatas kirim pesan di sisi client (lapisan pertama sebelum server).

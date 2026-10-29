@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme_provider.dart';
 import '../../../core/user_role.dart';
+import '../../../core/admin_api.dart';
 
 import 'widgets/manage_users_widgets.dart';
 
@@ -65,9 +66,11 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
   Future<void> _updateUserRole(String userId, UserRole role) async {
     try {
-      await _client.from('profiles').update({'role': role.value}).eq('id', userId);
+      await AdminApi.call('set_role', {'user_id': userId, 'role': role.value});
       await _loadUsers();
       _snack('Role berhasil diubah ke ${role.label}.', isError: false);
+    } on AdminApiException catch (e) {
+      _snack('Gagal mengubah role: ${e.message}', isError: true);
     } catch (e) {
       _snack('Gagal mengubah role: $e', isError: true);
     }
@@ -83,12 +86,14 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     );
     if (confirm == true && mounted) {
       try {
-        await _client
-            .from('profiles')
-            .update({'status': isBanned ? 'active' : 'banned'})
-            .eq('id', userId);
+        await AdminApi.call('set_status', {
+          'user_id': userId,
+          'status': isBanned ? 'active' : 'banned',
+        });
         await _loadUsers();
         _snack('User $currentName $action.', isError: false);
+      } on AdminApiException catch (e) {
+        _snack('Gagal: ${e.message}', isError: true);
       } catch (e) {
         _snack('Gagal: $e', isError: true);
       }
@@ -103,9 +108,11 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     );
     if (confirm == true && mounted) {
       try {
-        await _client.from('reviews').delete().eq('user_id', userId);
+        await AdminApi.call('reviews_delete_by_user', {'user_id': userId});
         await _loadReviews();
         _snack('Semua ulasan user berhasil dihapus.', isError: false);
+      } on AdminApiException catch (e) {
+        _snack('Gagal: ${e.message}', isError: true);
       } catch (e) {
         _snack('Gagal: $e', isError: true);
       }

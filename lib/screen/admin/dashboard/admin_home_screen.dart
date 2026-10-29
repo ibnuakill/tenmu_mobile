@@ -15,6 +15,7 @@ import '../settings/admin_settings_screen.dart';
 import '../users/manage_users_screen.dart';
 import '../users/manage_owner_requests_screen.dart';
 import '../verify/verify_place_screen.dart';
+import '../../../core/error_reporter.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -47,7 +48,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   DateTimeRange? _dateRange;
 
   String _getDateStr(DateTime now) {
-    const bulan = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const bulan = [
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
+    ];
     if (_dateRange != null) {
       return '${_dateRange!.start.day} ${bulan[_dateRange!.start.month]} - '
           '${_dateRange!.end.day} ${bulan[_dateRange!.end.month]}, ${_dateRange!.end.year}';
@@ -211,7 +226,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _log('DONE: places=$_totalPlaces users=$_totalUsers reviews=$_totalReviews error=$_error');
+      _log(
+        'DONE: places=$_totalPlaces users=$_totalUsers reviews=$_totalReviews error=$_error',
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -226,7 +243,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     try {
       final f = File('${Directory.current.path}/dashboard_debug.log');
       f.writeAsString('${DateTime.now()}: $msg\n', mode: FileMode.append);
-    } catch (_) {}
+    } catch (e, s) {
+      ErrorReporter.reportCaught(e, s, 'admin_home_screen:229');
+    }
   }
 
   @override
@@ -349,7 +368,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             const SizedBox(height: 2),
             Text(
               label,
-              style: TextStyle(fontFamily: 'Nunito', 
+              style: TextStyle(
+                fontFamily: 'Nunito',
                 fontSize: 10,
                 fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                 color: active ? kPrimary : kTextMuted,

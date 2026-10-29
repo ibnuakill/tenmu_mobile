@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'haversine.dart';
+import 'places_cache.dart';
 
 /// Mode urutan / sort tempat.
 enum SortMode { terbaru, terdekat, rating }
@@ -64,6 +67,7 @@ class PlacesProvider extends ChangeNotifier {
   bool _hasMore = true;
   DateTime? _lastFetch;
   String? _error;
+  bool _isOffline = false;
 
   PlaceQuery _query = const PlaceQuery();
   DateTime? _cursorCreatedAt; // created_at baris terakhir halaman sebelumnya
@@ -81,6 +85,9 @@ class PlacesProvider extends ChangeNotifier {
   bool get isLoadingMore => _isLoadingMore;
   bool get hasMore => _hasMore;
   String? get error => _error;
+
+  /// True kalau daftar yang tampil berasal dari cache (koneksi gagal).
+  bool get isOffline => _isOffline;
 
   bool get _shouldRefresh =>
       _lastFetch == null ||
@@ -177,9 +184,30 @@ class PlacesProvider extends ChangeNotifier {
       _hasMore = hasMore;
       _lastFetch = DateTime.now();
       _rebuildRatings(page);
+
+      // Simpan untuk mode offline — hanya daftar utama tanpa filter,
+      // supaya cache tidak tertukar dengan hasil pencarian/kategori.
+      if (reset &&
+          _query.search.isEmpty &&
+          _query.categories.isEmpty &&
+          !_query.featured) {
+        unawaited(PlacesCache.save(_placesList));
+      }
+      _isOffline = false;
     } catch (e) {
       debugPrint('Error fetching places: $e');
-      if (reset) _error = 'Gagal memuat tempat. Periksa koneksi internet.';
+      if (reset) {
+        // Koneksi gagal → coba tampilkan data terakhir yang tersimpan.
+        final cached = await PlacesCache.load();
+        if (cached != null && cached.isNotEmpty) {
+          _placesList = cached;
+          _isOffline = true;
+          _error = 'Kamu sedang offline. Menampilkan data tersimpan.';
+          _rebuildRatings(_placesList);
+        } else {
+          _error = 'Gagal memuat tempat. Periksa koneksi internet.';
+        }
+      }
       // Halaman tambahan gagal → biarkan list yg sudah ada tetap tampil.
     } finally {
       _isLoading = false;

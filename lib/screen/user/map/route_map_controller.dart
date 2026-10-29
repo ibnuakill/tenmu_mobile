@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:maplibre_gl/maplibre_gl.dart';
 import '../../../core/location_permission_helper.dart';
 import '../../../core/poi_category.dart';
+import '../../../core/error_reporter.dart';
 
 enum TravelMode {
   walking,
@@ -14,22 +15,22 @@ enum TravelMode {
   car;
 
   String get osrmProfile => switch (this) {
-        TravelMode.walking => 'walking',
-        TravelMode.motorcycle => 'driving',
-        TravelMode.car => 'driving',
-      };
+    TravelMode.walking => 'walking',
+    TravelMode.motorcycle => 'driving',
+    TravelMode.car => 'driving',
+  };
 
   double get speedKmh => switch (this) {
-        TravelMode.walking => 5,
-        TravelMode.motorcycle => 40,
-        TravelMode.car => 30,
-      };
+    TravelMode.walking => 5,
+    TravelMode.motorcycle => 40,
+    TravelMode.car => 30,
+  };
 
   String get label => switch (this) {
-        TravelMode.walking => 'Jalan Kaki',
-        TravelMode.motorcycle => 'Motor',
-        TravelMode.car => 'Mobil',
-      };
+    TravelMode.walking => 'Jalan Kaki',
+    TravelMode.motorcycle => 'Motor',
+    TravelMode.car => 'Mobil',
+  };
 }
 
 /// Owns all non-widget state: position, route, markers, GPS stream,
@@ -107,10 +108,10 @@ class RouteMapController extends ChangeNotifier {
   bool isUpdatingMarker = false;
 
   Color get routeColor => switch (travelMode) {
-        TravelMode.walking => Colors.green,
-        TravelMode.motorcycle => Colors.blue,
-        TravelMode.car => Colors.orange,
-      };
+    TravelMode.walking => Colors.green,
+    TravelMode.motorcycle => Colors.blue,
+    TravelMode.car => Colors.orange,
+  };
 
   // ═══════════════════════════════════════════
   // Bootstrap
@@ -152,7 +153,9 @@ class RouteMapController extends ChangeNotifier {
 
       try {
         await mapReady.future.timeout(const Duration(seconds: 3));
-      } catch (_) {}
+      } catch (e, s) {
+        ErrorReporter.reportCaught(e, s, 'route_map_controller:155');
+      }
 
       _startLiveTracking();
     } catch (e) {
@@ -190,7 +193,9 @@ class RouteMapController extends ChangeNotifier {
     try {
       final last = await Geolocator.getLastKnownPosition();
       if (last != null) return last;
-    } catch (_) {}
+    } catch (e, s) {
+      ErrorReporter.reportCaught(e, s, 'route_map_controller:193');
+    }
 
     // Kalau masih belum ada, ambil fix baru dengan timeout biar nggak nge-hang.
     try {
@@ -228,8 +233,10 @@ class RouteMapController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<(List<LatLng> points, double distanceM, double durationS)?>
-      fetchRoute(Position position, {int retry = 1}) async {
+  Future<(List<LatLng> points, double distanceM, double durationS)?> fetchRoute(
+    Position position, {
+    int retry = 1,
+  }) async {
     if (destinationLat == null || destinationLng == null) return null;
 
     const servers = <String>['https://router.project-osrm.org/route/v1', ''];
@@ -245,7 +252,9 @@ class RouteMapController extends ChangeNotifier {
             '$destinationLng,$destinationLat'
             '?geometries=geojson&overview=full',
           );
-          final response = await http.get(url).timeout(const Duration(seconds: 6));
+          final response = await http
+              .get(url)
+              .timeout(const Duration(seconds: 6));
           if (response.statusCode == 200) {
             final data = json.decode(response.body);
             final code = data['code'] as String?;
@@ -261,7 +270,9 @@ class RouteMapController extends ChangeNotifier {
             final duration = (route['duration'] as num).toDouble();
             return (points, distance, duration);
           }
-        } catch (_) {}
+        } catch (e, s) {
+          ErrorReporter.reportCaught(e, s, 'route_map_controller:264');
+        }
       }
     }
     return null;
@@ -294,55 +305,56 @@ class RouteMapController extends ChangeNotifier {
   // ═══════════════════════════════════════════
 
   void _startLiveTracking() {
+    _positionStreamSubscription?.cancel();
     const settings = LocationSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 5,
     );
     _positionStreamSubscription =
         Geolocator.getPositionStream(locationSettings: settings).listen((p) {
-      currentPosition = p;
-      _currentSpeedMs = p.speed;
+          currentPosition = p;
+          _currentSpeedMs = p.speed;
 
-      if (destinationLat == null ||
-          destinationLng == null ||
-          _isRerouting) {
-        return;
-      }
+          if (destinationLat == null ||
+              destinationLng == null ||
+              _isRerouting) {
+            return;
+          }
 
-      final remaining = Geolocator.distanceBetween(
-        p.latitude,
-        p.longitude,
-        destinationLat!,
-        destinationLng!,
-      );
+          final remaining = Geolocator.distanceBetween(
+            p.latitude,
+            p.longitude,
+            destinationLat!,
+            destinationLng!,
+          );
 
-      if (!hasArrived && remaining < 50) {
-        _onArrival();
-        return;
-      }
+          if (!hasArrived && remaining < 50) {
+            _onArrival();
+            return;
+          }
 
-      final ratio = osrmTotalDistance > 0 && originalStraightDistance > 0
-          ? osrmTotalDistance / originalStraightDistance
-          : 1.0;
-      final road = remaining * ratio;
-      distanceInKm = road / 1000;
-      estimatedTimeInMins =
-          ((road / travelMode.speedKmh) / 1000 * 60).round();
+          final ratio = osrmTotalDistance > 0 && originalStraightDistance > 0
+              ? osrmTotalDistance / originalStraightDistance
+              : 1.0;
+          final road = remaining * ratio;
+          distanceInKm = road / 1000;
+          estimatedTimeInMins = ((road / travelMode.speedKmh) / 1000 * 60)
+              .round();
 
-      if (!useFallback && routePoints.length > 1) {
-        final deviation = distanceToRoute(
-          LatLng(p.latitude, p.longitude),
-          routePoints,
-        );
-        final now = DateTime.now();
-        if (deviation > _rerouteThresholdM &&
-            now.difference(_lastReroute) > _rerouteCooldown) {
-          _lastReroute = now;
-          _doReroute(p);
-        }
-      }
-      notifyListeners();
-    });
+          if (!useFallback && routePoints.length > 1) {
+            final deviation = distanceToRoute(
+              LatLng(p.latitude, p.longitude),
+              routePoints,
+            );
+            final now = DateTime.now();
+            if (deviation > _rerouteThresholdM &&
+                now.difference(_lastReroute) > _rerouteCooldown) {
+              _lastReroute = now;
+              _doReroute(p);
+            }
+          }
+          notifyListeners();
+        });
   }
 
   void _onArrival() {
@@ -437,8 +449,8 @@ class RouteMapController extends ChangeNotifier {
         destinationLng!,
       );
       distanceInKm = distanceMeters / 1000;
-      estimatedTimeInMins =
-          ((distanceMeters / 1000) / travelMode.speedKmh * 60).round();
+      estimatedTimeInMins = ((distanceMeters / 1000) / travelMode.speedKmh * 60)
+          .round();
       useFallback = false;
       isLoading = false;
       hasArrived = false;
@@ -498,11 +510,8 @@ class RouteMapController extends ChangeNotifier {
       showDialog(
         context: context,
         barrierDismissible: true,
-        builder: (ctx) => _TripSummaryDialog(
-          name: name,
-          distKm: dist,
-          mins: mins,
-        ),
+        builder: (ctx) =>
+            _TripSummaryDialog(name: name, distKm: dist, mins: mins),
       );
     }
   }
@@ -602,7 +611,9 @@ class RouteMapController extends ChangeNotifier {
         await mapController!.animateCamera(
           CameraUpdate.newLatLngZoom(routePoints.first, 14.0),
         );
-      } catch (_) {}
+      } catch (e, s) {
+        ErrorReporter.reportCaught(e, s, 'route_map_controller:606');
+      }
     }
   }
 
@@ -647,10 +658,7 @@ class _SummaryStat extends StatelessWidget {
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 11, color: Colors.grey),
-        ),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
       ],
     );
   }
@@ -670,9 +678,7 @@ class _TripSummaryDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Text(
         'Perjalanan Selesai',
         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
@@ -694,11 +700,7 @@ class _TripSummaryDialog extends StatelessWidget {
                 label: 'Jarak',
                 value: '${distKm.toStringAsFixed(1)} km',
               ),
-              Container(
-                width: 1,
-                height: 40,
-                color: Colors.grey.shade300,
-              ),
+              Container(width: 1, height: 40, color: Colors.grey.shade300),
               _SummaryStat(
                 icon: Icons.access_time,
                 label: 'Waktu',

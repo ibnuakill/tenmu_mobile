@@ -100,17 +100,17 @@ class DashboardPage extends StatelessWidget {
                             Row(
                               children: [
                                 // Date range pill (shrink)
-                                GestureDetector(
-                                  onTap: () async {
-                                    final picked = await _pickDateRange(
-                                      context,
-                                    );
-                                    if (picked != null &&
-                                        onDateRangeChanged != null) {
-                                      onDateRangeChanged!(picked);
-                                    }
-                                  },
-                                  child: Expanded(
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () async {
+                                      final picked = await _pickDateRange(
+                                        context,
+                                      );
+                                      if (picked != null &&
+                                          onDateRangeChanged != null) {
+                                        onDateRangeChanged!(picked);
+                                      }
+                                    },
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 12,
@@ -452,10 +452,7 @@ class DashboardPage extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 16),
                                 // Bottom Right (Top UMKM)
-                                Expanded(
-                                  flex: 1,
-                                  child: _buildTopUmkmWidget(),
-                                ),
+                                Expanded(flex: 1, child: _buildTopUmkmWidget()),
                               ],
                             ),
                           );
@@ -1591,13 +1588,21 @@ class DashboardPage extends StatelessWidget {
       buf.writeln('Nama UMKM;Kategori;Status Verifikasi;Tanggal Dibuat');
       final sorted = List<Map<String, dynamic>>.from(placesList)
         ..sort((a, b) {
-          final ta = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime(2000);
-          final tb = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime(2000);
+          final ta =
+              DateTime.tryParse(a['created_at']?.toString() ?? '') ??
+              DateTime(2000);
+          final tb =
+              DateTime.tryParse(b['created_at']?.toString() ?? '') ??
+              DateTime(2000);
           return tb.compareTo(ta);
         });
       for (final p in sorted) {
-        final nama = (p['nama_tempat']?.toString() ?? '-').replaceAll(';', ',').replaceAll('\n', ' ');
-        final kategori = (p['category']?.toString() ?? '-').replaceAll(';', ',').replaceAll('\n', ' ');
+        final nama = (p['nama_tempat']?.toString() ?? '-')
+            .replaceAll(';', ',')
+            .replaceAll('\n', ' ');
+        final kategori = (p['category']?.toString() ?? '-')
+            .replaceAll(';', ',')
+            .replaceAll('\n', ' ');
         final status = (p['verification_status']?.toString() ?? '-');
         final createdAt = DateTime.tryParse(p['created_at']?.toString() ?? '');
         final tgl = _formatDate(createdAt);
@@ -1610,7 +1615,9 @@ class DashboardPage extends StatelessWidget {
           .replaceAll(':', '-')
           .split('.')
           .first;
-      final file = File('${dir.path}${Platform.pathSeparator}tenmu-umkm-$stamp.csv');
+      final file = File(
+        '${dir.path}${Platform.pathSeparator}tenmu-umkm-$stamp.csv',
+      );
       await file.writeAsString('\uFEFF${buf.toString()}');
 
       messenger.showSnackBar(
@@ -1620,9 +1627,7 @@ class DashboardPage extends StatelessWidget {
         ),
       );
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Gagal export: $e')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text('Gagal export: $e')));
     }
   }
 

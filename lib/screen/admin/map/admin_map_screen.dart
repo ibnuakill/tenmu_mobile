@@ -11,18 +11,23 @@ import '../../../core/maptiler_style.dart';
 import '../../../core/poi_category.dart';
 import '../../../core/location_permission_helper.dart';
 import '../../user/map/widgets/map_marker_painter.dart';
+import '../../../core/error_reporter.dart';
 
 // Quixotic Palette
-const _kPrimary      = Color(0xFF1E7A52);
-const _kAccentGreen  = Color(0xFF0FA968);
-const _kAccentAmber  = Color(0xFFF59E0B);
-const _kPageBg       = Color(0xFFF3F4F6);
-const _kCardBg       = Color(0xFFFFFFFF);
-const _kBorderColor  = Color(0xFFE5E7EB);
-const _kTextPrimary  = Color(0xFF111827);
-const _kTextSecondary= Color(0xFF6B7280);
-const _kTextMuted    = Color(0xFF9CA3AF);
-const _kShadow = BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, 4));
+const _kPrimary = Color(0xFF1E7A52);
+const _kAccentGreen = Color(0xFF0FA968);
+const _kAccentAmber = Color(0xFFF59E0B);
+const _kPageBg = Color(0xFFF3F4F6);
+const _kCardBg = Color(0xFFFFFFFF);
+const _kBorderColor = Color(0xFFE5E7EB);
+const _kTextPrimary = Color(0xFF111827);
+const _kTextSecondary = Color(0xFF6B7280);
+const _kTextMuted = Color(0xFF9CA3AF);
+const _kShadow = BoxShadow(
+  color: Color(0x0A000000),
+  blurRadius: 12,
+  offset: Offset(0, 4),
+);
 
 class AdminMapScreen extends StatefulWidget {
   const AdminMapScreen({super.key});
@@ -102,7 +107,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
       }
 
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       ).timeout(const Duration(seconds: 10));
       if (!mounted) return;
       setState(() {
@@ -125,7 +132,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
     try {
       final data = await client
           .from('places')
-          .select('id, nama_tempat, category, latitude, longitude, verification_status')
+          .select(
+            'id, nama_tempat, category, latitude, longitude, verification_status',
+          )
           .not('latitude', 'is', null)
           .not('longitude', 'is', null);
 
@@ -205,7 +214,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
       );
       try {
         await c.addImage(_pinKey(cat), img);
-      } catch (_) {}
+      } catch (e, s) {
+        ErrorReporter.reportCaught(e, s, 'admin_map_screen:208');
+      }
     }
 
     final fallbackImg = await MapMarkerPainter.buildCircleMarkerImage(
@@ -216,7 +227,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
     );
     try {
       await c.addImage('pin_ritel', fallbackImg);
-    } catch (_) {}
+    } catch (e, s) {
+      ErrorReporter.reportCaught(e, s, 'admin_map_screen:219');
+    }
 
     final currentImg = await MapMarkerPainter.buildCircleMarkerImage(
       bgColor: _kPrimary,
@@ -225,13 +238,17 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
     );
     try {
       await c.addImage('pin_current', currentImg);
-    } catch (_) {}
+    } catch (e, s) {
+      ErrorReporter.reportCaught(e, s, 'admin_map_screen:228');
+    }
   }
 
   void _onSymbolTapped(mgl.Symbol symbol) {
     final placeId = symbol.data?['placeId'] as String?;
     if (placeId == null) return;
-    final place = _places.where((p) => p['id']?.toString() == placeId).firstOrNull;
+    final place = _places
+        .where((p) => p['id']?.toString() == placeId)
+        .firstOrNull;
     if (place == null) return;
     setState(() => _selectedPlace = place);
     _redrawSymbols();
@@ -245,7 +262,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
       for (final sym in _mlSymbols) {
         try {
           await c.removeSymbol(sym);
-        } catch (_) {}
+        } catch (e, s) {
+          ErrorReporter.reportCaught(e, s, 'admin_map_screen:248');
+        }
       }
       _mlSymbols.clear();
 
@@ -270,7 +289,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
             {'placeId': place['id']?.toString() ?? ''},
           );
           _mlSymbols.add(sym);
-        } catch (_) {}
+        } catch (e, s) {
+          ErrorReporter.reportCaught(e, s, 'admin_map_screen:273');
+        }
       }
 
       if (_currentLocation != null) {
@@ -299,7 +320,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
               zIndex: 100,
             ),
           );
-        } catch (_) {}
+        } catch (e, s) {
+          ErrorReporter.reportCaught(e, s, 'admin_map_screen:302');
+        }
       }
     } finally {
       _isRedrawing = false;
@@ -315,15 +338,22 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
     if (loc == null) return null;
     return Marker(
       point: loc,
-      width: 28, height: 28,
+      width: 28,
+      height: 28,
       child: Container(
         decoration: BoxDecoration(
           color: _kPrimary,
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white, width: 2.5),
-          boxShadow: [BoxShadow(color: _kPrimary.withValues(alpha: 0.4), blurRadius: 8)],
+          boxShadow: [
+            BoxShadow(color: _kPrimary.withValues(alpha: 0.4), blurRadius: 8),
+          ],
         ),
-        child: const Icon(Icons.my_location_rounded, color: Colors.white, size: 14),
+        child: const Icon(
+          Icons.my_location_rounded,
+          color: Colors.white,
+          size: 14,
+        ),
       ),
     );
   }
@@ -352,7 +382,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
             border: Border.all(color: Colors.white, width: isSelected ? 3 : 2),
             boxShadow: [
               BoxShadow(
-                color: isSelected ? color.withValues(alpha: 0.5) : Colors.black12,
+                color: isSelected
+                    ? color.withValues(alpha: 0.5)
+                    : Colors.black12,
                 blurRadius: isSelected ? 12 : 4,
                 spreadRadius: isSelected ? 2 : 0,
               ),
@@ -366,7 +398,10 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                   padding: EdgeInsets.all(isSelected ? 7.0 : 5.0),
                   child: SvgPicture.asset(
                     svgPath,
-                    colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                    colorFilter: const ColorFilter.mode(
+                      Colors.white,
+                      BlendMode.srcIn,
+                    ),
                   ),
                 );
               }
@@ -394,7 +429,12 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
         children: [
           // ── MAP ──
           if (_loading)
-            Center(child: CircularProgressIndicator(color: _kPrimary, strokeWidth: 2.5))
+            Center(
+              child: CircularProgressIndicator(
+                color: _kPrimary,
+                strokeWidth: 2.5,
+              ),
+            )
           else if (_useMaplibre)
             mgl.MapLibreMap(
               styleString: MapTilerStyle.hasKey
@@ -431,12 +471,15 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                     initialZoom: _defaultZoom,
                     minZoom: 4,
                     maxZoom: 22,
-                    interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+                    interactionOptions: const InteractionOptions(
+                      flags: InteractiveFlag.all,
+                    ),
                     onTap: (_, a) => setState(() => _selectedPlace = null),
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.tenmu.app',
                     ),
                     MarkerLayer(markers: markers),
@@ -449,9 +492,13 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
           if (_locationFailed)
             Positioned(
               top: MediaQuery.paddingOf(context).top + 70,
-              left: 20, right: 20,
+              left: 20,
+              right: 20,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: _kCardBg,
                   borderRadius: BorderRadius.circular(14),
@@ -460,11 +507,21 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline_rounded, size: 16, color: _kAccentAmber),
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      size: 16,
+                      color: _kAccentAmber,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text('Lokasi tidak tersedia. Aktifkan GPS.',
-                        style: TextStyle(fontFamily: 'Nunito', fontSize: 12, color: _kTextSecondary)),
+                      child: Text(
+                        'Lokasi tidak tersedia. Aktifkan GPS.',
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
+                          fontSize: 12,
+                          color: _kTextSecondary,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -474,7 +531,8 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
           // ── FLOATING SEARCH ──
           Positioned(
             top: MediaQuery.paddingOf(context).top + 16,
-            left: 20, right: 20,
+            left: 20,
+            right: 20,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               decoration: BoxDecoration(
@@ -485,7 +543,11 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.search_rounded, size: 20, color: _kTextMuted),
+                  const Icon(
+                    Icons.search_rounded,
+                    size: 20,
+                    color: _kTextMuted,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
@@ -496,18 +558,29 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                       },
                       decoration: InputDecoration(
                         hintText: 'Cari tempat di peta...',
-                        hintStyle: TextStyle(fontFamily: 'Nunito', color: _kTextMuted, fontSize: 13),
+                        hintStyle: TextStyle(
+                          fontFamily: 'Nunito',
+                          color: _kTextMuted,
+                          fontSize: 13,
+                        ),
                         border: InputBorder.none,
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                        ),
                       ),
-                      style: TextStyle(fontFamily: 'Nunito', fontSize: 13, color: _kTextPrimary),
+                      style: TextStyle(
+                        fontFamily: 'Nunito',
+                        fontSize: 13,
+                        color: _kTextPrimary,
+                      ),
                     ),
                   ),
                   Container(width: 1, height: 20, color: _kBorderColor),
                   const SizedBox(width: 8),
                   GestureDetector(
-                    onTap: () => setState(() => _filterVisible = !_filterVisible),
+                    onTap: () =>
+                        setState(() => _filterVisible = !_filterVisible),
                     child: Icon(Icons.tune_rounded, size: 20, color: _kPrimary),
                   ),
                 ],
@@ -522,15 +595,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _ctrlBtn(
-                  Icons.add_rounded,
-                  onTap: _zoomIn,
-                ),
+                _ctrlBtn(Icons.add_rounded, onTap: _zoomIn),
                 const SizedBox(height: 6),
-                _ctrlBtn(
-                  Icons.remove_rounded,
-                  onTap: _zoomOut,
-                ),
+                _ctrlBtn(Icons.remove_rounded, onTap: _zoomOut),
                 const SizedBox(height: 10),
                 _ctrlBtn(
                   Icons.my_location_rounded,
@@ -543,12 +610,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
 
           // ── INFO CARD ──
           if (_selectedPlace != null)
-            Positioned(
-              bottom: 90,
-              left: 20,
-              right: 20,
-              child: _infoCard(),
-            ),
+            Positioned(bottom: 90, left: 20, right: 20, child: _infoCard()),
         ],
       ),
     );
@@ -642,7 +704,8 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                     children: [
                       Text(
                         name,
-                        style: TextStyle(fontFamily: 'Nunito', 
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: _kTextPrimary,
@@ -651,7 +714,8 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                       const SizedBox(height: 2),
                       Text(
                         cat,
-                        style: TextStyle(fontFamily: 'Nunito', 
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
                           fontSize: 12,
                           color: _kTextSecondary,
                         ),
@@ -670,7 +734,11 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                       color: _kPageBg,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.close_rounded, size: 16, color: _kTextMuted),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      size: 16,
+                      color: _kTextMuted,
+                    ),
                   ),
                 ),
               ],
@@ -679,7 +747,10 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: status == 'verified'
                         ? _kAccentGreen.withValues(alpha: 0.1)
@@ -696,7 +767,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: status == 'verified' ? _kAccentGreen : _kAccentAmber,
+                      color: status == 'verified'
+                          ? _kAccentGreen
+                          : _kAccentAmber,
                     ),
                   ),
                 ),

@@ -10,6 +10,7 @@ import 'route_map_controller.dart';
 import 'widgets/map_marker_painter.dart';
 import 'widgets/map_navigation_sheet.dart';
 import '../../../core/lucide_icons.dart';
+import '../../../core/error_reporter.dart';
 
 class RouteMapScreen extends StatefulWidget {
   final List<Map<String, dynamic>>? placesList;
@@ -102,9 +103,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
             );
           }
           if (_ctrl.errorMessage != null || _ctrl.currentPosition == null) {
-            return MapErrorView(
-              message: _ctrl.errorMessage,
+            return LocationRequiredView(
               onRetry: _ctrl.retryInit,
+              message: _ctrl.errorMessage,
             );
           }
 
@@ -145,8 +146,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
               // --- Compass + Recenter FABs ---
               Positioned(
                 right: 16,
-                bottom:
-                    200 + MediaQuery.paddingOf(context).bottom,
+                bottom: 200 + MediaQuery.paddingOf(context).bottom,
                 child: MapFabStack(controller: _ctrl),
               ),
 
@@ -295,7 +295,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     if (_ctrl.routeLine != null) {
       try {
         await c.removeLine(_ctrl.routeLine!);
-      } catch (_) {}
+      } catch (e, s) {
+        ErrorReporter.reportCaught(e, s, 'route_map_screen:298');
+      }
       _ctrl.routeLine = null;
     }
 
@@ -313,7 +315,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           lineOpacity: 0.9,
         ),
       );
-    } catch (_) {}
+    } catch (e, s) {
+      ErrorReporter.reportCaught(e, s, 'route_map_screen:316');
+    }
   }
 
   Future<void> _drawPlaceMarkers() async {
@@ -323,7 +327,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     for (final sym in _ctrl.placeSymbols) {
       try {
         await c.removeSymbol(sym);
-      } catch (_) {}
+      } catch (e, s) {
+        ErrorReporter.reportCaught(e, s, 'route_map_screen:326');
+      }
     }
     _ctrl.placeSymbols.clear();
 
@@ -352,7 +358,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           {'placeId': place['id']?.toString() ?? ''},
         );
         _ctrl.placeSymbols.add(sym);
-      } catch (_) {}
+      } catch (e, s) {
+        ErrorReporter.reportCaught(e, s, 'route_map_screen:355');
+      }
     }
   }
 
@@ -378,10 +386,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         try {
           await c.updateSymbol(
             _ctrl.currentPosSymbol!,
-            SymbolOptions(
-              geometry: geometry,
-              iconRotate: heading,
-            ),
+            SymbolOptions(geometry: geometry, iconRotate: heading),
           );
           return;
         } catch (_) {
@@ -412,7 +417,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     if (_ctrl.destinationSymbol != null) {
       try {
         await c.removeSymbol(_ctrl.destinationSymbol!);
-      } catch (_) {}
+      } catch (e, s) {
+        ErrorReporter.reportCaught(e, s, 'route_map_screen:415');
+      }
       _ctrl.destinationSymbol = null;
     }
 
@@ -442,7 +449,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           zIndex: 5,
         ),
       );
-    } catch (_) {}
+    } catch (e, s) {
+      ErrorReporter.reportCaught(e, s, 'route_map_screen:445');
+    }
   }
 
   // ═══════════════════════════════════════════
@@ -461,18 +470,18 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       child: isNavigating
           ? MapNavigationSheet(controller: _ctrl)
           : isPreviewing
-              ? MapUmkmPreview(
-                  place: _ctrl.selectedPlace!,
-                  onClose: () {
-                    _ctrl.clearSelection();
-                    _drawPlaceMarkers();
-                  },
-                  onStartRoute: () {
-                    _ctrl.startRoute();
-                    _ctrl.initLocationAndRoute();
-                  },
-                )
-              : MapBrowseInfo(),
+          ? MapUmkmPreview(
+              place: _ctrl.selectedPlace!,
+              onClose: () {
+                _ctrl.clearSelection();
+                _drawPlaceMarkers();
+              },
+              onStartRoute: () {
+                _ctrl.startRoute();
+                _ctrl.initLocationAndRoute();
+              },
+            )
+          : MapBrowseInfo(),
     );
   }
 }

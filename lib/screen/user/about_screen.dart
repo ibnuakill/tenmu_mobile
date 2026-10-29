@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme_provider.dart';
 import '../../core/lucide_icons.dart';
+import '../../core/app_info.dart';
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
@@ -44,7 +45,11 @@ class AboutScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: theme.border, width: 2),
                     ),
-                    child: LucideIcon('store', size: 60, color: theme.btnPrimary),
+                    child: LucideIcon(
+                      'store',
+                      size: 60,
+                      color: theme.btnPrimary,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -57,7 +62,7 @@ class AboutScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'v1.0.0',
+                    AppInfo.label,
                     style: TextStyle(color: theme.textSecondary, fontSize: 14),
                   ),
                 ],
@@ -157,7 +162,11 @@ class AboutScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _InfoRow(label: 'Versi:', value: '1.0.0', theme: theme),
+                  _InfoRow(
+                    label: 'Versi:',
+                    value: AppInfo.fullLabel,
+                    theme: theme,
+                  ),
                   const SizedBox(height: 8),
                   _InfoRow(
                     label: 'Pembuat:',
