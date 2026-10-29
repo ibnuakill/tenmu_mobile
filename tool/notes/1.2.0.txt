@@ -1,0 +1,4 @@
+Rombak navigasi: postingan jadi strip di Beranda + Lihat semua, tab Postingan & Tambah dihapus dari bottom nav, Tambah jadi FAB owner, entry Postingan di Pengaturan.
+
+--- rilis ulang 2026-10-29 14:27 ---
+Rombak navigasi: postingan jadi strip di Beranda (dengan Lihat semua), tab Postingan & Tambah dihapus dari bottom nav (sisa 4 item), Tambah jadi FAB khusus owner, entry Postingan baru di Pengaturan.

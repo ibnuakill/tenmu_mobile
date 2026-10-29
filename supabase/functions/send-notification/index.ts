@@ -5,6 +5,7 @@
 // OneSignal REST API key disimpan sebagai secret — aman di server.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 interface NotificationPayload {
   /** Mode broadcast admin */
@@ -16,6 +17,8 @@ interface NotificationPayload {
   /** Kalau diisi → kirim hanya ke user ini (OneSignal external_id = auth user id). Kosong → broadcast. */
   targetUserIds?: string[]
   type?: string
+  /** Tautan yang dibuka saat notifikasi diketuk (mis. URL APK untuk type=update). */
+  url?: string
 }
 
 const CORS = {
@@ -35,6 +38,47 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
+  // ── Otorisasi ────────────────────────────────────────
+  // Tanpa blok ini, siapa pun yang memegang anon key (ikut ter-bundle di APK)
+  // bisa mem-broadcast push ke SEMUA user. Jadi setiap panggilan wajib:
+  //   1) punya JWT user yang valid, dan
+  //   2) broadcast / kirim ke user lain hanya boleh admin,
+  //      sedangkan notifikasi tempat hanya boleh pemilik tempat itu.
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  if (!supabaseUrl || !serviceKey) {
+    console.error('[send-notification] Supabase env belum diset')
+    return json({ error: 'Server configuration error' }, 500)
+  }
+
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim()
+  if (!token) return json({ error: 'Unauthorized' }, 401)
+
+  // Anon key bukan identitas user — tolak kalau dipakai sebagai token.
+  if (anonKey && token === anonKey) {
+    return json({ error: 'Unauthorized' }, 401)
+  }
+
+  const asUser = createClient(supabaseUrl, anonKey ?? serviceKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  })
+  const { data: userData, error: userErr } = await asUser.auth.getUser(token)
+  if (userErr || !userData?.user) {
+    return json({ error: 'Unauthorized' }, 401)
+  }
+  const callerId = userData.user.id
+
+  const admin = createClient(supabaseUrl, serviceKey)
+  const { data: callerProfile } = await admin
+    .from('profiles')
+    .select('id, role')
+    .eq('id', callerId)
+    .maybeSingle()
+  const callerRole = (callerProfile?.role ?? 'user') as string
+  const isAdmin = callerRole === 'admin' || callerRole === 'superadmin'
+
   // ── Parse body ───────────────────────────────────────
   let body: NotificationPayload
   try {
@@ -49,6 +93,33 @@ serve(async (req) => {
   const isBroadcast = !!(title && message)
   if (!isBroadcast && (!placeId || !placeName)) {
     return json({ error: 'title+body atau placeId+placeName wajib diisi' }, 400)
+  }
+
+  let ownsPlace = false
+  if (isBroadcast) {
+    // Broadcast / kirim pesan bebas = hak admin saja.
+    if (!isAdmin) {
+      console.warn(`[send-notification] tolak broadcast dari ${callerId} (${callerRole})`)
+      return json({ error: 'Forbidden: khusus admin' }, 403)
+    }
+  } else if (!isAdmin) {
+    // Notifikasi tempat: pemanggil harus pemilik tempat tersebut.
+    const { data: place } = await admin
+      .from('places')
+      .select('id, owner_id')
+      .eq('id', placeId as number)
+      .maybeSingle()
+    if (!place || place.owner_id !== callerId) {
+      console.warn(`[send-notification] tolak notif tempat ${placeId} dari ${callerId}`)
+      return json({ error: 'Forbidden: bukan pemilik tempat' }, 403)
+    }
+    ownsPlace = true
+  }
+
+  // Kirim ke user tertentu: admin bebas; pemilik tempat hanya untuk notifikasi
+  // tempatnya sendiri (mis. memberi tahu admin soal pengajuan baru).
+  if (!isAdmin && !ownsPlace && Array.isArray(targetUserIds) && targetUserIds.length > 0) {
+    return json({ error: 'Forbidden: target user khusus admin' }, 403)
   }
 
   // ── Secrets ──────────────────────────────────────────
@@ -77,6 +148,9 @@ serve(async (req) => {
     type: type ?? (isBroadcast ? 'admin' : 'new_place'),
   }
   if (placeId) data.place_id = placeId
+  // Diteruskan ke aplikasi; dipakai NotificationService untuk membuka tautan
+  // saat notifikasi diketuk (mis. unduhan APK untuk type=update).
+  if (body.url) data.url = body.url
 
   const base = {
     app_id: appId,

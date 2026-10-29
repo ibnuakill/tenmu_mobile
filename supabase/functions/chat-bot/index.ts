@@ -7,17 +7,48 @@
 //      (nama, kota, tempat favorit) + daftar tempat verified (limit 40).
 //   3. Susun system prompt: asisten umum yang BISA tanya-jawab apa saja,
 //      tapi rekomendasi tempat wajib grounded ke daftar yang diberikan.
-//   4. Panggil Gemini REST API.
+//   4. Panggil AI: Gemini dulu; kalau gagal/kuota habis → Groq (cadangan).
 //   5. Kembali { reply, mentioned: [{ id, nama_tempat }] }.
+//
+// Secret yang dipakai: GEMINI_API_KEY (utama), GROQ_API_KEY (opsional,
+// cadangan gratis). Tanpa GROQ_API_KEY fungsi tetap jalan tapi tanpa fallback.
+// Opsional GROQ_MODEL untuk menimpa model Groq; default mencoba
+// openai/gpt-oss-120b → qwen/qwen3.8-27b → openai/gpt-oss-20b (model yang
+// memang ada di akun Groq free tier). Model non-chat (prompt-guard,
+// whisper, orpheus) otomatis diabaikan.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // ── Config ──────────────────────────────────────────────────
+/** Baca env var dengan beberapa kemungkinan nama (dashboard kadang
+ *  menyimpan nama secret dengan tanda hubung, mis. `GROQ-API-KEY`). */
+function pickEnv(names: string[]): string | undefined {
+  for (const n of names) {
+    const v = Deno.env.get(n)
+    if (v && v.trim()) return v.trim()
+  }
+  return undefined
+}
+
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
+const GEMINI_API_KEY = pickEnv(['GEMINI_API_KEY', 'GEMINI-API-KEY'])
+const GROQ_API_KEY = pickEnv(['GROQ_API_KEY', 'GROQ-API-KEY', 'GROQ_KEY', 'GROQ-KEY'])
 const MODEL = 'gemini-2.5-flash-lite'
+const GROQ_MODEL_RAW = pickEnv(['GROQ_MODEL', 'GROQ-MODEL'])
+// Sebagian model Groq BUKAN untuk chat (prompt-guard/safeguard = moderasi,
+// whisper = transkripsi, orpheus = suara). Kalau salah diisi, chat-completions
+// ditolak → fitur mati. Jadi saring, lalu coba beberapa model valid berurutan.
+const GROQ_MODEL_CANDIDATES: string[] = (() => {
+  const list: string[] = []
+  if (GROQ_MODEL_RAW && !/guard|whisper|tts|orpheus|playai|distil/i.test(GROQ_MODEL_RAW)) {
+    list.push(GROQ_MODEL_RAW)
+  }
+  // Default + cadangan yang tersedia di free tier Groq.
+  list.push('openai/gpt-oss-120b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b')
+  return [...new Set(list)]
+})()
 const MAX_PLACES_IN_CONTEXT = 40
 
 // ── Anti-abuse / proteksi biaya ─────────────────────────────
@@ -29,7 +60,16 @@ const RATE_PER_DAY = 200 // kuota harian per user
 const PING_PER_MINUTE = 20 // ping hanya cek hidup, murah tapi tetap dibatasi
 const MAX_BODY_BYTES = 32 * 1024 // tolak payload gede (flood)
 const GEMINI_TIMEOUT_MS = 25_000
+const GROQ_TIMEOUT_MS = 30_000
 const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') ?? '*'
+
+// ── Error khusus untuk fallback cascade ───────────────────────────
+class AiUnavailableError extends Error {
+  constructor(reason: string) {
+    super(reason)
+    this.name = 'AiUnavailableError'
+  }
+}
 
 // Rate limiter in-memory (per isolate). Cukup untuk meredam spam dari satu
 // perangkat/user; kuota keras jangka panjang tetap dijaga limit harian.
@@ -124,9 +164,10 @@ interface PlaceRow {
   fasilitas: string | null
   avg_rating: number | null
   review_count: number | null
-  harga_teks: string | null
-  min_price: number | null
-  max_price: number | null
+  // Opsional: tidak semua deploy DB punya kolom harga.
+  harga_teks?: string | null
+  min_price?: number | null
+  max_price?: number | null
   jam_buka: string | null
   jam_tutup: string | null
   nomor_telepon: string | null
@@ -182,18 +223,130 @@ async function geminiChat(
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
 }
 
+// ── Groq REST call (cadangan; OpenAI-compatible) ───────────
+async function groqChat(
+  system: string,
+  history: { role: string; parts: (string | { text: string })[] }[],
+  userText: string,
+): Promise<string> {
+  // Groq pakai format OpenAI: role assistant/user/system + content string.
+  const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+    { role: 'system', content: system },
+  ]
+  for (const m of history) {
+    const text = m.parts
+      .map((p) => (typeof p === 'string' ? p : (p?.text ?? '')))
+      .join(' ')
+      .trim()
+    if (!text) continue
+    messages.push({
+      role: m.role === 'user' ? 'user' : 'assistant',
+      content: text,
+    })
+  }
+  messages.push({ role: 'user', content: userText })
+
+  const failures: string[] = []
+  for (const model of GROQ_MODEL_CANDIDATES) {
+    let res: Response
+    try {
+      res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+        },
+        signal: AbortSignal.timeout(GROQ_TIMEOUT_MS),
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.7,
+          max_tokens: 700,
+        }),
+      })
+    } catch (e) {
+      failures.push(`${model}: ${e instanceof Error ? e.message : String(e)}`)
+      continue
+    }
+
+    if (!res.ok) {
+      const err = await res.text()
+      failures.push(`${model}: HTTP ${res.status} ${err.slice(0, 120)}`)
+      // 401/403 = key salah → percuma coba model lain.
+      if (res.status === 401 || res.status === 403) break
+      // 404 model tak ada / 400 request salah → coba model berikutnya.
+      continue
+    }
+
+    const data = await res.json()
+    const text: string = data.choices?.[0]?.message?.content ?? ''
+    if (text.trim()) return text
+    failures.push(`${model}: jawaban kosong`)
+  }
+  throw new Error(`Groq gagal → ${failures.join(' | ')}`)
+}
+
+// ── Cascade: Gemini dulu, Groq kalau Gemini gagal ──────────
+// Free tier Gemini hanya 20 request/HARI per model — sangat cepat habis.
+// Kalau kena 429/timeout/5xx kita pindah ke Groq (free tier ~1.000/hari)
+// supaya user tidak melihat "AI offline" padahal layanan masih bisa jalan.
+async function generateReply(
+  system: string,
+  history: { role: string; parts: (string | { text: string })[] }[],
+  userText: string,
+): Promise<{ text: string; provider: 'gemini' | 'groq' }> {
+  const failures: string[] = []
+
+  if (GEMINI_API_KEY) {
+    try {
+      const text = await geminiChat(system, history, userText)
+      if (text.trim()) return { text, provider: 'gemini' }
+      failures.push('gemini: jawaban kosong')
+    } catch (e) {
+      failures.push(`gemini: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  } else {
+    failures.push('gemini: GEMINI_API_KEY tidak diset')
+  }
+
+  if (GROQ_API_KEY) {
+    try {
+      const text = await groqChat(system, history, userText)
+      if (text.trim()) return { text, provider: 'groq' }
+      failures.push('groq: jawaban kosong')
+    } catch (e) {
+      failures.push(`groq: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  } else {
+    failures.push('groq: GROQ_API_KEY tidak diset')
+  }
+
+  throw new AiUnavailableError(failures.join(' | '))
+}
+
 // ── Konteks pengguna: nama, kota, favorit ──────────────────
 async function loadUserContext(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<{ nama: string; kota: string; favNames: string[] }> {
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, nama, city')
-    .eq('id', userId)
-    .maybeSingle()
-  const nama = profile?.full_name || profile?.nama || ''
-  const kota = profile?.city || ''
+  // Skema `profiles` bisa beda antar-deploy (mis. `full_name`/`city` belum
+  // ada). Coba yang paling lengkap dulu lalu turun bertahap — personalisasi
+  // boleh gagal diam-diam, TAPI tidak boleh menggagalkan chat.
+  let profile: Record<string, unknown> | null = null
+  for (const cols of ['nama, city', 'nama', '*']) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select(cols)
+      .eq('id', userId)
+      .maybeSingle()
+    if (!error) {
+      profile = (data as Record<string, unknown> | null) ?? null
+      break
+    }
+  }
+  const asText = (v: unknown) => (typeof v === 'string' ? v : '')
+  const nama = asText(profile?.nama) || asText(profile?.full_name)
+  const kota = asText(profile?.city)
 
   let favNames: string[] = []
   try {
@@ -257,7 +410,7 @@ function buildSystemPrompt(
     }
     if (p.harga_teks) parts.push(` • Harga: ${p.harga_teks}`)
     else if (p.min_price != null || p.max_price != null) {
-      const r = (x: number | null) => (x == null ? '' : x.toLocaleString('id-ID'))
+      const r = (x: number | null | undefined) => (x == null ? '' : x.toLocaleString('id-ID'))
       parts.push(` • Harga: ${r(p.min_price)}-${r(p.max_price)}`)
     }
     if (p.jam_buka || p.jam_tutup) {
@@ -287,19 +440,11 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })
   }
-  if (req.method !== 'POST') {
-    return jsonError('Method not allowed', 405, corsHeaders)
-  }
-
-  // Body size guard (prevent flood / DoS)
-  const contentLength = Number(req.headers.get('content-length') || '0')
-  if (contentLength > MAX_BODY_BYTES) {
-    return jsonError('Payload too large', 413, corsHeaders)
-  }
 
   const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown'
 
-  // Ping endpoint – masih butuh rate limit agar tidak dipakai untuk DoS.
+  // Ping endpoint – cek hidup murah. Boleh GET (uptime check) maupun POST
+  // (dipakai functions_client di Flutter). Tetap di-rate-limit anti-DoS.
   if (url.searchParams.get('ping') === '1') {
     const rate = checkRate(`ping:${ip}`, PING_PER_MINUTE, Number.MAX_SAFE_INTEGER)
     if (!rate.ok) {
@@ -309,6 +454,16 @@ serve(async (req) => {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+  }
+
+  if (req.method !== 'POST') {
+    return jsonError('Method not allowed', 405, corsHeaders)
+  }
+
+  // Body size guard (prevent flood / DoS)
+  const contentLength = Number(req.headers.get('content-length') || '0')
+  if (contentLength > MAX_BODY_BYTES) {
+    return jsonError('Payload too large', 413, corsHeaders)
   }
 
   // Limit kasar per-IP sebelum auth (murah, tidak menyimpan token di memori).
@@ -358,36 +513,65 @@ serve(async (req) => {
       return jsonError('Rate limit exceeded', 429, corsHeaders, userRate.retryAfter)
     }
 
+    // Kuota harian persisten (tahan cold start / multi-instance).
+    // Kalau tabel belum ada, jangan blokir chat — cukup catat di log.
+    try {
+      const { data: usedCount, error: usageErr } = await supabase.rpc(
+        'bump_chat_usage',
+        { p_user_id: userId },
+      )
+      if (usageErr) {
+        console.warn('[chat-bot] bump_chat_usage gagal:', usageErr.message)
+      } else if (typeof usedCount === 'number' && usedCount > RATE_PER_DAY) {
+        return jsonError(
+          `Kuota chat harian habis (${RATE_PER_DAY} pesan/hari). Coba lagi besok ya.`,
+          429,
+          corsHeaders,
+          Math.ceil((DAY_MS - (Date.now() % DAY_MS)) / 1000),
+        )
+      }
+    } catch (e) {
+      console.warn('[chat-bot] kuota persisten dilewati:', e)
+    }
+
     // 1. Konteks pengguna (nama, kota, favorit) — personalisasi
     const user = await loadUserContext(supabase, userId)
 
-    // 2. Tempat verified (atau lister row)
-    const { data: rows, error } = await supabase
-      .from('places_with_ratings')
-      .select(
-        'id, nama_tempat, alamat, deskripsi, category, fasilitas, avg_rating, review_count, '
-          + 'harga_teks, min_price, max_price, jam_buka, jam_tutup, nomor_telepon, gambar_url, image_urls, latitude, longitude',
-      )
-      .eq('verification_status', 'verified')
-      .order('created_at', { ascending: false })
-      .limit(MAX_PLACES_IN_CONTEXT)
-    if (error) throw error
-    const places = (rows as PlaceRow[] | null) ?? []
+    // 2. Tempat verified (atau lister row).
+    //    PENTING: kolom harga (harga_teks/min_price/max_price) tidak ada di
+    //    semua deploy DB. Kalau di-select mentah, PostgREST balas 400 →
+    //    seluruh fungsi 500 → app jatuh ke fallback "AI offline".
+    //    Jadi: coba lengkap, lalu fallback ke kolom inti.
+    const CORE_COLS =
+      'id, nama_tempat, alamat, deskripsi, category, fasilitas, avg_rating, review_count, '
+        + 'jam_buka, jam_tutup, nomor_telepon, gambar_url, image_urls, latitude, longitude'
+    const PRICE_COLS = ', harga_teks, min_price, max_price'
+    const runPlacesQuery = (cols: string) =>
+      supabase
+        .from('places_with_ratings')
+        .select(cols)
+        .eq('verification_status', 'verified')
+        .order('created_at', { ascending: false })
+        .limit(MAX_PLACES_IN_CONTEXT)
 
-    // 3. Gemini call
-    if (!GEMINI_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: 'GEMINI_API_KEY not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    let placesRes = await runPlacesQuery(CORE_COLS + PRICE_COLS)
+    if (placesRes.error) {
+      console.warn(
+        '[chat-bot] kolom harga tidak tersedia, fallback ke kolom inti:',
+        placesRes.error.message,
       )
+      placesRes = await runPlacesQuery(CORE_COLS)
     }
-    const reply = cleanMarkdown(
-      await geminiChat(
-        buildSystemPrompt(places, user),
-        safeHistory,
-        message,
-      ),
+    if (placesRes.error) throw placesRes.error
+    const places = (placesRes.data as unknown as PlaceRow[] | null) ?? []
+
+    // 3. AI call (Gemini utama + Groq cadangan)
+    const { text: rawReply } = await generateReply(
+      buildSystemPrompt(places, user),
+      safeHistory,
+      message,
     )
+    const reply = cleanMarkdown(rawReply)
 
     // 4. Extract mentioned place names from reply (full payload for UI)
     const lower = reply.toLowerCase()
@@ -408,9 +592,9 @@ serve(async (req) => {
         nomor_telepon: p.nomor_telepon,
         jam_buka: p.jam_buka,
         jam_tutup: p.jam_tutup,
-        harga_teks: p.harga_teks,
-        min_price: p.min_price,
-        max_price: p.max_price,
+        harga_teks: p.harga_teks ?? null,
+        min_price: p.min_price ?? null,
+        max_price: p.max_price ?? null,
         gambar_url: p.gambar_url,
         image_urls: p.image_urls,
         latitude: p.latitude,
@@ -425,9 +609,17 @@ serve(async (req) => {
     })
   } catch (err) {
     console.error('[chat-bot]', err)
+    // AiUnavailableError = semua provider AI gagal (kuota/key/timeout).
+    // Selain itu = masalah internal (DB, dsb) → pesan berbeda.
+    const isAi = err instanceof AiUnavailableError
     return new Response(
-      JSON.stringify({ error: 'AI service temporarily unavailable' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      JSON.stringify({
+        error: isAi
+          ? 'AI sedang tidak tersedia, coba lagi sebentar'
+          : 'Layanan sedang bermasalah',
+        code: isAi ? 'ai_unavailable' : 'server_error',
+      }),
+      { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }
 })
@@ -438,9 +630,17 @@ function jsonError(msg: string, status: number, extraHeaders: Record<string, str
     ...extraHeaders,
   }
   if (retryAfter !== undefined) hdrs['Retry-After'] = String(retryAfter)
-  return new Response(JSON.stringify({ error: msg }), {
-    status,
-    headers: hdrs,
-  })
+  return new Response(
+    JSON.stringify({
+      error: msg,
+      // Sertakan di body: header Retry-After tidak terbaca oleh
+      // functions_client di Flutter, jadi client ambil dari sini.
+      ...(retryAfter !== undefined ? { retry_after: retryAfter } : {}),
+    }),
+    {
+      status,
+      headers: hdrs,
+    },
+  )
 }
 

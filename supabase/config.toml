@@ -428,3 +428,15 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# AI chat: gateway TIDAK memaksa verify_jwt.
+# Kunci publishable (sb_publishable_...) bukan JWT, jadi kalau gateway yang
+# memverifikasi, request ditolak "UNAUTHORIZED_INVALID_JWT_FORMAT" sebelum
+# fungsi jalan -> app menampilkan "AI offline". Fungsi ini tetap aman karena
+# memverifikasi token user sendiri lewat supabase.auth.getUser(token).
+[functions.chat-bot]
+verify_jwt = false
+
+[functions.admin-api]
+verify_jwt = false
+# Kunci publishable bukan JWT; fungsi verifikasi token user sendiri via auth.getUser().

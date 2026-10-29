@@ -1,0 +1,1 @@
+Tombol mode tampilan di Pengaturan jadi ikon bulat tanpa teks (gelap saat dark, terang saat white). Versi aplikasi di Pengaturan & Tentang sekarang ikut build APK (sebelumnya hardcode 1.0.0).

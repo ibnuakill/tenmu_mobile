@@ -27,31 +27,83 @@ saat dibuka, mengunduh APK baru, lalu membuka installer Android.
 | `lib/core/app_update_service.dart` | Service: cek versi, download APK, buka installer |
 | `lib/core/app_update_provider.dart` | `ChangeNotifier` — state (`UpdateStatus`, progress, error) |
 | `lib/core/widgets/update_dialog.dart` | Dialog pembaruan (changelog, progress, tombol) |
+| `lib/core/widgets/mandatory_update_screen.dart` | Layar kunci penuh untuk update wajib |
 | `lib/core/widgets/update_gate.dart` | Pemicu pengecekan otomatis saat app dibuka |
 | `supabase/create_app_versions.sql` | Tabel `app_versions` + bucket `app-releases` + RLS |
 | `tool/release.sh` | Script rilis 1-perintah |
+| `tool/apk_signature.txt` | Fingerprint sertifikat APK rilis pertama (pengaman) |
+| `tool/release_notes_*.txt` | Catatan rilis per versi |
 | `tool/storage_upload.py` | Upload APK ke Supabase Storage |
 | `tool/insert_version.py` | Insert baris ke `app_versions` |
 | `tool/storage_delete.py` | Hapus file dari storage (cleanup) |
 
+## Update Wajib vs Opsional
+
+| `is_mandatory` | Yang terjadi |
+|---|---|
+| `false` | Dialog "Pembaruan Tersedia" + tombol **Nanti** — user tetap bisa masuk |
+| `true` | `UpdateGate` mengembalikan `MandatoryUpdateScreen` sebagai pengganti **seluruh** isi aplikasi: tidak ada UI app di belakangnya, `PopScope(canPop: false)` mematikan tombol back, tidak ada tombol "Nanti" |
+
+Pengecekan ulang dilakukan setiap app kembali ke depan
+(`didChangeAppLifecycleState`) sehingga user yang sedang memakai app langsung
+terkunci begitu versi wajib dirilis.
+
+Kalau pengecekan gagal (offline / server tak terjangkau), `checkForUpdate()`
+mengembalikan `null` dan aplikasi **tetap bisa dipakai** — supaya user tidak
+terkurung gara-gara internet mati.
+
 ## Rilis — Perintah Satu Baris
 
 ```bash
-./tool/release.sh --bump patch --changelog "Perbaikan bug login"
+export SUPABASE_ACCESS_TOKEN=sbp_xxx        # sekali per terminal
+
+./tool/release.sh --version 1.2.0 --notes-file tool/release_notes_1.2.0.txt --mandatory
 ```
 
 Opsi:
-- `--bump major|minor|patch` — naikkan `version:` di `pubspec.yaml` (wajib naik!)
-- `--changelog "..."` — catatan rilis yang tampil di dialog
-- `--mandatory` — user tidak bisa skip update
+
+| Opsi | Arti |
+|------|------|
+| `--bump major\|minor\|patch` | Naikkan versi dari versi sekarang (buildNumber otomatis +1) |
+| `--version X.Y.Z` | Set nama versi eksplisit (buildNumber tetap +1) |
+| `--notes "teks"` | Catatan **internal** (detail teknis) — hanya masuk repo, tidak ke app |
+| `--notes-file file.txt` | Catatan internal multi-baris dari file |
+| `--public-notes "teks"` | Teks yang dilihat user di layar update (default: "Perbaikan bug dan peningkatan performa.") |
+| `--mandatory` | Update **wajib** — user terkunci di layar update |
+| `--optional` | Update bisa ditunda (default) |
+| `--yes`, `-y` | Lewati konfirmasi |
+| `--skip-build` | Pakai APK yang sudah ada (uji coba / rilis ulang) |
 
 Script melakukan:
-1. Bump `version:` di `pubspec.yaml` (versionCode +1)
-2. `flutter build apk --release --split-per-abi`
-3. Upload 3 APK (arm64-v8a, armeabi-v7a, x86_64) → bucket `app-releases`
-4. Insert baris ke `app_versions` dengan `apk_variants` (peta ABI → URL)
 
-Tanpa `--bump`, script memakai versi yang ada di `pubspec.yaml`.
+1. Cek `flutter`, `.env`, dan token Supabase
+2. Hitung versi baru, tulis ke `pubspec.yaml`
+3. **Cek sertifikat APK** vs `tool/apk_signature.txt` → batal kalau beda
+4. `flutter build apk --release --split-per-abi`
+5. Cek `versionName` di dalam APK benar-benar versi baru
+6. Upload 3 APK (< 50 MB tiap file) → bucket `app-releases`
+7. Insert/upsert `app_versions` + nonaktifkan baris rilis lain
+8. Verifikasi: link APK balas HTTP 200, dan anon melihat versi baru sebagai aktif
+9. Cetak ringkasan + link unduh
+
+Tanpa `--bump` / `--version`, script memakai versi di `pubspec.yaml` apa adanya
+dan menampilkan peringatan bahwa user tidak akan mendeteksi update.
+
+## Catatan Internal vs Publik
+
+Kolom `changelog` di `app_versions` **dilihat user** di layar update. Karena itu
+isi rilis tidak boleh menampilkan detail teknis/keamanan (mis. "tutup celah RLS
+owner_requests") — itu memberi peta gratis bagi orang yang mau menyalahgunakan.
+
+Aturannya:
+
+| Jenis | Disimpan di | Dikirim ke DB | Contoh |
+|---|---|---|---|
+| Internal | `tool/notes/<versi>.txt` | ❌ | "Tutup celah RLS owner_requests, hapus 10 akun uji" |
+| Publik | kolom `changelog` | ✅ | "Perbaikan bug dan peningkatan performa." |
+
+`release.sh` otomatis mengarsipkan catatan internal ke `tool/notes/<versi>.txt`
+dan hanya mengirim `--public-notes` (atau teks generik default) ke database.
 
 ## Kenapa Split-per-ABI
 
@@ -110,9 +162,15 @@ peta `{abi: url}`; `apk_url` berisi default `arm64-v8a`.
    Manifest sudah punya `REQUEST_INSTALL_PACKAGES`.
 4. **Bucket harus publik** supaya APK bisa diunduh tanpa login Supabase
    (RLS: `public read app releases`).
-5. **`service_role` key tidak disimpan di repo.** `tool/storage_upload.py`
-   mengambilnya on-the-fly dari Management API memakai PAT di
-   `~/.supabase/profile`.
+5. **`service_role` key tidak disimpan di repo.** `tool/storage_upload.py` dan
+   `tool/insert_version.py` mengambilnya on-the-fly dari Management API memakai
+   token di env `SUPABASE_ACCESS_TOKEN` (fallback: `~/.supabase/profile`).
+   Kalau token sudah dicabut, script berhenti dengan pesan jelas (HTTP 401),
+   bukan gagal separuh jalan.
+6. **Pengaman sertifikat.** `tool/apk_signature.txt` menyimpan fingerprint
+   SHA-256 sertifikat rilis pertama. `release.sh` membandingkan APK baru
+   dengan file itu dan **membatalkan rilis** kalau berbeda — karena APK dengan
+   sertifikat lain tidak akan bisa menimpa APK lama di HP user.
 
 ## Cek Manual
 

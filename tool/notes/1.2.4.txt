@@ -1,0 +1,1 @@
+Perbaikan layout dashboard admin: Expanded dibungkus GestureDetector menyebabkan error ParentData/FlexParentData (36x di log). Klik notifikasi update membuka unduhan APK. Edge function meneruskan field url.

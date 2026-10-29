@@ -1,0 +1,1 @@
+Klik notifikasi update sekarang membuka unduhan APK (sebelumnya hanya membuka app). Edge function send-notification meneruskan field url ke data notifikasi. Rename helper versi AppVersion->AppInfo agar tidak bentrok dengan model rilis.

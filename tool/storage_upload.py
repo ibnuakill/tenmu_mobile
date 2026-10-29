@@ -1,26 +1,44 @@
 """Upload file ke Supabase Storage memakai service_role key.
 
-service_role key diambil on-the-fly dari Management API (PAT di ~/.supabase/profile)
-sehingga tidak perlu disimpan di repo maupun di .env.
+Token akses dibaca dari env `SUPABASE_ACCESS_TOKEN` lebih dulu, lalu fallback
+ke `~/.supabase/profile`. `service_role` key diambil on-the-fly dari Management
+API sehingga tidak pernah disimpan di repo maupun di .env.
 """
 import json, os, sys, urllib.request, urllib.error
 
-PROJECT = "axtkquxgojewinwdndtt"
+PROJECT = os.environ.get("SUPABASE_PROJECT_REF", "axtkquxgojewinwdndtt")
 PROFILE = os.path.expanduser("~/.supabase/profile")
 
 
-def get_service_role_key():
-    pat = open(PROFILE, encoding="utf-8").read().strip()
+def get_pat():
+    pat = os.environ.get("SUPABASE_ACCESS_TOKEN", "").strip()
+    if not pat and os.path.exists(PROFILE):
+        pat = open(PROFILE, encoding="utf-8").read().strip()
     if not pat.startswith("sbp_"):
-        raise SystemExit("PAT di ~/.supabase/profile tidak valid")
+        raise SystemExit(
+            "Token Supabase tidak ditemukan.\n"
+            "  export SUPABASE_ACCESS_TOKEN=sbp_xxx\n"
+            "  (ambil di https://supabase.com/dashboard/account/tokens)"
+        )
+    return pat
+
+
+def get_service_role_key():
     url = f"https://api.supabase.com/v1/projects/{PROJECT}/api-keys"
-    req = urllib.request.Request(url, headers={"Authorization": "Bearer " + pat})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        keys = json.loads(r.read().decode("utf-8"))
+    req = urllib.request.Request(url, headers={"Authorization": "Bearer " + get_pat()})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            keys = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise SystemExit(
+            f"Gagal mengambil API key (HTTP {e.code}). "
+            "Token kemungkinan sudah dicabut/kedaluwarsa."
+        )
     for k in keys:
-        if k.get("id") == "service_role" or k.get("type") == "service_role":
+        labels = {k.get("id"), k.get("name"), k.get("type")}
+        if "service_role" in labels and (k.get("api_key") or "").startswith("eyJ"):
             return k["api_key"]
-    raise SystemExit("service_role key tidak ditemukan")
+    raise SystemExit("service_role key tidak ditemukan di daftar API key project")
 
 
 def upload(local_path, bucket, remote_path, content_type="application/octet-stream"):

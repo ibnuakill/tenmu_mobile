@@ -1,18 +1,33 @@
 """Insert baris rilis ke tabel `app_versions` (Supabase Project TenMu).
 
-Dipakai oleh tool/release.sh. PAT dibaca dari ~/.supabase/profile.
+Dipakai oleh tool/release.sh. Token dibaca dari env `SUPABASE_ACCESS_TOKEN`,
+fallback ke `~/.supabase/profile`.
+
+Baris rilis lain otomatis dinonaktifkan (`is_active = false`) supaya aplikasi
+hanya pernah melihat satu versi aktif.
 """
 import json, os, sys, urllib.request, urllib.error
 
-PROJECT = "axtkquxgojewinwdndtt"
+PROJECT = os.environ.get("SUPABASE_PROJECT_REF", "axtkquxgojewinwdndtt")
 PROFILE = os.path.expanduser("~/.supabase/profile")
+
+
+def get_pat():
+    pat = os.environ.get("SUPABASE_ACCESS_TOKEN", "").strip()
+    if not pat and os.path.exists(PROFILE):
+        pat = open(PROFILE, encoding="utf-8").read().strip()
+    if not pat.startswith("sbp_"):
+        raise SystemExit(
+            "Token Supabase tidak ditemukan.\n"
+            "  export SUPABASE_ACCESS_TOKEN=sbp_xxx\n"
+            "  (ambil di https://supabase.com/dashboard/account/tokens)"
+        )
+    return pat
 
 
 def insert_version(version_code, version_name, apk_url, apk_size,
                    changelog="", is_mandatory=False, apk_variants=None):
-    pat = open(PROFILE, encoding="utf-8").read().strip()
-    if not pat.startswith("sbp_"):
-        raise SystemExit("PAT di ~/.supabase/profile tidak valid")
+    pat = get_pat()
 
     safe_changelog = changelog.replace("'", "''")
     safe_url = apk_url.replace("'", "''")
@@ -23,6 +38,10 @@ def insert_version(version_code, version_name, apk_url, apk_size,
         variants_json = "'" + apk_variants.replace("'", "''") + "'::jsonb"
 
     sql = f"""
+update public.app_versions
+   set is_active = false
+ where is_active = true and version_code <> {int(version_code)};
+
 insert into public.app_versions
   (version_code, version_name, apk_url, apk_size, changelog, is_mandatory,
    is_active, apk_variants)
@@ -60,4 +79,4 @@ if __name__ == "__main__":
     variants = sys.argv[7] if len(sys.argv) > 7 else None
     status, body = insert_version(code, name, url, size, changelog, mandatory, variants)
     print("HTTP", status, body)
-    sys.exit(0 if status == 201 else 1)
+    sys.exit(0 if status in (200, 201, 204) else 1)

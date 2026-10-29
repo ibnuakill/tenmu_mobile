@@ -1,0 +1,7 @@
+Pembaruan wajib: aplikasi harus diperbarui untuk bisa dipakai.
+- Hapus akun sendiri (Pengaturan > Zona Berbahaya)
+- Mode offline: daftar tempat tersimpan + penanda offline
+- Laporan error otomatis agar bug cepat ketahuan
+- Kuota chat AI harian yang jelas
+- Keamanan: notifikasi & pengajuan owner diproteksi, data pribadi dipisah
+- Perbaikan: layar verifikasi admin, tombol Setuju/Tolak, tema gelap default

@@ -1,0 +1,1 @@
+Tombol mode tampilan dipindah ke pojok kanan atas (AppBar) sejajar judul Pengaturan; seksi TAMPILAN di body dihapus. Ikon saja, tanpa teks.
