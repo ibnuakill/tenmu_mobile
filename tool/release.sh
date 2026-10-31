@@ -96,6 +96,15 @@ fi
 export SUPABASE_ACCESS_TOKEN="$PAT"
 export SUPABASE_PROJECT_REF="$PROJECT_REF"
 
+# Validasi token ke API sungguhan SEBELUM build. Dulu token basi baru ketahuan
+# di langkah upload, setelah Gradle jalan 3-4 menit dan hasil build terbuang.
+TOKEN_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
+  -H "Authorization: Bearer $PAT" \
+  "https://api.supabase.com/v1/projects" || echo "000")
+if [[ "$TOKEN_CHECK" != "200" ]]; then
+  fail "Token Supabase ditolak (HTTP $TOKEN_CHECK). Ambil token baru di https://supabase.com/dashboard/account/tokens lalu: export SUPABASE_ACCESS_TOKEN=sbp_xxx"
+fi
+
 echo "   project : $PROJECT_REF"
 echo "   .env    : ${SUPABASE_URL}"
 echo "   token   : ${PAT:0:8}… (${#PAT} karakter)"
@@ -297,7 +306,28 @@ python tool/insert_version.py \
   "$DB_CODE" "$NEW_NAME" "$APK_URL" "$APK_SIZE" "$PUBLIC_NOTES" "$MANDATORY" \
   "$VARIANTS_JSON" || fail "insert app_versions gagal"
 
-# --- 9. Verifikasi ----------------------------------------------------------
+# --- 9. Kirim push notifikasi update (opsional) ------------------------------
+if [[ "$MANDATORY" == "true" ]]; then
+  step "Kirim push notifikasi update ke semua user"
+  # Ambil service role key langsung dari Management API memakai PAT yang sudah
+  # divalidasi di awal. Dulu langkah ini menuntut SUPABASE_SERVICE_ROLE_KEY di
+  # .env sehingga push selalu terlewat.
+  SERVICE_KEY=$(curl -sS -H "Authorization: Bearer $PAT" \
+    "https://api.supabase.com/v1/projects/$PROJECT_REF/api-keys" 2>/dev/null \
+    | python -c "import sys,json;print(next((k['api_key'] for k in json.load(sys.stdin) if k.get('name')=='service_role'),''))" 2>/dev/null || true)
+
+  if [[ -n "$SERVICE_KEY" ]]; then
+    PUSH_RESP=$(curl -sS -X POST "$SUPABASE_URL/functions/v1/send-notification" \
+      -H "Authorization: Bearer $SERVICE_KEY" \
+      -H "Content-Type: application/json" \
+      -d "{\"title\":\"Update Tersedia\",\"body\":\"TenMu $NEW_NAME sudah dirilis. Update sekarang untuk fitur terbaru.\",\"type\":\"update\",\"url\":\"$APK_URL\"}" 2>/dev/null || true)
+    echo "   respons: ${PUSH_RESP:0:200}"
+  else
+    echo "   service role key tidak bisa diambil — push dilewati"
+  fi
+fi
+
+# --- 10. Verifikasi ----------------------------------------------------------
 step "Verifikasi"
 
 echo "   cek link APK..."

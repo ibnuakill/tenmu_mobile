@@ -61,23 +61,47 @@ serve(async (req) => {
     return json({ error: 'Unauthorized' }, 401)
   }
 
-  const asUser = createClient(supabaseUrl, anonKey ?? serviceKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  })
-  const { data: userData, error: userErr } = await asUser.auth.getUser(token)
-  if (userErr || !userData?.user) {
-    return json({ error: 'Unauthorized' }, 401)
-  }
-  const callerId = userData.user.id
+  // Service role key = server-to-server (release script, cron, dll) → izin admin penuh.
+  // Deteksi lewat claim `role` di JWT, bukan perbandingan string, supaya tetap
+  // jalan walau key project dirotasi.
+  let callerId: string
+  let isAdmin = false
+  let callerRole = 'anon'
+  const jwtRole = (() => {
+    try {
+      const payload = token.split('.')[1]
+      if (!payload) return ''
+      const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+      const decoded = JSON.parse(atob(normalized))
+      return typeof decoded?.role === 'string' ? decoded.role : ''
+    } catch {
+      return ''
+    }
+  })()
 
-  const admin = createClient(supabaseUrl, serviceKey)
-  const { data: callerProfile } = await admin
-    .from('profiles')
-    .select('id, role')
-    .eq('id', callerId)
-    .maybeSingle()
-  const callerRole = (callerProfile?.role ?? 'user') as string
-  const isAdmin = callerRole === 'admin' || callerRole === 'superadmin'
+  if (jwtRole === 'service_role') {
+    callerId = 'service-role'
+    callerRole = 'service_role'
+    isAdmin = true
+  } else {
+    const asUser = createClient(supabaseUrl, anonKey ?? serviceKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    })
+    const { data: userData, error: userErr } = await asUser.auth.getUser(token)
+    if (userErr || !userData?.user) {
+      return json({ error: 'Unauthorized' }, 401)
+    }
+    callerId = userData.user.id
+
+    const admin = createClient(supabaseUrl, serviceKey)
+    const { data: callerProfile } = await admin
+      .from('profiles')
+      .select('id, role')
+      .eq('id', callerId)
+      .maybeSingle()
+    callerRole = (callerProfile?.role ?? 'user') as string
+    isAdmin = callerRole === 'admin' || callerRole === 'superadmin'
+  }
 
   // ── Parse body ───────────────────────────────────────
   let body: NotificationPayload
@@ -99,11 +123,12 @@ serve(async (req) => {
   if (isBroadcast) {
     // Broadcast / kirim pesan bebas = hak admin saja.
     if (!isAdmin) {
-      console.warn(`[send-notification] tolak broadcast dari ${callerId} (${callerRole})`)
+      console.warn(`[send-notification] tolak broadcast dari ${callerId}`)
       return json({ error: 'Forbidden: khusus admin' }, 403)
     }
   } else if (!isAdmin) {
     // Notifikasi tempat: pemanggil harus pemilik tempat tersebut.
+    const admin = createClient(supabaseUrl, serviceKey)
     const { data: place } = await admin
       .from('places')
       .select('id, owner_id')
@@ -197,10 +222,21 @@ serve(async (req) => {
     return { res, result: await res.json() }
   }
 
+  // OneSignal membalas HTTP 200 walau tidak ada penerima (mis. app masih versi
+  // legacy yang tidak mengenal external_id). Jadi "gagal" harus dideteksi dari
+  // isi body, bukan hanya status code — kalau tidak, fallback v1 tak pernah jalan.
+  const looksFailed = (r: Response, body: Record<string, unknown> | null) => {
+    if (!r.ok) return true
+    if (!body) return true
+    if (body.errors) return true
+    if (Array.isArray(body.invalid_aliases)) return true
+    return false
+  }
+
   let { res, result } = await sendModern()
   console.log('[send-notification] modern:', res.status, JSON.stringify(result))
 
-  if (!res.ok) {
+  if (looksFailed(res, result as Record<string, unknown>)) {
     const retry = await sendLegacy()
     console.log('[send-notification] legacy:', retry.res.status, JSON.stringify(retry.result))
     res = retry.res
@@ -211,10 +247,15 @@ serve(async (req) => {
     return json({ error: 'OneSignal API error', detail: result }, 502)
   }
 
+  const resultObj = (result ?? {}) as Record<string, unknown>
+  const noRecipients = Boolean(resultObj.errors) ||
+    (typeof resultObj.recipients === 'number' && resultObj.recipients === 0)
+
   return json({
-    success: true,
+    success: !noRecipients,
     targeted: isTargeted,
-    recipients: ids.length,
+    recipients: (resultObj.recipients as number | undefined) ?? ids.length,
     data: result,
+    ...(noRecipients ? { warning: 'Tidak ada perangkat terdaftar yang menerima push ini.' } : {}),
   })
 })

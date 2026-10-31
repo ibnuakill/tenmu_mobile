@@ -1,0 +1,4 @@
+Perbaikan tema: tampilan sekarang benar-benar mengikuti pilihan mode terang/gelap.
+
+--- rilis ulang 2026-11-01 02:31 ---
+Perbaikan tema: tampilan sekarang benar-benar mengikuti pilihan mode terang/gelap.

@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tenmu/core/theme_provider.dart';
+import 'package:tenmu/core/app_colors.dart';
+import 'package:tenmu/core/app_colors_light.dart';
 import 'package:tenmu/core/places_provider.dart';
 import 'package:tenmu/core/notification_service.dart';
 import 'package:tenmu/core/notification_center.dart';
@@ -117,37 +119,101 @@ Future<void> _handleDeepLink(Uri uri) async {
   }
 }
 
-// Membuat kerangka dasar aplikasi (MaterialApp)
+/// Tema gelap TenMu (dipakai saat pengguna memilih mode gelap).
+ThemeData _buildDarkTheme() {
+  return ThemeData(
+    brightness: Brightness.dark,
+    fontFamily: 'Nunito',
+    primarySwatch: Colors.blue,
+    scaffoldBackgroundColor: AppColors.bgBase,
+    canvasColor: AppColors.bgBase,
+    cardColor: AppColors.bgSurface,
+    dividerColor: AppColors.divider,
+    colorScheme: const ColorScheme.dark(
+      primary: AppColors.btnPrimary,
+      onPrimary: AppColors.btnLabel,
+      surface: AppColors.bgSurface,
+      onSurface: AppColors.textPrimary,
+    ),
+    textTheme: const TextTheme(
+      bodyMedium: TextStyle(color: AppColors.textPrimary),
+      bodySmall: TextStyle(color: AppColors.textSecondary),
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: AppColors.bgBase,
+      foregroundColor: AppColors.textPrimary,
+      elevation: 0,
+    ),
+  );
+}
+
+/// Tema terang TenMu (dipakai saat pengguna memilih mode terang).
+ThemeData _buildLightTheme() {
+  return ThemeData(
+    brightness: Brightness.light,
+    fontFamily: 'Nunito',
+    primarySwatch: Colors.blue,
+    scaffoldBackgroundColor: AppColorsLight.bgBase,
+    canvasColor: AppColorsLight.bgBase,
+    cardColor: AppColorsLight.bgSurface,
+    dividerColor: AppColorsLight.divider,
+    colorScheme: const ColorScheme.light(
+      primary: AppColorsLight.btnPrimary,
+      onPrimary: AppColorsLight.btnLabel,
+      surface: AppColorsLight.bgSurface,
+      onSurface: AppColorsLight.textPrimary,
+    ),
+    textTheme: const TextTheme(
+      bodyMedium: TextStyle(color: AppColorsLight.textPrimary),
+      bodySmall: TextStyle(color: AppColorsLight.textSecondary),
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: AppColorsLight.bgBase,
+      foregroundColor: AppColorsLight.textPrimary,
+      elevation: 0,
+    ),
+  );
+}
+
+// Membuat kerangka dasar aplikasi (MaterialApp).
+// Root ini WAJIB mendengarkan ThemeProvider. Sebelumnya MaterialApp dibuat
+// statis dengan brightness dark, sehingga tombol tema tidak pernah mengubah
+// tampilan walaupun ThemeProvider sudah berganti nilai.
 class TenMuApp extends StatelessWidget {
   const TenMuApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = context.watch<ThemeProvider>();
+    final isDark = themeProvider.isDarkMode;
+
     SystemChrome.setEnabledSystemUIMode(
       SystemUiMode.manual,
       overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
     );
     SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        systemNavigationBarColor: Color(0xFF121212),
-        systemNavigationBarIconBrightness: Brightness.light,
-        systemNavigationBarDividerColor: Color(0xFF121212),
+      SystemUiOverlayStyle(
+        systemNavigationBarColor: isDark
+            ? AppColors.bgBase
+            : AppColorsLight.bgBase,
+        systemNavigationBarIconBrightness: isDark
+            ? Brightness.light
+            : Brightness.dark,
+        systemNavigationBarDividerColor: isDark
+            ? AppColors.bgBase
+            : AppColorsLight.bgBase,
         statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
     );
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'TenMu',
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        fontFamily: 'Nunito',
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: const Color(0xFF0C0C0C),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF1ED760),
-          surface: Color(0xFF141414),
-        ),
-      ),
+      theme: _buildLightTheme(),
+      darkTheme: _buildDarkTheme(),
+      themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       home: const UpdateGate(
         child: AnimatedSplashScreen(nextScreen: AuthGate()),
       ),

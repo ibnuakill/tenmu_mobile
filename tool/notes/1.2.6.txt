@@ -1,0 +1,1 @@
+Perbaikan tema: MaterialApp sekarang mendengarkan ThemeProvider (Consumer) sehingga toggle dark/light mode di Settings benar-benar mengubah tampilan seluruh aplikasi. Sebelumnya theme hardcode dark di MaterialApp.
