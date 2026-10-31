@@ -1,0 +1,4 @@
+Perbaikan query profil di Beranda (kolom full_name/city tidak ada di tabel profiles sehingga PostgREST membalas 400 tiap kali Beranda dibuka). Versi aplikasi kini tampil di judul dashboard admin untuk memudahkan cek build yang terpasang.
+
+--- rilis ulang 2026-11-01 00:01 ---
+Perbaikan query profil Beranda (kolom full_name/city tidak ada di tabel profiles -> PostgREST 400 tiap buka Beranda). Judul dashboard admin kini menampilkan versi terpasang.

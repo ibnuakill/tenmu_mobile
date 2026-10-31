@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'admin_design.dart';
 import 'admin_shell.dart';
+import '../../../../core/app_info.dart';
 
 class DashboardPage extends StatelessWidget {
   final bool isLoading;
@@ -83,15 +84,29 @@ class DashboardPage extends StatelessWidget {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Title
-                            Text(
-                              'Dashboard Admin Tenmu',
-                              style: TextStyle(
-                                fontFamily: 'Nunito',
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                                color: kTextPrimary,
-                                letterSpacing: -0.5,
+                            // Title + versi terpasang (biar gampang cek build)
+                            Text.rich(
+                              TextSpan(
+                                text: 'Dashboard Admin Tenmu',
+                                style: TextStyle(
+                                  fontFamily: 'Nunito',
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w700,
+                                  color: kTextPrimary,
+                                  letterSpacing: -0.5,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: '  ${AppInfo.label}',
+                                    style: TextStyle(
+                                      fontFamily: 'Nunito',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: kTextMuted,
+                                      letterSpacing: 0,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -219,14 +234,28 @@ class DashboardPage extends StatelessWidget {
                         return Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                'Dashboard Admin Tenmu',
-                                style: TextStyle(
-                                  fontFamily: 'Nunito',
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w700,
-                                  color: kTextPrimary,
-                                  letterSpacing: -0.5,
+                              child: Text.rich(
+                                TextSpan(
+                                  text: 'Dashboard Admin Tenmu',
+                                  style: TextStyle(
+                                    fontFamily: 'Nunito',
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w700,
+                                    color: kTextPrimary,
+                                    letterSpacing: -0.5,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: '  ${AppInfo.label}',
+                                      style: TextStyle(
+                                        fontFamily: 'Nunito',
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: kTextMuted,
+                                        letterSpacing: 0,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),

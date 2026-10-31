@@ -98,14 +98,17 @@ class HomeController extends ChangeNotifier {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
     try {
+      // `profiles` hanya punya kolom nama + role (full_name/city tidak ada di
+      // tabel ini, hanya di metadata auth). Query dengan kolom yang tidak ada
+      // membuat PostgREST membalas 400 setiap kali Beranda dibuka.
       final res = await Supabase.instance.client
           .from('profiles')
-          .select('full_name, nama, role, city')
+          .select('nama, role')
           .eq('id', user.id)
           .maybeSingle();
       if (res != null) {
         _userName = _resolveName(user, res);
-        _userLocation = res['city'] ?? 'Cirebon';
+        _userLocation = 'Cirebon';
       } else {
         _userName = _resolveName(user, null);
         _userLocation = 'Cirebon';
