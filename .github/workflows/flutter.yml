@@ -14,10 +14,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Java (untuk toolchain Android/Gradle)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -38,7 +38,21 @@ jobs:
       # warning. Infos (lint gaya) tidak menggagalkan build — jumlahnya ratusan
       # dan tidak relevan untuk gate merge.
       - name: Analyze (error & warning = gagal)
-        run: flutter analyze --no-fatal-infos
+        run: |
+          set +e
+          flutter analyze --no-fatal-infos 2>&1 | tee analyze.log
+          status=${PIPESTATUS[0]}
+          # Temuan dipancarkan sebagai annotation supaya kelihatan tanpa perlu
+          # login (log CI repo publik cuma bisa dibuka kalau sudah masuk).
+          grep -E "(error|warning) - " analyze.log \
+            | head -25 \
+            | while IFS= read -r line; do echo "::error::$line"; done
+          if [ "$status" -eq 0 ]; then
+            echo "Analyze bersih: 0 error, 0 warning."
+          else
+            echo "::error::flutter analyze gagal (exit $status) — lihat 25 temuan pertama di atas."
+          fi
+          exit "$status"
 
       # Informasi saja: repo ini belum 100% `dart format`-clean, jadi jangan
       # menggagalkan merge. Jalankan `dart format lib test` lokal sebelum PR
@@ -62,7 +76,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Semua file migrasi berakhiran .sql & nama unik
         run: |
