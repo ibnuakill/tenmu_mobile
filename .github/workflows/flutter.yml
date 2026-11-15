@@ -98,14 +98,55 @@ jobs:
 
       # Build debug APK membuktikan proyek benar-benar bisa dikompilasi
       # (analyze saja tidak menangkap error plugin Android).
+      # Plugin `com.google.gms.google-services` diterapkan di
+      # android/app/build.gradle.kts, tapi google-services.json di-gitignore
+      # (berisi API key project Firebase). Tanpa file ini build Android gagal:
+      # "File google-services.json is missing". Placeholder di bawah cukup
+      # untuk kompilasi; build rilis tetap memakai file asli di mesin dev/CI
+      # rahasia.
+      - name: Buat google-services.json placeholder (kalau tidak ada)
+        run: |
+          f=android/app/google-services.json
+          if [ -f "$f" ]; then
+            echo "google-services.json sudah ada."
+          else
+            cat > "$f" <<'JSON'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "ci-placeholder",
+              "storage_bucket": "ci-placeholder.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+                  "android_client_info": { "package_name": "com.tenmu.mobile" }
+                },
+                "oauth_client": [],
+                "api_key": [ { "current_key": "AIzaSyCI_PLACEHOLDER_000000000000000000" } ],
+                "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          JSON
+            echo "Placeholder google-services.json dibuat."
+          fi
+
       - name: Build APK debug
         run: |
           set +e
           flutter build apk --debug 2>&1 | tee build.log
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
-            echo "::error::flutter build apk gagal (exit $status); 30 baris terakhir:"
-            tail -30 build.log | while IFS= read -r line; do
+            echo "::error::flutter build apk gagal (exit $status)"
+            # Baris kunci Gradle lebih berguna daripada 30 baris terakhir mentah.
+            grep -aE "FAILURE|What went wrong|Execution failed|Could not (resolve|find|determine)|error:|Caused by|OutOfMemory|heap space|SDK location|minSdk|A problem occurred" build.log \
+              | head -20 \
+              | while IFS= read -r line; do echo "::error::$line"; done
+            echo "::error::--- 40 baris terakhir ---"
+            tail -40 build.log | while IFS= read -r line; do
               [ -n "$line" ] && echo "::error::$line"
             done
           fi
