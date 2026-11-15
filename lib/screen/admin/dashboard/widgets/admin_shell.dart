@@ -60,6 +60,7 @@ class IconRailSidebar extends StatelessWidget {
     (2, Icons.category_rounded, 'Kategori & Tag'),
     (3, Icons.people_alt_rounded, 'Manajemen User'),
     (4, Icons.rate_review_rounded, 'Review & Rating'),
+    (5, Icons.article_rounded, 'Artikel UMKM'),
     (6, Icons.notifications_active_rounded, 'Notifikasi'),
     (7, Icons.map_rounded, 'Peta Sebaran'),
     (9, Icons.timeline_rounded, 'Audit Trail'),

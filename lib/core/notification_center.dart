@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../data/write_helpers.dart';
 
 /// Satu baris notifikasi milik user (tabel `notifications`).
 class AppNotification {
@@ -137,11 +138,15 @@ class NotificationCenter extends ChangeNotifier {
     if (user == null) return;
     _patchLocal(id, isRead: true);
     try {
-      await _client
-          .from('notifications')
-          .update({'is_read': true})
-          .eq('id', id)
-          .eq('user_id', user.id);
+      await verifiedWrite(
+        _client
+            .from('notifications')
+            .update({'is_read': true})
+            .eq('id', id)
+            .eq('user_id', user.id)
+            .select('id'),
+        label: 'markRead:$id',
+      );
     } catch (e) {
       debugPrint('[NotificationCenter] markRead error: $e');
     }
@@ -165,11 +170,17 @@ class NotificationCenter extends ChangeNotifier {
     }
     notifyListeners();
     try {
-      await _client
-          .from('notifications')
-          .update({'is_read': true})
-          .eq('user_id', user.id)
-          .eq('is_read', false);
+      // Boleh 0 baris: kalau memang tidak ada yang unread, bukan error.
+      await verifiedWrite(
+        _client
+            .from('notifications')
+            .update({'is_read': true})
+            .eq('user_id', user.id)
+            .eq('is_read', false)
+            .select('id'),
+        label: 'markAllRead',
+        requireRows: false,
+      );
     } catch (e) {
       debugPrint('[NotificationCenter] markAllRead error: $e');
     }
@@ -182,11 +193,15 @@ class NotificationCenter extends ChangeNotifier {
     _knownIds.remove(id);
     notifyListeners();
     try {
-      await _client
-          .from('notifications')
-          .delete()
-          .eq('id', id)
-          .eq('user_id', user.id);
+      await verifiedDelete(
+        _client
+            .from('notifications')
+            .delete()
+            .eq('id', id)
+            .eq('user_id', user.id),
+        label: 'deleteOne:$id',
+        requireRows: true,
+      );
     } catch (e) {
       debugPrint('[NotificationCenter] deleteOne error: $e');
     }
@@ -199,7 +214,12 @@ class NotificationCenter extends ChangeNotifier {
     _knownIds.clear();
     notifyListeners();
     try {
-      await _client.from('notifications').delete().eq('user_id', user.id);
+      // Boleh 0 baris: kalau memang belum ada notifikasi, bukan error.
+      await verifiedDelete(
+        _client.from('notifications').delete().eq('user_id', user.id),
+        label: 'deleteAll',
+        requireRows: false,
+      );
     } catch (e) {
       debugPrint('[NotificationCenter] deleteAll error: $e');
     }
@@ -249,7 +269,10 @@ Future<int> sendNotifications({
       .toList();
 
   try {
-    await Supabase.instance.client.from('notifications').insert(rows);
+    await verifiedInsert(
+      Supabase.instance.client.from('notifications').insert(rows),
+      label: 'sendNotifications:${userIds.length}',
+    );
   } catch (e) {
     debugPrint('[NotificationCenter] send error: $e');
     return 0;
@@ -272,4 +295,36 @@ Future<int> sendNotifications({
   }
 
   return rows.length;
+}
+
+/// Broadcast push "artikel baru" ke semua user (dipanggil admin setelah publish).
+///
+/// Insert ke `notifications` + push device lewat Edge Function. Dipakai dari
+/// [ManageArticlesScreen] saat artikel pertama kali dipublikasikan.
+Future<int> notifyNewArticle({
+  required int articleId,
+  required String title,
+  required String excerpt,
+}) async {
+  try {
+    final users = await Supabase.instance.client
+        .from('profiles')
+        .select('id')
+        .eq('role', 'user');
+
+    final ids = users.map<String>((p) => p['id'] as String).toList();
+    if (ids.isEmpty) return 0;
+
+    return sendNotifications(
+      userIds: ids,
+      title: 'Artikel baru: $title',
+      body: excerpt.isEmpty
+          ? 'Ada artikel terbaru di Portal UMKM Cirebon.'
+          : excerpt,
+      type: 'new_article',
+    );
+  } catch (e) {
+    debugPrint('[NotificationCenter] notifyNewArticle error: $e');
+    return 0;
+  }
 }

@@ -4,7 +4,6 @@ import '../../../../core/poi_facility.dart';
 import '../../../../core/poi_category.dart';
 import '../../../../core/theme_provider.dart';
 import '../../review/review_section.dart';
-import '../../post/widgets/place_posts_section.dart';
 import '../../../../core/lucide_icons.dart';
 
 /// Tab content (Detail / Ulasan) — memilih tab via TabController.
@@ -255,13 +254,6 @@ class _DetailsTab extends StatelessWidget {
             ),
           ),
         ],
-
-        // Posts
-        if (placeId != null)
-          PlacePostsSection(
-            placeId: placeId as int,
-            placeName: place['nama_tempat'] ?? 'Tempat Ini',
-          ),
       ],
     );
   }

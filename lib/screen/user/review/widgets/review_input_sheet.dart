@@ -79,7 +79,7 @@ class _ReviewInputSheetState extends State<ReviewInputSheet> {
           'komentar': _controller.text.trim().isEmpty
               ? null
               : _controller.text.trim(),
-        }, onConflict: 'umkm_id, user_id');
+        }, onConflict: 'umkm_id,user_id');
       }
 
       if (mounted) {
@@ -170,9 +170,7 @@ class _ReviewInputSheetState extends State<ReviewInputSheet> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: LucideIcon(
-                      starValue <= _selectedRating
-                          ? 'star'
-                          : 'star',
+                      starValue <= _selectedRating ? 'star' : 'star',
                       size: 40,
                       color: starValue <= _selectedRating
                           ? const Color(0xFFFFB800)

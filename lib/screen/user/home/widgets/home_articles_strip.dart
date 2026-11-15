@@ -1,43 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme_provider.dart';
 import '../../../../core/lucide_icons.dart';
-import '../../post/post_models.dart';
-import '../../post/post_provider.dart';
+import '../../../../core/article_models.dart';
+import '../../../../core/articles_provider.dart';
 
-/// Strip "Postingan terbaru" di beranda.
+/// Strip "Artikel terbaru" di beranda.
 ///
-/// Fungsi: memberi eksposur konten komunitas tanpa memindahkan fokus beranda
-/// dari pencarian tempat. Isinya ringkas (horizontal), bukan feed penuh —
-/// feed penuh tetap punya layar sendiri lewat tombol "Lihat semua".
-///
-/// Widget ini otomatis tidak menampilkan apa pun bila belum ada postingan
-/// atau masih memuat, supaya beranda tidak "melompat" saat data datang.
-class HomePostsStrip extends StatelessWidget {
+/// Menampilkan artikel Portal UMKM terbaru secara horizontal. Otomatis
+/// tidak menampilkan apa pun bila belum ada artikel atau masih memuat,
+/// supaya beranda tidak "melompat" saat data datang.
+class HomeArticlesStrip extends StatelessWidget {
   final ThemeProvider theme;
   final Color accent;
-  final PostProvider provider;
+  final ArticlesProvider provider;
   final VoidCallback onSeeAll;
-  final void Function(PlacePost post) onTapPost;
+  final void Function(Article article) onTapArticle;
 
-  const HomePostsStrip({
+  const HomeArticlesStrip({
     super.key,
     required this.theme,
     required this.accent,
     required this.provider,
     required this.onSeeAll,
-    required this.onTapPost,
+    required this.onTapArticle,
   });
 
   static const int _maxCards = 8;
 
   @override
   Widget build(BuildContext context) {
-    final posts = provider.posts;
-    if (posts.isEmpty) return const SizedBox.shrink();
+    final articles = provider.articles;
+    if (articles.isEmpty) return const SizedBox.shrink();
 
-    final shown = posts.take(_maxCards).toList();
+    final shown = articles.take(_maxCards).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,7 +44,7 @@ class HomePostsStrip extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Postingan terbaru',
+                  'Artikel terbaru',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -91,12 +87,11 @@ class HomePostsStrip extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: shown.length,
             separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (context, i) => _PostThumb(
-              post: shown[i],
+            itemBuilder: (context, i) => _ArticleThumb(
+              article: shown[i],
               theme: theme,
               accent: accent,
-              likes: provider.likeCount(shown[i].id),
-              onTap: () => onTapPost(shown[i]),
+              onTap: () => onTapArticle(shown[i]),
             ),
           ),
         ),
@@ -105,31 +100,22 @@ class HomePostsStrip extends StatelessWidget {
   }
 }
 
-class _PostThumb extends StatelessWidget {
-  final PlacePost post;
+class _ArticleThumb extends StatelessWidget {
+  final Article article;
   final ThemeProvider theme;
   final Color accent;
-  final int likes;
   final VoidCallback onTap;
 
-  const _PostThumb({
-    required this.post,
+  const _ArticleThumb({
+    required this.article,
     required this.theme,
     required this.accent,
-    required this.likes,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final url = Supabase.instance.client.storage
-        .from('posts')
-        .getPublicUrl(post.imagePath);
-    final label = post.hasPlace
-        ? post.placeName
-        : (post.caption?.trim().isNotEmpty ?? false)
-        ? post.caption!.trim()
-        : 'Postingan';
+    final url = article.getCoverUrl();
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -141,22 +127,34 @@ class _PostThumb extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              CachedNetworkImage(
-                imageUrl: url,
-                fit: BoxFit.cover,
-                fadeInDuration: const Duration(milliseconds: 200),
-                placeholder: (_, __) => Container(color: theme.bgSurface),
-                errorWidget: (_, __, ___) => Container(
+              if (url != null)
+                CachedNetworkImage(
+                  imageUrl: url,
+                  fit: BoxFit.cover,
+                  fadeInDuration: const Duration(milliseconds: 200),
+                  placeholder: (_, __) => Container(color: theme.bgSurface),
+                  errorWidget: (_, __, ___) => Container(
+                    color: theme.bgSurface,
+                    child: Center(
+                      child: LucideIcon(
+                        'image-off',
+                        size: 20,
+                        color: theme.textHint,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Container(
                   color: theme.bgSurface,
                   child: Center(
                     child: LucideIcon(
-                      'image-off',
-                      size: 20,
+                      'notebook-text',
+                      size: 22,
                       color: theme.textHint,
                     ),
                   ),
                 ),
-              ),
               // Gradien bawah agar teks selalu terbaca di atas foto apa pun.
               const DecoratedBox(
                 decoration: BoxDecoration(
@@ -164,7 +162,30 @@ class _PostThumb extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [Colors.transparent, Color(0xB3000000)],
-                    stops: [0.45, 1.0],
+                    stops: [0.35, 1.0],
+                  ),
+                ),
+              ),
+              // Badge kategori di atas.
+              Positioned(
+                top: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${article.category.emoji} ${article.category.label}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -173,7 +194,7 @@ class _PostThumb extends StatelessWidget {
                 right: 10,
                 bottom: 10,
                 child: Text(
-                  label,
+                  article.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -184,40 +205,6 @@ class _PostThumb extends StatelessWidget {
                   ),
                 ),
               ),
-              if (likes > 0)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const LucideIcon(
-                          'heart',
-                          size: 11,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          '$likes',
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
             ],
           ),
         ),

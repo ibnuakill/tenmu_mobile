@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/app_colors_light.dart';
+import '../../../data/places_repository.dart';
 import '../../../core/poi_image_helper.dart';
 import '../../owner/add_place_screen.dart';
 import '../../owner/edit_place_screen.dart';
@@ -759,7 +760,12 @@ class _AdminMsmeScreenState extends State<AdminMsmeScreen> {
 
     if (confirmed == true && mounted) {
       try {
-        await _client.from('places').delete().eq('id', place['id']);
+        // Admin: hapus tempat siapa pun (allowAdmin → tanpa filter owner_id).
+        await PlacesRepository(_client).deletePlace(
+          placeId: place['id'] as int,
+          ownerId: '',
+          allowAdmin: true,
+        );
         if (mounted) _loadPlaces();
       } catch (e) {
         if (mounted) {

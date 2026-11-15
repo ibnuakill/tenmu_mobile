@@ -7,14 +7,18 @@ import 'haversine.dart';
 import 'places_cache.dart';
 
 /// Mode urutan / sort tempat.
-enum SortMode { terbaru, terdekat, rating }
+import '../data/places_repository.dart';
+import '../data/places_sort.dart';
+
+export '../data/places_sort.dart' show SortMode;
 
 /// Parameter query server-side. `==` & `hashCode` di-override agar cache 5-menit
 /// per-query berfungsi (query berbeda = list berbeda, tak boleh berbagi cache).
 @immutable
 class PlaceQuery {
   final String search; // lowercase, sudah di-trim
-  final List<String> categories; // di-normalisasi (PoiCategory.normalizeCategory)
+  final List<String>
+  categories; // di-normalisasi (PoiCategory.normalizeCategory)
   final SortMode sort;
   final double? userLat;
   final double? userLng;
@@ -59,11 +63,19 @@ class PlaceQuery {
 }
 
 class PlacesProvider extends ChangeNotifier {
+  /// Semua query lewat repository (bukan `Supabase.instance.client` langsung),
+  /// supaya bisa diuji dengan repository palsu dan aturan query ada di satu file.
+  PlacesProvider({PlacesRepository? repo})
+    : _repo = repo ?? PlacesRepository(Supabase.instance.client);
+
+  final PlacesRepository _repo;
+
   List<Map<String, dynamic>> _placesList = [];
   List<Map<String, dynamic>> _featuredList = [];
   final Map<int, double> _ratings = {};
   bool _isLoading = false;
   bool _isLoadingMore = false;
+  bool _isFetchingFeatured = false;
   bool _hasMore = true;
   DateTime? _lastFetch;
   String? _error;
@@ -120,19 +132,19 @@ class PlacesProvider extends ChangeNotifier {
   /// independen dari query utama; cache 5 menit sendiri.
   Future<void> fetchFeatured({bool force = false}) async {
     if (!force && !_shouldRefresh && _featuredList.isNotEmpty) return;
-    if (_isLoading) return;
+    // Jangan pakai `_isLoading` di sini: `setQuery()` sudah menyalakannya secara
+    // sinkron, jadi pemanggilan paralel dari home akan langsung balik dan
+    // carousel featured tidak pernah terisi. Guard khusus, terpisah.
+    if (_isFetchingFeatured) return;
+    _isFetchingFeatured = true;
     try {
-      final data = await Supabase.instance.client
-          .from('places_with_ratings')
-          .select(_columns)
-          .eq('verification_status', 'verified')
-          .eq('is_featured', true)
-          .order('created_at', ascending: false)
-          .limit(30)
-          .timeout(const Duration(seconds: 20));
-      _featuredList = List<Map<String, dynamic>>.from(data);
+      final data = await _repo.fetchFeatured(columns: _columns);
+      _featuredList = data;
+      notifyListeners();
     } catch (e) {
       debugPrint('Error fetching featured: $e');
+    } finally {
+      _isFetchingFeatured = false;
     }
   }
 
@@ -143,24 +155,19 @@ class PlacesProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final params = <String, dynamic>{
-        'p_search': _query.search.isEmpty ? null : _query.search,
-        'p_categories': _query.categories.isEmpty ? null : _query.categories,
-        'p_featured': _query.featured ? true : null,
-        'p_user_lat': _query.userLat,
-        'p_user_lng': _query.userLng,
-        'p_sort': _query.sort.name,
-        'p_cursor_created_at': _cursorCreatedAt?.toIso8601String(),
-        'p_cursor_id': _cursorId,
-        'p_cursor_value': _cursorValue,
-        'p_page_size': PlacesProvider.pageSize,
-      };
+      final rows = await _repo.fetchPaged(
+        search: _query.search,
+        categories: _query.categories,
+        featured: _query.featured,
+        sort: _query.sort,
+        userLat: _query.userLat,
+        userLng: _query.userLng,
+        cursorCreatedAt: _cursorCreatedAt,
+        cursorId: _cursorId,
+        cursorValue: _cursorValue,
+        pageSize: PlacesProvider.pageSize,
+      );
 
-      final data = await Supabase.instance.client
-          .rpc('get_places_paged', params: params)
-          .timeout(const Duration(seconds: 20));
-
-      final rows = List<Map<String, dynamic>>.from(data);
       final hasMore = rows.length > PlacesProvider.pageSize;
       final page = hasMore ? rows.sublist(0, PlacesProvider.pageSize) : rows;
 

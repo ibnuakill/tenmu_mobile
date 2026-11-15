@@ -13,9 +13,10 @@ import '../../../core/session_timeout_service.dart';
 import '../../admin/profile/admin_profile_screen.dart';
 import '../../owner/manage_place_screen.dart';
 import '../../owner/add_place_screen.dart';
+import '../../owner/owner_profile_screen.dart';
 import '../about_screen.dart';
 import '../favorite_screen.dart';
-import '../post/post_feed_screen.dart';
+import '../article_list_screen.dart';
 import '../profile_settings_screen.dart';
 import 'owner_request_screen.dart';
 import '../help/help_center_screen.dart';
@@ -372,17 +373,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           icon: 'user',
           iconColor: theme.textPrimary,
           title: 'Pengaturan Akun',
-          subtitle: 'Ubah nama, foto profil, dan password',
+          subtitle: _userRole == UserRole.superadmin
+              ? 'Ubah email & password akun admin'
+              : 'Ubah nama, foto profil, email, dan password',
           theme: theme,
           onTap: () {
-            final isPrivileged =
-                _userRole == UserRole.superadmin || _userRole == UserRole.owner;
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => isPrivileged
-                    ? const AdminProfileScreen()
-                    : const ProfileSettingsScreen(),
+                builder: (_) => switch (_userRole) {
+                  UserRole.superadmin => const AdminProfileScreen(),
+                  UserRole.owner => const OwnerProfileScreen(),
+                  _ => const ProfileSettingsScreen(),
+                },
               ),
             );
           },
@@ -393,14 +396,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     children.addAll([
       SettingsNavTile(
-        icon: 'images',
+        icon: 'notebook-text',
         iconColor: theme.textPrimary,
-        title: 'Postingan',
-        subtitle: 'Foto & cerita dari tempat sekitar',
+        title: 'Artikel UMKM',
+        subtitle: 'Berita, kuliner & wisata Cirebon',
         theme: theme,
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const PostFeedScreen()),
+          MaterialPageRoute(builder: (_) => const ArticleListScreen()),
         ),
       ),
       Divider(color: theme.border, height: 1, indent: 56),

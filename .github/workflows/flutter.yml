@@ -1,0 +1,102 @@
+name: Flutter CI
+
+on:
+  push:
+    branches: [develop, main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  analyze-and-test:
+    name: Analyze & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java (untuk toolchain Android/Gradle)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Info versi
+        run: flutter --version
+
+      - name: Ambil dependency
+        run: flutter pub get
+
+      # `flutter analyze` mengembalikan exit code != 0 kalau ada error ATAU
+      # warning. Infos (lint gaya) tidak menggagalkan build — jumlahnya ratusan
+      # dan tidak relevan untuk gate merge.
+      - name: Analyze (error & warning = gagal)
+        run: flutter analyze --no-fatal-infos
+
+      # Informasi saja: repo ini belum 100% `dart format`-clean, jadi jangan
+      # menggagalkan merge. Jalankan `dart format lib test` lokal sebelum PR
+      # besar kalau ingin diffnya rapi.
+      - name: Format check (informasi, tidak memblokir)
+        continue-on-error: true
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Test
+        run: flutter test --reporter expanded
+
+      # Build debug APK membuktikan proyek benar-benar bisa dikompilasi
+      # (analyze saja tidak menangkap error plugin Android).
+      - name: Build APK debug
+        run: flutter build apk --debug
+
+  migrations-lint:
+    name: Cek migrasi SQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Semua file migrasi berakhiran .sql & nama unik
+        run: |
+          set -eu
+          dir=supabase/migrations
+          if [ ! -d "$dir" ]; then
+            echo "Tidak ada folder $dir — dilewati."
+            exit 0
+          fi
+
+          bad=0
+          for f in "$dir"/*; do
+            [ -e "$f" ] || continue
+            case "$f" in
+              *.sql) ;;
+              *.md) ;;   # README/dokumentasi migrasi — diizinkan
+              *) echo "::error file=$f::File di supabase/migrations harus .sql (atau .md untuk dokumentasi)"; bad=1 ;;
+            esac
+          done
+
+          # Timestamp harus format YYYYMMDDHHMMSS_ (14 digit) atau YYYYMMDDHHMMSS.
+          for f in "$dir"/*.sql; do
+            [ -e "$f" ] || continue
+            base=$(basename "$f")
+            case "$base" in
+              [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_*) ;;
+              *) echo "::error file=$f::Nama harus berawalan 14 digit timestamp + '_'"; bad=1 ;;
+            esac
+          done
+
+          dup=$(ls "$dir"/*.sql | sed 's|.*/||' | cut -d_ -f1 | sort | uniq -d)
+          if [ -n "$dup" ]; then
+            echo "::error::Timestamp migrasi duplikat: $dup"
+            bad=1
+          fi
+
+          exit $bad

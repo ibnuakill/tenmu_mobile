@@ -201,7 +201,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
       body: UserListTab(
         users: _users,
         reviews: _reviews,
-        isLoading: _loadingUsers,
+        // Tunggu kedua query (users + reviews); kalau hanya users yang dicek,
+        // tab review sempat tampil kosong seolah tidak ada data.
+        isLoading: _loadingUsers || _loadingReviews,
         onDeleteAll: _deleteAllReviewsByUser,
         onRoleChanged: _updateUserRole,
         onToggleBan: _toggleBanUser,

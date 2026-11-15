@@ -9,6 +9,7 @@ import 'package:tenmu/core/theme_provider.dart';
 import 'package:tenmu/core/app_colors.dart';
 import 'package:tenmu/core/app_colors_light.dart';
 import 'package:tenmu/core/places_provider.dart';
+import 'package:tenmu/core/articles_provider.dart';
 import 'package:tenmu/core/notification_service.dart';
 import 'package:tenmu/core/notification_center.dart';
 import 'package:tenmu/core/app_update_provider.dart';
@@ -19,6 +20,7 @@ import 'package:tenmu/screen/auth/auth_gate.dart';
 import 'package:tenmu/screen/auth/forgot_password_screen.dart';
 import 'package:tenmu/screen/splash/animated_splash_screen.dart';
 import 'package:app_links/app_links.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'platform/desktop.dart' if (dart.library.js_interop) 'platform/web.dart';
 
@@ -26,6 +28,10 @@ import 'platform/desktop.dart' if (dart.library.js_interop) 'platform/web.dart';
 Future<void> main() async {
   // Memastikan bahwa framework Flutter sudah siap sebelum menjalankan kode lain
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Data locale untuk `DateFormat(..., 'id')` (mis. "15 Nov 2026"). Tanpa ini
+  // intl melempar LocaleDataException saat layar notifikasi dibuka.
+  await initializeDateFormatting('id');
 
   // Pasang penangkap error sedini mungkin — kalau inisialisasi di bawah gagal,
   // kegagalannya tetap tercatat dan tidak hilang begitu saja.
@@ -70,6 +76,7 @@ Future<void> main() async {
           providers: [
             ChangeNotifierProvider(create: (_) => ThemeProvider()),
             ChangeNotifierProvider(create: (_) => PlacesProvider()),
+            ChangeNotifierProvider(create: (_) => ArticlesProvider()),
             ChangeNotifierProvider(create: (_) => AppUpdateProvider()),
             ChangeNotifierProvider(create: (_) => NotificationCenter()),
           ],
@@ -187,9 +194,75 @@ class TenMuApp extends StatelessWidget {
     final themeProvider = context.watch<ThemeProvider>();
     final isDark = themeProvider.isDarkMode;
 
+    return _SystemUiSync(
+      isDark: isDark,
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'TenMu',
+        theme: _buildLightTheme(),
+        darkTheme: _buildDarkTheme(),
+        themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+        home: const UpdateGate(
+          child: AnimatedSplashScreen(nextScreen: AuthGate()),
+        ),
+        onGenerateRoute: (settings) {
+          // Handle deep link reset password
+          if (settings.name != null &&
+              settings.name!.contains('reset-callback')) {
+            return MaterialPageRoute(
+              builder: (_) => const ForgotPasswordScreen(),
+            );
+          }
+          return null;
+        },
+      ),
+    );
+  }
+}
+
+/// Menyinkronkan warna status/navigation bar Android dengan tema aktif.
+///
+/// Dulu `SystemChrome.*` dipanggil langsung di dalam `build()`. Itu efek
+/// samping saat build (dipanggil ulang tiap rebuild → jank) dan bisa jalan
+/// sebelum frame pertama selesai. Sekarang dijalankan sekali per perubahan
+/// tema, setelah frame, lewat post-frame callback.
+class _SystemUiSync extends StatefulWidget {
+  const _SystemUiSync({required this.isDark, required this.child});
+
+  final bool isDark;
+  final Widget child;
+
+  @override
+  State<_SystemUiSync> createState() => _SystemUiSyncState();
+}
+
+class _SystemUiSyncState extends State<_SystemUiSync> {
+  bool? _applied;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scheduleApply();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SystemUiSync oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isDark != widget.isDark) _scheduleApply();
+  }
+
+  void _scheduleApply() {
+    if (_applied == widget.isDark) return; // sudah pas — tak perlu ulang
+    _applied = widget.isDark;
+    final isDark = widget.isDark;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _apply(isDark));
+  }
+
+  void _apply(bool isDark) {
+    if (!mounted) return;
     SystemChrome.setEnabledSystemUIMode(
       SystemUiMode.manual,
-      overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+      overlays: const [SystemUiOverlay.top, SystemUiOverlay.bottom],
     );
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
@@ -207,26 +280,8 @@ class TenMuApp extends StatelessWidget {
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
     );
-
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'TenMu',
-      theme: _buildLightTheme(),
-      darkTheme: _buildDarkTheme(),
-      themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
-      home: const UpdateGate(
-        child: AnimatedSplashScreen(nextScreen: AuthGate()),
-      ),
-      onGenerateRoute: (settings) {
-        // Handle deep link reset password
-        if (settings.name != null &&
-            settings.name!.contains('reset-callback')) {
-          return MaterialPageRoute(
-            builder: (_) => const ForgotPasswordScreen(),
-          );
-        }
-        return null;
-      },
-    );
   }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

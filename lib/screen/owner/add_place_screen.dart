@@ -8,6 +8,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
+import '../../data/places_repository.dart';
 import '../../core/theme_provider.dart';
 import '../../core/location_permission_helper.dart';
 import '../../core/notification_service.dart';
@@ -607,13 +608,13 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final result = await Supabase.instance.client
-          .from('places')
-          .insert(_buildPlacePayload())
-          .select();
+      // Lewat repository: write diverifikasi jumlah baris (0 baris = exception,
+      // mis. RLS menolak walau PostgREST balas 200).
+      final insertedId = await PlacesRepository(
+        Supabase.instance.client,
+      ).insertPlace(_buildPlacePayload());
 
       // Kirim notifikasi ke admin untuk verifikasi
-      final insertedId = (result as List).first['id'] as int;
       NotificationService.notifyAdminsNewSubmission(
         placeId: insertedId,
         placeName: _namaController.text.trim(),

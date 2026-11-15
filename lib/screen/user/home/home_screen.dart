@@ -9,18 +9,18 @@ import '../../../core/notification_center.dart';
 import '../../../widgets/notification_popup.dart';
 import '../../owner/add_place_screen.dart';
 import '../map/route_map_screen.dart';
-import '../detail/poi_detail_screen.dart';
 import '../user_notification_screen.dart';
 import '../chat/chat_bot_sheet.dart';
-import '../post/post_feed_screen.dart';
-import '../post/post_models.dart';
-import '../post/post_provider.dart';
+import '../article_list_screen.dart';
+import '../article_detail_screen.dart';
+import '../../../core/articles_provider.dart';
+import '../../../core/article_models.dart';
 import '../../../core/lucide_icons.dart';
 import '../widgets/sort_filter_widget.dart';
 import '../settings/settings_screen.dart';
 import 'home_controller.dart';
 import 'widgets/home_widgets.dart';
-import 'widgets/home_posts_strip.dart';
+import 'widgets/home_articles_strip.dart';
 import 'widgets/home_filter_sheet.dart';
 
 /// Orchestrator: composes header, search, categories, carousel, list, bottom nav.
@@ -46,15 +46,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   StreamSubscription<AppNotification>? _notifSub;
   bool _notifInited = false;
 
-  /// Sumber data strip "Postingan terbaru" di beranda (feed penuh punya
-  /// instance sendiri di [PostFeedScreen]).
-  late final PostProvider _postProvider;
+  /// Sumber data strip "Artikel terbaru" di beranda memakai [ArticlesProvider]
+  /// global (di-inject lewat MultiProvider di main.dart).
+  ArticlesProvider get _articlesProvider => context.read<ArticlesProvider>();
 
   @override
   void initState() {
     super.initState();
     _ctrl = HomeController(context: context);
-    _postProvider = PostProvider();
     _scrollCtrl = ScrollController();
     _carouselCtrl = PageController(viewportFraction: 0.88);
     _carouselPage = ValueNotifier(0.0);
@@ -99,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _ctrl.loadUserRole();
       _ctrl.loadUserProfile();
       _ctrl.loadUnreadCount();
-      _postProvider.fetchFeed();
+      _articlesProvider.loadArticles();
       _initNotifications();
     });
   }
@@ -128,7 +127,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void dispose() {
     _notifSub?.cancel();
-    _postProvider.dispose();
     _ctrl.dispose();
     _entranceCtrl.dispose();
     _cardCtrl.dispose();
@@ -196,70 +194,63 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         opacity: _fadeAnim,
         child: SlideTransition(
           position: _slideAnim,
-          child: CustomScrollView(
-            controller: _scrollCtrl,
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: HomeGreetingHeader(
-                  theme: theme,
-                  userName: _ctrl.userName ?? 'Pengguna',
-                  userLocation: _ctrl.userLocation,
-                  isUpdatingLocation: _ctrl.isUpdatingLocation,
-                  unreadNotifCount: context
-                      .watch<NotificationCenter>()
-                      .unreadCount,
-                  onTapLocation: () => _ctrl.updateLocationFromGPS(
-                    ScaffoldMessenger.of(context),
-                  ),
-                  onTapNotification: _openNotifScreen,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: HomeSearchBar(
-                  theme: theme,
-                  accent: accent,
-                  searchQuery: _ctrl.searchQuery,
-                  hasActiveFilter: _hasActiveFilter(),
-                  onTapSearch: () => _openFilterSheet(accent),
-                  onClearSearch: () => _ctrl.clearSearchQuery(provider),
-                  onTapFilter: () => _openFilterSheet(accent),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 8)),
-              // Strip postingan: hanya saat tidak sedang mencari/memfilter,
-              // supaya hasil pencarian tidak terdorong ke bawah.
-              if (!_hasActiveFilter() && _ctrl.searchQuery.isEmpty)
+          // RefreshIndicator HARUS membungkus scrollable (CustomScrollView),
+          // bukan Column di dalam sliver — pull-to-refresh tidak akan pernah
+          // terpicu kalau child-nya bukan scrollable.
+          child: RefreshIndicator(
+            onRefresh: () => _ctrl.refreshAll(provider),
+            color: accent,
+            backgroundColor: theme.bgElevated,
+            child: CustomScrollView(
+              controller: _scrollCtrl,
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
                 SliverToBoxAdapter(
-                  child: ListenableBuilder(
-                    listenable: _postProvider,
-                    builder: (_, __) => HomePostsStrip(
-                      theme: theme,
-                      accent: accent,
-                      provider: _postProvider,
-                      onSeeAll: _openPostFeed,
-                      onTapPost: _openPostDetail,
+                  child: HomeGreetingHeader(
+                    theme: theme,
+                    userName: _ctrl.userName ?? 'Pengguna',
+                    userLocation: _ctrl.userLocation,
+                    isUpdatingLocation: _ctrl.isUpdatingLocation,
+                    unreadNotifCount: context
+                        .watch<NotificationCenter>()
+                        .unreadCount,
+                    onTapLocation: () => _ctrl.updateLocationFromGPS(
+                      ScaffoldMessenger.of(context),
                     ),
+                    onTapNotification: _openNotifScreen,
                   ),
                 ),
-              SliverToBoxAdapter(
-                child: HomeSectionTitle(
-                  theme: theme,
-                  title: 'Pilih destinasimu',
+                SliverToBoxAdapter(
+                  child: HomeSearchBar(
+                    theme: theme,
+                    accent: accent,
+                    searchQuery: _ctrl.searchQuery,
+                    hasActiveFilter: _hasActiveFilter(),
+                    onTapSearch: () => _openFilterSheet(accent),
+                    onClearSearch: () => _ctrl.clearSearchQuery(provider),
+                    onTapFilter: () => _openFilterSheet(accent),
+                  ),
                 ),
-              ),
-              SliverToBoxAdapter(
-                child: _buildContent(
-                  theme,
-                  accent,
-                  provider,
-                  allPlaces,
-                  featured,
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                SliverToBoxAdapter(
+                  child: HomeSectionTitle(
+                    theme: theme,
+                    title: 'Pilih destinasimu',
+                  ),
                 ),
-              ),
-              // Ruang ekstra agar item terakhir tidak tertutup FAB.
-              const SliverToBoxAdapter(child: SizedBox(height: 96)),
-            ],
+                SliverToBoxAdapter(
+                  child: _buildContent(
+                    theme,
+                    accent,
+                    provider,
+                    allPlaces,
+                    featured,
+                  ),
+                ),
+                // Ruang ekstra agar item terakhir tidak tertutup FAB.
+                const SliverToBoxAdapter(child: SizedBox(height: 96)),
+              ],
+            ),
           ),
         ),
       ),
@@ -327,107 +318,114 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: () => _ctrl.refreshAll(provider),
-      color: accent,
-      backgroundColor: theme.bgElevated,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 20),
-          if (provider.isOffline) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 9,
-                ),
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.cloud_off_rounded, size: 16, color: accent),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Mode offline — menampilkan data tersimpan.',
-                        style: TextStyle(
-                          color: theme.textSecondary,
-                          fontSize: 12.5,
-                        ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 20),
+        if (provider.isOffline) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.cloud_off_rounded, size: 16, color: accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Mode offline — menampilkan data tersimpan.',
+                      style: TextStyle(
+                        color: theme.textSecondary,
+                        fontSize: 12.5,
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-          HomeFeaturedCarousel(
-            theme: theme,
-            accent: accent,
-            cards: _featuredCards(featured, allPlaces),
-            controller: _carouselCtrl,
-            pageNotifier: _carouselPage,
-            currentPage: _currentCardPage,
-            isFallback: featured.isEmpty,
-            provider: provider,
-            ratingOf: (id) => provider.ratings[id] ?? 0.0,
-          ),
-          if (allPlaces.isNotEmpty) ...[
-            HomeAllPlacesHeader(
-              theme: theme,
-              count: allPlaces.length,
-              hasFilter: _hasActiveFilter() || _ctrl.searchQuery.isNotEmpty,
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  childAspectRatio: 0.65,
-                ),
-                itemCount: allPlaces.length,
-                itemBuilder: (context, index) {
-                  final place = allPlaces[index];
-                  return HomePoiGridCard(
-                    place: place,
-                    rating: provider.ratings[place['id']] ?? 0.0,
-                    theme: theme,
-                    accent: accent,
-                    index: index,
-                    userPosition: _ctrl.currentPosition,
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (provider.isLoadingMore)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-              )
-            else if (!provider.hasMore)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Center(
-                  child: Text(
-                    'Tidak ada tempat lagi',
-                    style: TextStyle(color: theme.textSecondary, fontSize: 13),
                   ),
-                ),
-              )
-            else
-              const SizedBox(height: 8),
-          ],
+                ],
+              ),
+            ),
+          ),
         ],
-      ),
+        HomeFeaturedCarousel(
+          theme: theme,
+          accent: accent,
+          cards: _featuredCards(featured, allPlaces),
+          controller: _carouselCtrl,
+          pageNotifier: _carouselPage,
+          currentPage: _currentCardPage,
+          isFallback: featured.isEmpty,
+          provider: provider,
+          ratingOf: (id) => provider.ratings[id] ?? 0.0,
+        ),
+        // Strip artikel sengaja ditaruh di bawah card slide, bukan di atas,
+        // supaya slide tetap jadi elemen pertama yang dilihat user.
+        if (!_hasActiveFilter() && _ctrl.searchQuery.isEmpty) ...[
+          const SizedBox(height: 16),
+          Consumer<ArticlesProvider>(
+            builder: (_, articlesProvider, __) => HomeArticlesStrip(
+              theme: theme,
+              accent: accent,
+              provider: articlesProvider,
+              onSeeAll: _openArticleList,
+              onTapArticle: _openArticleDetail,
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
+        if (allPlaces.isNotEmpty) ...[
+          HomeAllPlacesHeader(
+            theme: theme,
+            count: allPlaces.length,
+            hasFilter: _hasActiveFilter() || _ctrl.searchQuery.isNotEmpty,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 0.65,
+              ),
+              itemCount: allPlaces.length,
+              itemBuilder: (context, index) {
+                final place = allPlaces[index];
+                return HomePoiGridCard(
+                  place: place,
+                  rating: provider.ratings[place['id']] ?? 0.0,
+                  theme: theme,
+                  accent: accent,
+                  index: index,
+                  userPosition: _ctrl.currentPosition,
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (provider.isLoadingMore)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else if (!provider.hasMore)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'Tidak ada tempat lagi',
+                  style: TextStyle(color: theme.textSecondary, fontSize: 13),
+                ),
+              ),
+            )
+          else
+            const SizedBox(height: 8),
+        ],
+      ],
     );
   }
 
@@ -502,27 +500,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (mounted) _ctrl.setNavIndex(0);
   }
 
-  /// "Lihat semua" → layar feed penuh. Sekembalinya, segarkan strip karena
-  /// user mungkin baru membuat/menghapus postingan di sana.
-  Future<void> _openPostFeed() async {
+  /// "Lihat semua" → layar daftar artikel penuh. Sekembalinya, segarkan strip.
+  Future<void> _openArticleList() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const PostFeedScreen()),
+      MaterialPageRoute(builder: (_) => const ArticleListScreen()),
     );
-    if (mounted) _postProvider.fetchFeed();
+    if (mounted) _articlesProvider.loadArticles(force: true);
   }
 
-  /// Tap kartu postingan: buka detail tempatnya bila tertaut, kalau tidak
-  /// (postingan tanpa tempat) buka feed penuh.
-  void _openPostDetail(PlacePost post) {
-    final place = post.place;
-    if (place == null) {
-      _openPostFeed();
-      return;
-    }
+  /// Tap kartu artikel: buka detailnya.
+  void _openArticleDetail(Article article) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => PoiDetailScreen(place: place)),
+      MaterialPageRoute(builder: (_) => ArticleDetailScreen(article: article)),
     );
   }
 }

@@ -6,6 +6,7 @@ import 'widgets/admin_design.dart';
 import 'widgets/admin_shell.dart';
 import 'widgets/admin_dashboard_page.dart';
 import '../activity/admin_activity_screen.dart';
+import '../articles/manage_articles_screen.dart';
 import '../kategori/manage_kategori_screen.dart';
 import '../map/admin_map_screen.dart';
 import '../msme/admin_msme_screen.dart';
@@ -42,9 +43,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   int _todayActivityCount = 0;
   List<Map<String, dynamic>> _placesList = [];
 
-  int _placesLastMonth = 0;
-  int _usersLastMonth = 0;
-  int _reviewsLastMonth = 0;
   DateTimeRange? _dateRange;
 
   String _getDateStr(DateTime now) {
@@ -87,7 +85,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       final now = DateTime.now();
       final fourteenDaysAgo = now.subtract(const Duration(days: 13));
       final thisMonthStart = DateTime(now.year, now.month, 1);
-      final lastMonthStart = DateTime(now.year, now.month - 1, 1);
       final todayStart = DateTime(now.year, now.month, now.day);
 
       final results = await Future.wait([
@@ -131,43 +128,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       _pendingCount = pending;
       _activeCount = active;
 
-      // Growth: places this month vs last month
-      int placesThisMonth = 0, placesLast = 0;
-      for (final p in placeList) {
-        final dt = DateTime.tryParse(p['created_at'] as String? ?? '');
-        if (dt == null) continue;
-        if (!dt.isBefore(thisMonthStart)) placesThisMonth++;
-        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart)) {
-          placesLast++;
-        }
-      }
-      _placesLastMonth = placesLast == 0
-          ? placesThisMonth * 5
-          : placesLast; // fallback agar growth terlihat
-
-      // Growth: users
-      int usersThisMonth = 0, usersLast = 0;
-      for (final u in userList) {
-        final dt = DateTime.tryParse(u['created_at'] as String? ?? '');
-        if (dt == null) continue;
-        if (!dt.isBefore(thisMonthStart)) usersThisMonth++;
-        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart)) {
-          usersLast++;
-        }
-      }
-      _usersLastMonth = usersLast == 0 ? usersThisMonth * 4 : usersLast;
-
-      // Growth: reviews
-      int reviewsThisMonth = 0, reviewsLast = 0;
+      // Ulasan bulan berjalan — angka nyata, bukan estimasi.
+      int reviewsThisMonth = 0;
       for (final r in reviewList) {
         final dt = DateTime.tryParse(r['created_at'] as String? ?? '');
         if (dt == null) continue;
         if (!dt.isBefore(thisMonthStart)) reviewsThisMonth++;
-        if (!dt.isBefore(lastMonthStart) && dt.isBefore(thisMonthStart)) {
-          reviewsLast++;
-        }
       }
-      _reviewsLastMonth = reviewsLast == 0 ? reviewsThisMonth * 1 : reviewsLast;
       _reviewsThisMonth = reviewsThisMonth;
 
       // Category distribution
@@ -265,9 +232,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         recentActivities: _recentActivities,
         topPlaces: _topPlaces,
         todayActivityCount: _todayActivityCount,
-        placesLastMonth: _placesLastMonth,
-        usersLastMonth: _usersLastMonth,
-        reviewsLastMonth: _reviewsLastMonth,
         placesList: _placesList,
         onRetry: _loadDashboard,
         onVerify: () => setState(() => _tabIndex = 1),
@@ -283,9 +247,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       const ManageKategoriScreen(),
       const ManageUsersScreen(),
       const ManageReviewScreen(),
-      // index 5: "Konten & Promo" sudah dihapus dari navbar.
-      // Placeholder kosong dipertahankan supaya index page lain tidak bergeser.
-      const SizedBox.shrink(),
+      // index 5: Kelola Artikel (Portal UMKM)
+      const ManageArticlesScreen(),
       const AdminNotifikasiScreen(),
       const AdminMapScreen(),
       const VerifyPlaceScreen(),
@@ -341,6 +304,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               _navItem(0, Icons.dashboard_rounded, 'Dashboard'),
               _navItem(1, Icons.storefront_rounded, 'UMKM'),
               _navItem(2, Icons.category_rounded, 'Kategori'),
+              _navItem(5, Icons.article_rounded, 'Artikel'),
               _navItem(3, Icons.people_rounded, 'Users'),
               _navItem(8, Icons.verified_rounded, 'Verifikasi'),
             ],

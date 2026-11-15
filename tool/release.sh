@@ -100,7 +100,7 @@ export SUPABASE_PROJECT_REF="$PROJECT_REF"
 # di langkah upload, setelah Gradle jalan 3-4 menit dan hasil build terbuang.
 TOKEN_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
   -H "Authorization: Bearer $PAT" \
-  "https://api.supabase.com/v1/projects" || echo "000")
+  "https://api.supabase.com/v1/projects" 2>/dev/null || true)
 if [[ "$TOKEN_CHECK" != "200" ]]; then
   fail "Token Supabase ditolak (HTTP $TOKEN_CHECK). Ambil token baru di https://supabase.com/dashboard/account/tokens lalu: export SUPABASE_ACCESS_TOKEN=sbp_xxx"
 fi

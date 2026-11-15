@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'widgets/place_form_style.dart';
+import '../../data/places_repository.dart';
 import '../../core/poi_category.dart';
 import '../../core/poi_facility.dart';
 import '../../core/poi_image_helper.dart';
@@ -146,10 +147,13 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await Supabase.instance.client
-          .from('places')
-          .update(_buildUpdatePayload())
-          .eq('id', widget.place['id']);
+      // Lewat repository: update diverifikasi (0 baris = exception, mis. RLS
+      // menolak atau id sudah tidak ada).
+      await PlacesRepository(Supabase.instance.client).updatePlace(
+        placeId: widget.place['id'] as int,
+        ownerId: widget.place['owner_id'] as String? ?? '',
+        payload: _buildUpdatePayload(),
+      );
 
       if (mounted) {
         _toast('Data berhasil diperbarui.');
@@ -163,30 +167,30 @@ class _EditPlaceScreenState extends State<EditPlaceScreen> {
   }
 
   Map<String, dynamic> _buildUpdatePayload() {
-    return {
-      'owner_id':
-          widget.place['owner_id'] ??
-          Supabase.instance.client.auth.currentUser?.id,
-      'nama_tempat': _namaController.text.trim(),
-      'alamat': _alamatController.text.trim(),
-      'deskripsi': _deskripsiController.text.trim(),
-      'nomor_telepon': _nomorTeleponController.text.trim().isNotEmpty
-          ? _nomorTeleponController.text.trim()
-          : null,
-      'jam_buka': _jamBukaController.text.trim().isNotEmpty
-          ? _jamBukaController.text.trim()
-          : null,
-      'jam_tutup': _jamTutupController.text.trim().isNotEmpty
-          ? _jamTutupController.text.trim()
-          : null,
-      'latitude': double.tryParse(_latController.text.trim()),
-      'longitude': double.tryParse(_lngController.text.trim()),
-      'gambar_url': _imageUrls.isNotEmpty ? _imageUrls.first : null,
-      'image_urls': _imageUrls,
-      'category': _selectedCategory,
-      'fasilitas': _selectedFacilities.toList(),
-    };
-  }
+      return {
+        // owner_id DIHAPUS dari update — ownership tidak berubah lewat edit.
+        // (Proteksi tambahan: trigger DB `protect_place_columns` memblokir
+        // perubahan owner_id kecuali service_role.)
+        'nama_tempat': _namaController.text.trim(),
+        'alamat': _alamatController.text.trim(),
+        'deskripsi': _deskripsiController.text.trim(),
+        'nomor_telepon': _nomorTeleponController.text.trim().isNotEmpty
+            ? _nomorTeleponController.text.trim()
+            : null,
+        'jam_buka': _jamBukaController.text.trim().isNotEmpty
+            ? _jamBukaController.text.trim()
+            : null,
+        'jam_tutup': _jamTutupController.text.trim().isNotEmpty
+                    ? _jamTutupController.text.trim()
+                    : null,
+        'latitude': double.tryParse(_latController.text.trim()),
+        'longitude': double.tryParse(_lngController.text.trim()),
+        'gambar_url': _imageUrls.isNotEmpty ? _imageUrls.first : null,
+        'image_urls': _imageUrls,
+        'category': _selectedCategory,
+        'fasilitas': _selectedFacilities.toList(),
+      };
+    }
 
   void _toast(String message, {bool isError = false}) {
     final theme = const PlaceFormStyle();

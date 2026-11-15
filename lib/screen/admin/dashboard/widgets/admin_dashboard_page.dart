@@ -20,9 +20,6 @@ class DashboardPage extends StatelessWidget {
   final List<Map<String, dynamic>> recentActivities;
   final List<Map<String, dynamic>> topPlaces;
   final int todayActivityCount;
-  final int placesLastMonth;
-  final int usersLastMonth;
-  final int reviewsLastMonth;
   final VoidCallback onRetry;
   final VoidCallback onVerify;
   final VoidCallback onActivity;
@@ -47,9 +44,6 @@ class DashboardPage extends StatelessWidget {
     required this.recentActivities,
     required this.topPlaces,
     required this.todayActivityCount,
-    required this.placesLastMonth,
-    required this.usersLastMonth,
-    required this.reviewsLastMonth,
     required this.dateStr,
     this.dateRange,
     this.onDateRangeChanged,

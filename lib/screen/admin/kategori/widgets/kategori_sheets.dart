@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../data/write_helpers.dart';
 
 const kPrimary      = Color(0xFF1E7A52);
 const kAccentRed    = Color(0xFFEF4444);
@@ -48,16 +49,19 @@ class EditKategoriSheetState extends State<EditKategoriSheet> {
   Future<void> _updateKategori() async {
     setState(() => _isLoading = true);
     try {
-      await Supabase.instance.client
-          .from('kategori')
-          .update({
-            'emoji': _emojiController.text.trim(),
-            'deskripsi': _deskripsiController.text.trim().isEmpty
-                ? null
-                : _deskripsiController.text.trim(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', widget.kategori['id']);
+      await verifiedUpdate(
+        Supabase.instance.client
+            .from('kategori')
+            .update({
+              'emoji': _emojiController.text.trim(),
+              'deskripsi': _deskripsiController.text.trim().isEmpty
+                  ? null
+                  : _deskripsiController.text.trim(),
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', widget.kategori['id']),
+        label: 'updateKategori:${widget.kategori['id']}',
+      );
 
       if (mounted) {
         _toast('Kategori berhasil diperbarui.', isError: false);

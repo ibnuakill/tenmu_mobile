@@ -77,5 +77,22 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>TenMu memakai kamera untuk memotret foto tempat usaha.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>TenMu memakai galeri untuk memilih foto tempat usaha dan foto profil.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>TenMu memakai lokasi kamu untuk menampilkan tempat terdekat, menghitung jarak, dan menggambar rute.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tel</string>
+		<string>mailto</string>
+		<string>whatsapp</string>
+		<string>https</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

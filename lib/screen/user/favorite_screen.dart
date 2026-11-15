@@ -27,7 +27,11 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
         .order('created_at', ascending: false);
 
     return (response as List)
-        .map((fav) => fav['places'] as Map<String, dynamic>)
+        // `places(*)` bisa null kalau tempatnya sudah dihapus atau tidak
+        // terverifikasi (embed tidak lolos RLS) → jangan di-cast paksa.
+        .map((fav) => fav['places'])
+        .whereType<Map>()
+        .map((m) => Map<String, dynamic>.from(m))
         .toList();
   }
 
@@ -81,10 +85,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        LucideIcon('bookmark',
-                          size: 64,
-                          color: theme.textHint,
-                        ),
+                        LucideIcon('bookmark', size: 64, color: theme.textHint),
                         const SizedBox(height: 16),
                         Text(
                           'Belum ada tempat favorit.',
@@ -181,10 +182,7 @@ class _FavoriteCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        LucideIcon('map-pin',
-                          size: 14,
-                          color: theme.iconColor,
-                        ),
+                        LucideIcon('map-pin', size: 14, color: theme.iconColor),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(

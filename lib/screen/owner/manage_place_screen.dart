@@ -2,9 +2,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
+import '../../data/places_repository.dart';
 import '../../core/theme_provider.dart';
 import '../../core/poi_image_helper.dart';
-import '../user/post/widgets/post_upload_sheet.dart';
 import 'add_place_screen.dart';
 import 'edit_place_screen.dart';
 
@@ -80,7 +80,13 @@ class _ManagePlaceScreenState extends State<ManagePlaceScreen> {
 
     if (confirm == true) {
       try {
-        await Supabase.instance.client.from('places').delete().eq('id', id);
+        final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
+        await PlacesRepository(Supabase.instance.client).deletePlace(
+          placeId: id,
+          ownerId: userId,
+          // Admin view boleh menghapus tempat siapa pun; owner view dibatasi.
+          allowAdmin: !widget.isOwnerView,
+        );
         if (mounted) {
           final theme = Provider.of<ThemeProvider>(context, listen: false);
           ScaffoldMessenger.of(context).showSnackBar(
@@ -282,15 +288,6 @@ class _ManagePlaceScreenState extends State<ManagePlaceScreen> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (widget.isOwnerView)
-                        _iconBtn(
-                          icon: Icons.add_photo_alternate_outlined,
-                          color: theme.borderFocus,
-                          onTap: () => PostUploadSheet.show(context),
-                        )
-                      else
-                        const SizedBox.shrink(),
-                      const SizedBox(width: 6),
                       _iconBtn(
                         icon: Icons.edit_outlined,
                         color: theme.borderFocus,

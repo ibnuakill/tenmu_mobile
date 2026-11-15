@@ -88,8 +88,11 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       // Upload ke bucket profiles
       await Supabase.instance.client.storage
           .from('profiles')
-          .uploadBinary(fileName, _selectedImageBytes!,
-              fileOptions: FileOptions(contentType: 'image/jpeg'));
+          .uploadBinary(
+            fileName,
+            _selectedImageBytes!,
+            fileOptions: FileOptions(contentType: 'image/jpeg'),
+          );
 
       final imageUrl = Supabase.instance.client.storage
           .from('profiles')
@@ -221,7 +224,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const LucideIcon('camera',
+                            : const LucideIcon(
+                                'camera',
                                 color: Colors.white,
                                 size: 16,
                               ),
@@ -231,6 +235,42 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 ],
               ),
             ),
+            // Badge kecil penanda peran: hanya muncul untuk pemilik UMKM.
+            if (_currentRole == 'owner') ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.btnPrimary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: theme.btnPrimary.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LucideIcon(
+                      'badge-check',
+                      size: 13,
+                      color: theme.btnPrimary,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Pemilik UMKM',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: theme.btnPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 32),
             TextField(
               readOnly: true,
@@ -270,49 +310,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: theme.borderFocus),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Role info
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Role Akun',
-                style: TextStyle(
-                  color: theme.textSecondary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.bgSurface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: theme.border),
-              ),
-              child: Row(
-                children: [
-                  LucideIcon(
-                    _currentRole == 'owner'
-                        ? 'store'
-                        : 'user',
-                    color: theme.iconColor,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    _currentRole == 'owner'
-                        ? 'Pemilik UMKM'
-                        : 'User Biasa',
-                    style: TextStyle(
-                      color: theme.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
               ),
             ),
             const SizedBox(height: 16),

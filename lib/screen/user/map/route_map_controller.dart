@@ -592,13 +592,39 @@ class RouteMapController extends ChangeNotifier {
 
   Future<void> fitRouteToCamera() async {
     if (routePoints.length < 2 || mapController == null) return;
+    // Bounds = min/max lat & lng seluruh titik. `first`/`last` bukan bounds —
+    // kalau rute mengarah ke barat/selatan, LatLngBounds-nya jadi terbalik dan
+    // animateCamera melempar error.
+    var minLat = routePoints.first.latitude;
+    var maxLat = minLat;
+    var minLng = routePoints.first.longitude;
+    var maxLng = minLng;
+    for (final p in routePoints) {
+      if (p.latitude < minLat) minLat = p.latitude;
+      if (p.latitude > maxLat) maxLat = p.latitude;
+      if (p.longitude < minLng) minLng = p.longitude;
+      if (p.longitude > maxLng) maxLng = p.longitude;
+    }
+    // Bounds nol luas (semua titik praktis sama, rute super pendek) bikin
+    // `newLatLngBounds` menghitung zoom tak terhingga → peta mentok/error.
+    // Untuk kasus itu cukup geser kamera ke titiknya dengan zoom tetap.
+    if ((maxLat - minLat).abs() < 1e-6 && (maxLng - minLng).abs() < 1e-6) {
+      try {
+        await mapController!.animateCamera(
+          CameraUpdate.newLatLngZoom(LatLng(minLat, minLng), 17),
+        );
+      } catch (_) {
+        // abaikan — peta mungkin belum siap
+      }
+      return;
+    }
     try {
       const padding = EdgeInsets.fromLTRB(40, 80, 40, 220);
       await mapController!.animateCamera(
         CameraUpdate.newLatLngBounds(
           LatLngBounds(
-            southwest: routePoints.first,
-            northeast: routePoints.last,
+            southwest: LatLng(minLat, minLng),
+            northeast: LatLng(maxLat, maxLng),
           ),
           left: padding.left,
           top: padding.top,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../dashboard/widgets/admin_design.dart';
+import '../../../data/write_helpers.dart';
 
 /// Admin → Review & Rating.
 /// Menampilkan seluruh ulasan user terhadap UMKM, lengkap dengan statistik,
@@ -121,7 +122,11 @@ class _ManageReviewScreenState extends State<ManageReviewScreen> {
     if (konfirmasi != true) return;
 
     try {
-      await _client.from('reviews').delete().eq('id', review['id']);
+      await verifiedDelete(
+        _client.from('reviews').delete().eq('id', review['id']),
+        label: 'adminDeleteReview:${review['id']}',
+        requireRows: true,
+      );
       if (!mounted) return;
       _snack('Ulasan dihapus.', false);
       await _load();
