@@ -25,7 +25,11 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          # Dipin ke versi yang dipakai developer (3.41.7). Analyzer versi
+          # stable terbaru memunculkan lint baru yang tidak ada di sini,
+          # sehingga CI merah walau `flutter analyze` lokal bersih —
+          # gate merge jadi tidak deterministik.
+          flutter-version: 3.41.7
           cache: true
 
       - name: Info versi
@@ -44,9 +48,11 @@ jobs:
           status=${PIPESTATUS[0]}
           # Temuan dipancarkan sebagai annotation supaya kelihatan tanpa perlu
           # login (log CI repo publik cuma bisa dibuka kalau sudah masuk).
-          grep -E "(error|warning) - " analyze.log \
+          # Format `flutter analyze`: "error • pesan • file:line • kode".
+          grep -E "(error|warning)[[:space:]]*[•-]" analyze.log \
             | head -25 \
             | while IFS= read -r line; do echo "::error::$line"; done
+          grep -E "issues? found|No issues found" analyze.log || true
           if [ "$status" -eq 0 ]; then
             echo "Analyze bersih: 0 error, 0 warning."
           else
@@ -63,6 +69,24 @@ jobs:
 
       - name: Test
         run: flutter test --reporter expanded
+
+      # `.env` di-gitignore (tidak boleh masuk repo), padahal pubspec.yaml
+      # mendaftarkannya sebagai asset — tanpa file ini `flutter build` gagal.
+      # Nilai di sini placeholder: hanya untuk membuktikan proyek bisa
+      # dikompilasi, bukan untuk build rilis.
+      - name: Buat .env placeholder (build debug saja)
+        run: |
+          if [ -f .env ]; then
+            echo ".env sudah ada."
+          else
+            {
+              echo "SUPABASE_URL=https://ci-placeholder.supabase.co"
+              echo "SUPABASE_ANON_KEY=ci-placeholder-anon-key"
+              echo "ONESIGNAL_APP_ID=ci-placeholder-onesignal"
+              echo "MAPTILER_KEY=ci-placeholder-maptiler"
+            } > .env
+            echo "Placeholder .env dibuat untuk build CI."
+          fi
 
       # Build debug APK membuktikan proyek benar-benar bisa dikompilasi
       # (analyze saja tidak menangkap error plugin Android).
