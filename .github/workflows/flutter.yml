@@ -49,14 +49,21 @@ jobs:
           # Temuan dipancarkan sebagai annotation supaya kelihatan tanpa perlu
           # login (log CI repo publik cuma bisa dibuka kalau sudah masuk).
           # Format `flutter analyze`: "error • pesan • file:line • kode".
-          grep -E "(error|warning)[[:space:]]*[•-]" analyze.log \
-            | head -25 \
-            | while IFS= read -r line; do echo "::error::$line"; done
-          grep -E "issues? found|No issues found" analyze.log || true
+          findings=$(grep -E "(error|warning)[[:space:]]*[•-]" analyze.log | head -25)
+          if [ -n "$findings" ]; then
+            printf '%s\n' "$findings" | while IFS= read -r line; do echo "::error::$line"; done
+          else
+            # Tidak ada daftar temuan sama sekali → analyze gagal sebelum
+            # analisis (error toolchain). Kirim ekor outputnya sebagai annotation.
+            echo "::error::flutter analyze tidak menghasilkan daftar temuan (exit $status); 25 baris terakhir output:"
+            tail -25 analyze.log | while IFS= read -r line; do
+              [ -n "$line" ] && echo "::error::$line"
+            done
+          fi
           if [ "$status" -eq 0 ]; then
             echo "Analyze bersih: 0 error, 0 warning."
           else
-            echo "::error::flutter analyze gagal (exit $status) — lihat 25 temuan pertama di atas."
+            echo "::error::flutter analyze gagal (exit $status)."
           fi
           exit "$status"
 
