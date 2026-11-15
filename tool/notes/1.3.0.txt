@@ -1,0 +1,1 @@
+Tombol ganti tema di halaman login. AuthPalette jadi palet runtime (AuthPalette.of(context)) sehingga seluruh layar auth ikut tema aktif. ThemeModeTile dipindah ke lib/core/widgets/ (satu sumber: login + Pengaturan). test/auth/auth_palette_test.dart baru; total 24 test hijau.
