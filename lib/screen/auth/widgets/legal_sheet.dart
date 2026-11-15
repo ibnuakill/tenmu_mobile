@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme_provider.dart';
+
 import 'auth_common.dart';
 
 /// Jenis dokumen legal.
@@ -21,10 +23,11 @@ Future<void> showLegalSheet(BuildContext context, LegalDoc doc) {
     isScrollControlled: true,
     builder: (ctx) {
       final maxH = MediaQuery.sizeOf(ctx).height * 0.85;
+      final p = AuthPalette.of(ctx);
       return Container(
         constraints: BoxConstraints(maxHeight: maxH),
-        decoration: const BoxDecoration(
-          color: AuthPalette.bg,
+        decoration: BoxDecoration(
+          color: p.bg,
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
@@ -35,7 +38,7 @@ Future<void> showLegalSheet(BuildContext context, LegalDoc doc) {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AuthPalette.divider,
+                color: p.divider,
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
@@ -49,18 +52,18 @@ Future<void> showLegalSheet(BuildContext context, LegalDoc doc) {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
-                            color: AuthPalette.ink,
+                            color: p.ink,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           subtitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12.5,
-                            color: AuthPalette.grey,
+                            color: p.grey,
                             height: 1.4,
                           ),
                         ),
@@ -69,21 +72,21 @@ Future<void> showLegalSheet(BuildContext context, LegalDoc doc) {
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(ctx).pop(),
-                    icon: const Icon(Icons.close_rounded, color: AuthPalette.grey),
+                    icon: Icon(Icons.close_rounded, color: p.grey),
                   ),
                 ],
               ),
             ),
-            const Divider(color: AuthPalette.divider, height: 1),
+            Divider(color: p.divider, height: 1),
             Flexible(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
                 children: [
                   Text(
                     'Terakhir diperbarui: $_lastUpdated',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AuthPalette.hint,
+                      color: p.hint,
                       fontStyle: FontStyle.italic,
                     ),
                   ),
@@ -91,19 +94,19 @@ Future<void> showLegalSheet(BuildContext context, LegalDoc doc) {
                   for (final s in sections) ...[
                     Text(
                       s.$1,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: AuthPalette.ink,
+                        color: p.ink,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       s.$2,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13.5,
                         height: 1.6,
-                        color: AuthPalette.grey,
+                        color: p.grey,
                       ),
                     ),
                     const SizedBox(height: 18),
@@ -112,16 +115,16 @@ Future<void> showLegalSheet(BuildContext context, LegalDoc doc) {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: AuthPalette.surface,
+                      color: p.surface,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AuthPalette.border),
+                      border: Border.all(color: p.border),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Dengan mencentang persetujuan & masuk ke TenMu, kamu menyatakan telah membaca dan menyetujui dokumen ini.',
                       style: TextStyle(
                         fontSize: 12.5,
                         height: 1.5,
-                        color: AuthPalette.grey,
+                        color: p.grey,
                       ),
                     ),
                   ),

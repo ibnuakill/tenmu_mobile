@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../core/theme_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/email_validator.dart';
@@ -105,15 +107,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } on AuthException catch (e) {
       if (!mounted) return;
       final msg = e.message.toLowerCase();
-      if (msg.contains('already registered') || msg.contains('already been registered')) {
-        showAuthSnack(context, 'Email ini sudah terdaftar. Coba masuk atau lupa password.');
+      if (msg.contains('already registered') ||
+          msg.contains('already been registered')) {
+        showAuthSnack(
+          context,
+          'Email ini sudah terdaftar. Coba masuk atau lupa password.',
+        );
       } else if (msg.contains('weak') || msg.contains('password')) {
-        showAuthSnack(context, 'Password terlalu lemah. Gunakan minimal 6 karakter.');
+        showAuthSnack(
+          context,
+          'Password terlalu lemah. Gunakan minimal 6 karakter.',
+        );
       } else {
         showAuthSnack(context, e.message);
       }
     } catch (_) {
-      if (mounted) showAuthSnack(context, 'Gagal mendaftar. Periksa koneksi lalu coba lagi.');
+      if (mounted)
+        showAuthSnack(
+          context,
+          'Gagal mendaftar. Periksa koneksi lalu coba lagi.',
+        );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -121,14 +134,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = AuthPalette.of(context);
 
     return Scaffold(
-      backgroundColor: AuthPalette.bg,
+      backgroundColor: p.bg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AuthPalette.ink),
+          icon: Icon(Icons.arrow_back, color: p.ink),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -142,18 +156,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
+                  Text(
                     'Buat Akun Baru',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
-                      color: AuthPalette.ink,
+                      color: p.ink,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Isi data di bawah untuk mendaftar dengan email & password.',
-                    style: TextStyle(fontSize: 13.5, color: AuthPalette.grey, height: 1.5),
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      color: p.grey,
+                      height: 1.5,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   AuthTextField(
@@ -180,7 +198,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     errorText: _emailError,
                     enabled: !_isLoading,
                     onChanged: (_) {
-                      if (_emailError != null) setState(() => _emailError = null);
+                      if (_emailError != null)
+                        setState(() => _emailError = null);
                     },
                   ),
                   const SizedBox(height: 14),
@@ -194,17 +213,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     errorText: _passwordError,
                     enabled: !_isLoading,
                     onChanged: (_) {
-                      if (_passwordError != null) setState(() => _passwordError = null);
+                      if (_passwordError != null)
+                        setState(() => _passwordError = null);
                     },
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
-                        color: AuthPalette.grey,
+                        color: p.grey,
                         size: 20,
                       ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -218,7 +239,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     errorText: _confirmError,
                     enabled: !_isLoading,
                     onChanged: (_) {
-                      if (_confirmError != null) setState(() => _confirmError = null);
+                      if (_confirmError != null)
+                        setState(() => _confirmError = null);
                     },
                     onSubmitted: (_) => _register(),
                     suffixIcon: IconButton(
@@ -226,10 +248,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         _obscureConfirm
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
-                        color: AuthPalette.grey,
+                        color: p.grey,
                         size: 20,
                       ),
-                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                      onPressed: () =>
+                          setState(() => _obscureConfirm = !_obscureConfirm),
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -250,16 +273,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
+                      Text(
                         'Sudah punya akun? ',
-                        style: TextStyle(color: AuthPalette.grey, fontSize: 13.5),
+                        style: TextStyle(color: p.grey, fontSize: 13.5),
                       ),
                       GestureDetector(
-                        onTap: _isLoading ? null : () => Navigator.of(context).pop(),
-                        child: const Text(
+                        onTap: _isLoading
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        child: Text(
                           'Masuk',
                           style: TextStyle(
-                            color: AuthPalette.btn,
+                            color: p.btn,
                             fontSize: 13.5,
                             fontWeight: FontWeight.w800,
                           ),

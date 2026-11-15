@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../core/theme_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth_rate_limit.dart';
@@ -72,13 +74,20 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> {
         _resendCountdown = 60;
       });
       _startResendTimer();
-      showAuthSnack(context, 'Kode dikirim ke $email. Berlaku 5 menit.', isError: false);
+      showAuthSnack(
+        context,
+        'Kode dikirim ke $email. Berlaku 5 menit.',
+        isError: false,
+      );
     } on AuthException catch (e) {
       if (!mounted) return;
       showAuthSnack(context, _parseSendError(e.message));
     } catch (_) {
       if (!mounted) return;
-      showAuthSnack(context, 'Gagal mengirim kode. Periksa koneksi lalu coba lagi.');
+      showAuthSnack(
+        context,
+        'Gagal mengirim kode. Periksa koneksi lalu coba lagi.',
+      );
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -124,11 +133,15 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> {
       if (!mounted) return;
       final msg = e.message.toLowerCase();
       if (msg.contains('expired')) {
-        setState(() => _codeError = 'Kode sudah kedaluwarsa. Kirim ulang kode.');
+        setState(
+          () => _codeError = 'Kode sudah kedaluwarsa. Kirim ulang kode.',
+        );
       } else if (attempts >= 5) {
         showAuthSnack(context, 'Kode salah 5×. Diblokir 30 menit.');
       } else {
-        setState(() => _codeError = 'Kode salah. Sisa percobaan: ${5 - attempts}');
+        setState(
+          () => _codeError = 'Kode salah. Sisa percobaan: ${5 - attempts}',
+        );
       }
     } catch (_) {
       if (!mounted) return;
@@ -181,14 +194,15 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = AuthPalette.of(context);
 
     return Scaffold(
-      backgroundColor: AuthPalette.bg,
+      backgroundColor: p.bg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AuthPalette.ink),
+          icon: Icon(Icons.arrow_back, color: p.ink),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -207,32 +221,38 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> {
                     height: 72,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: AuthPalette.surface,
+                      color: p.surface,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AuthPalette.border),
+                      border: Border.all(color: p.border),
                     ),
                     child: Icon(
-                      _codeSent ? Icons.mark_email_read_outlined : Icons.mail_outline_rounded,
-                      color: AuthPalette.ink,
+                      _codeSent
+                          ? Icons.mark_email_read_outlined
+                          : Icons.mail_outline_rounded,
+                      color: p.ink,
                       size: 34,
                     ),
                   ),
                   const SizedBox(height: 20),
                   Text(
                     _codeSent ? 'Masukkan Kode' : 'Masuk dengan Email',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
-                      color: AuthPalette.ink,
+                      color: p.ink,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     _codeSent
                         ? 'Kami mengirim 6 digit kode ke ${_emailController.text.trim()}. '
-                            'Masukkan kode tersebut — berlaku 5 menit.'
+                              'Masukkan kode tersebut — berlaku 5 menit.'
                         : 'Masukkan email kamu. Kami akan mengirim kode verifikasi 6 digit.',
-                    style: const TextStyle(fontSize: 13.5, color: AuthPalette.grey, height: 1.5),
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      color: p.grey,
+                      height: 1.5,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   if (!_codeSent) ...[
@@ -247,7 +267,8 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> {
                       errorText: _emailError,
                       enabled: !_isSending,
                       onChanged: (_) {
-                        if (_emailError != null) setState(() => _emailError = null);
+                        if (_emailError != null)
+                          setState(() => _emailError = null);
                       },
                       onSubmitted: (_) => _sendCode(),
                     ),
@@ -270,7 +291,8 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> {
                       enabled: !_isVerifying,
                       maxLength: 6,
                       onChanged: (_) {
-                        if (_codeError != null) setState(() => _codeError = null);
+                        if (_codeError != null)
+                          setState(() => _codeError = null);
                       },
                       onSubmitted: (_) => _verifyCode(),
                     ),
@@ -287,9 +309,9 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> {
                       children: [
                         TextButton(
                           onPressed: _changeEmail,
-                          child: const Text(
+                          child: Text(
                             'Ganti email',
-                            style: TextStyle(color: AuthPalette.grey),
+                            style: TextStyle(color: p.grey),
                           ),
                         ),
                         TextButton(
@@ -299,7 +321,7 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> {
                                 ? 'Kirim ulang ($_resendCountdown s)'
                                 : 'Kirim ulang kode',
                             style: TextStyle(
-                              color: _resendCountdown > 0 ? AuthPalette.hint : AuthPalette.ink,
+                              color: _resendCountdown > 0 ? p.hint : p.ink,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -318,7 +340,11 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: const [
-                        Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 20),
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: Color(0xFFD97706),
+                          size: 20,
+                        ),
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(

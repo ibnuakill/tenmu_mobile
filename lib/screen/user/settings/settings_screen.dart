@@ -21,7 +21,7 @@ import '../profile_settings_screen.dart';
 import 'owner_request_screen.dart';
 import '../help/help_center_screen.dart';
 import 'widgets/settings_tile.dart';
-import 'widgets/theme_mode_tile.dart';
+import '../../../core/widgets/theme_mode_tile.dart';
 import '../../../core/lucide_icons.dart';
 
 class SettingsScreen extends StatefulWidget {

@@ -1,6 +1,10 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../core/theme_provider.dart';
+import '../../core/widgets/theme_mode_tile.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lottie/lottie.dart';
@@ -30,7 +34,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -54,10 +59,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         statusBarIconBrightness: Brightness.light,
       ),
     );
-    _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
-    _slideAnim = Tween<Offset>(begin: const Offset(0, 0.25), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.25),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
     _animCtrl.forward();
   }
 
@@ -127,7 +137,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             message: 'Password salah 5×. Demi keamanan, akun diblokir 3 jam.',
           );
         } else {
-          showAuthSnack(context, 'Email atau password salah. Sisa percobaan: ${5 - attempts}');
+          showAuthSnack(
+            context,
+            'Email atau password salah. Sisa percobaan: ${5 - attempts}',
+          );
         }
       } else if (msg.contains('email not confirmed')) {
         showAuthSnack(
@@ -138,7 +151,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         showAuthSnack(context, e.message);
       }
     } catch (_) {
-      if (mounted) showAuthSnack(context, 'Gagal masuk. Periksa koneksi lalu coba lagi.');
+      if (mounted)
+        showAuthSnack(context, 'Gagal masuk. Periksa koneksi lalu coba lagi.');
     } finally {
       if (mounted) setState(() => _isLoadingPassword = false);
     }
@@ -152,13 +166,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       return;
     }
     setState(() => _isLoadingGoogle = true);
-    final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final isDesktop =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
     try {
       final redirectTo = kIsWeb
           ? Uri.base.origin
           : isDesktop
-              ? 'http://127.0.0.1:8976/auth/callback'
-              : 'tenmu://login-callback';
+          ? 'http://127.0.0.1:8976/auth/callback'
+          : 'tenmu://login-callback';
       if (isDesktop) await DesktopOAuthService().start();
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
@@ -166,14 +181,20 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       );
     } on AuthException catch (e) {
       if (isDesktop) await DesktopOAuthService().stop();
-      if (mounted) showAuthErrorDialog(context, title: 'Login Google Gagal', message: e.message);
+      if (mounted)
+        showAuthErrorDialog(
+          context,
+          title: 'Login Google Gagal',
+          message: e.message,
+        );
     } catch (_) {
       if (isDesktop) await DesktopOAuthService().stop();
       if (mounted) {
         showAuthErrorDialog(
           context,
           title: 'Login Google Gagal',
-          message: 'Tidak dapat masuk dengan Google. Periksa koneksi internetmu lalu coba lagi.',
+          message:
+              'Tidak dapat masuk dengan Google. Periksa koneksi internetmu lalu coba lagi.',
         );
       }
     } finally {
@@ -187,191 +208,224 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       showAuthSnack(context, 'Setujui Ketentuan Layanan dulu ya.');
       return;
     }
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const EmailOtpScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute(builder: (_) => const EmailOtpScreen()));
     // Pop-up "Login Berhasil" ditangani AuthGate (lihat auth_gate.dart).
   }
 
   Future<void> _openRegister() async {
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const RegisterScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute(builder: (_) => const RegisterScreen()));
     // Pop-up "Login Berhasil" ditangani AuthGate (lihat auth_gate.dart).
   }
 
   void _openForgotPassword() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()));
   }
 
   @override
   Widget build(BuildContext context) {
+    final p = AuthPalette.of(context);
     final busy = _isLoadingPassword || _isLoadingGoogle;
 
     return Scaffold(
-      backgroundColor: AuthPalette.bg,
+      backgroundColor: p.bg,
       resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  FadeTransition(opacity: _fadeAnim, child: const _LoginHero()),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Selamat Datang di TenMu',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: AuthPalette.ink,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Masuk untuk menemukan tempat menarik di sekitarmu.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13.5, height: 1.4, color: AuthPalette.grey),
-                  ),
-                  const SizedBox(height: 26),
-                  SlideTransition(
-                    position: _slideAnim,
-                    child: FadeTransition(
-                      opacity: _fadeAnim,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // ── Form email + password ──
-                          AuthTextField(
-                            controller: _emailController,
-                            label: 'Email',
-                            hint: 'nama@email.com',
-                            icon: Icons.mail_outline_rounded,
-                            keyboardType: TextInputType.emailAddress,
-                            autofillHints: const [AutofillHints.email],
-                            errorText: _emailError,
-                            enabled: !busy,
-                            onChanged: (_) {
-                              if (_emailError != null) setState(() => _emailError = null);
-                            },
-                          ),
-                          const SizedBox(height: 14),
-                          AuthTextField(
-                            controller: _passwordController,
-                            label: 'Password',
-                            hint: '••••••••',
-                            icon: Icons.lock_outline_rounded,
-                            obscure: _obscurePassword,
-                            autofillHints: const [AutofillHints.password],
-                            textInputAction: TextInputAction.done,
-                            errorText: _passwordError,
-                            enabled: !busy,
-                            onChanged: (_) {
-                              if (_passwordError != null) setState(() => _passwordError = null);
-                            },
-                            onSubmitted: (_) => _signInWithPassword(),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                                color: AuthPalette.grey,
-                                size: 20,
-                              ),
-                              onPressed: () =>
-                                  setState(() => _obscurePassword = !_obscurePassword),
-                            ),
-                          ),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: busy ? null : _openForgotPassword,
-                              child: const Text(
-                                'Lupa password?',
-                                style: TextStyle(color: AuthPalette.grey, fontSize: 13),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          AuthPrimaryButton(
-                            label: 'Masuk',
-                            loadingLabel: 'Masuk...',
-                            isLoading: _isLoadingPassword,
-                            onPressed: _signInWithPassword,
-                          ),
-                          const SizedBox(height: 22),
-                          const AuthOrDivider(),
-                          const SizedBox(height: 22),
-                          // ── Google (kiri) & Email OTP (kanan) — bulat, icon saja ──
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
+          children: [
+            // Tombol ganti tema — pilihan ikut tersimpan di perangkat, jadi
+            // tema yang dipilih di sini tetap dipakai di beranda setelah login.
+            Positioned(
+              top: 8,
+              right: 14,
+              child: Consumer<ThemeProvider>(
+                builder: (_, theme, __) => ThemeModeTile(theme: theme),
+              ),
+            ),
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      FadeTransition(
+                        opacity: _fadeAnim,
+                        child: const _LoginHero(),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Selamat Datang di TenMu',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: p.ink,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Masuk untuk menemukan tempat menarik di sekitarmu.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          height: 1.4,
+                          color: p.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 26),
+                      SlideTransition(
+                        position: _slideAnim,
+                        child: FadeTransition(
+                          opacity: _fadeAnim,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _CircleAuthButton(
-                                tooltip: 'Masuk dengan Google',
-                                onPressed: busy ? null : _signInWithGoogle,
-                                isLoading: _isLoadingGoogle,
-                                child: SvgPicture.asset(
-                                  'assets/branding/google-logo.svg',
-                                  height: 28,
-                                  width: 28,
-                                ),
+                              // ── Form email + password ──
+                              AuthTextField(
+                                controller: _emailController,
+                                label: 'Email',
+                                hint: 'nama@email.com',
+                                icon: Icons.mail_outline_rounded,
+                                keyboardType: TextInputType.emailAddress,
+                                autofillHints: const [AutofillHints.email],
+                                errorText: _emailError,
+                                enabled: !busy,
+                                onChanged: (_) {
+                                  if (_emailError != null)
+                                    setState(() => _emailError = null);
+                                },
                               ),
-                              const SizedBox(width: 24),
-                              _CircleAuthButton(
-                                tooltip: 'Masuk dengan Email (kode OTP)',
-                                onPressed: busy ? null : _openOtpLogin,
-                                child: const LucideIcon(
-                                  'mail',
-                                  size: 26,
-                                  color: AuthPalette.ink,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
-                          AuthTermsCheckbox(
-                            value: _agreedToTerms,
-                            onChanged: busy
-                                ? null
-                                : (v) => setState(() => _agreedToTerms = v ?? false),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text(
-                                'Belum punya akun? ',
-                                style: TextStyle(color: AuthPalette.grey, fontSize: 13.5),
-                              ),
-                              GestureDetector(
-                                onTap: busy ? null : _openRegister,
-                                child: const Text(
-                                  'Daftar',
-                                  style: TextStyle(
-                                    color: AuthPalette.btn,
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w800,
+                              const SizedBox(height: 14),
+                              AuthTextField(
+                                controller: _passwordController,
+                                label: 'Password',
+                                hint: '••••••••',
+                                icon: Icons.lock_outline_rounded,
+                                obscure: _obscurePassword,
+                                autofillHints: const [AutofillHints.password],
+                                textInputAction: TextInputAction.done,
+                                errorText: _passwordError,
+                                enabled: !busy,
+                                onChanged: (_) {
+                                  if (_passwordError != null)
+                                    setState(() => _passwordError = null);
+                                },
+                                onSubmitted: (_) => _signInWithPassword(),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    color: p.grey,
+                                    size: 20,
+                                  ),
+                                  onPressed: () => setState(
+                                    () => _obscurePassword = !_obscurePassword,
                                   ),
                                 ),
                               ),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: busy ? null : _openForgotPassword,
+                                  child: Text(
+                                    'Lupa password?',
+                                    style: TextStyle(
+                                      color: p.grey,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              AuthPrimaryButton(
+                                label: 'Masuk',
+                                loadingLabel: 'Masuk...',
+                                isLoading: _isLoadingPassword,
+                                onPressed: _signInWithPassword,
+                              ),
+                              const SizedBox(height: 22),
+                              AuthOrDivider(),
+                              const SizedBox(height: 22),
+                              // ── Google (kiri) & Email OTP (kanan) — bulat, icon saja ──
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _CircleAuthButton(
+                                    tooltip: 'Masuk dengan Google',
+                                    onPressed: busy ? null : _signInWithGoogle,
+                                    isLoading: _isLoadingGoogle,
+                                    child: SvgPicture.asset(
+                                      'assets/branding/google-logo.svg',
+                                      height: 28,
+                                      width: 28,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 24),
+                                  _CircleAuthButton(
+                                    tooltip: 'Masuk dengan Email (kode OTP)',
+                                    onPressed: busy ? null : _openOtpLogin,
+                                    child: LucideIcon(
+                                      'mail',
+                                      size: 26,
+                                      color: p.ink,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 18),
+                              AuthTermsCheckbox(
+                                value: _agreedToTerms,
+                                onChanged: busy
+                                    ? null
+                                    : (v) => setState(
+                                        () => _agreedToTerms = v ?? false,
+                                      ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'Belum punya akun? ',
+                                    style: TextStyle(
+                                      color: p.grey,
+                                      fontSize: 13.5,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: busy ? null : _openRegister,
+                                    child: Text(
+                                      'Daftar',
+                                      style: TextStyle(
+                                        color: p.btn,
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -393,26 +447,25 @@ class _CircleAuthButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = AuthPalette.of(context);
     return Tooltip(
       message: tooltip,
       child: SizedBox(
         width: 64,
         height: 64,
         child: Material(
-          color: AuthPalette.surface,
-          shape: CircleBorder(
-            side: BorderSide(color: AuthPalette.border, width: 1.5),
-          ),
+          color: p.surface,
+          shape: CircleBorder(side: BorderSide(color: p.border, width: 1.5)),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onPressed,
             child: Center(
               child: isLoading
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(
-                        color: AuthPalette.ink,
+                        color: p.ink,
                         strokeWidth: 2.2,
                       ),
                     )

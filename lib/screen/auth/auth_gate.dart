@@ -124,9 +124,7 @@ class _AuthGateState extends State<AuthGate> {
         final effectiveUser = session.user;
 
         // Semua user yang berhasil login (Google/Magic Link) langsung ke RoleChecker
-        return RoleChecker(
-          key: ValueKey(effectiveUser.id),
-        );
+        return RoleChecker(key: ValueKey(effectiveUser.id));
       },
     );
   }

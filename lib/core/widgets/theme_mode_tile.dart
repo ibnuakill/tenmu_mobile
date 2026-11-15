@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme_provider.dart';
-import '../../../../core/lucide_icons.dart';
+import '../lucide_icons.dart';
+import '../theme_provider.dart';
 
 /// Tombol ganti mode tampilan — ikon saja, tanpa teks.
 ///

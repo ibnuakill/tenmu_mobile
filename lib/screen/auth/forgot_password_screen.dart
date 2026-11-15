@@ -61,7 +61,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     // Cek lock
     final locked = await AuthRateLimit.isForgotLocked(email);
     if (locked) {
-      final remaining = await AuthRateLimit.getForgotRemainingLockSeconds(email);
+      final remaining = await AuthRateLimit.getForgotRemainingLockSeconds(
+        email,
+      );
       _toast(
         'Terlalu banyak percobaan. Coba lagi setelah ${AuthRateLimit.formatDuration(remaining)}.',
         isError: true,
@@ -92,10 +94,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
           isError: true,
         );
       } else {
-        _toast(
-          'Gagal ($attempts/3). ${e.message}',
-          isError: true,
-        );
+        _toast('Gagal ($attempts/3). ${e.message}', isError: true);
       }
     } catch (_) {
       _toast('Terjadi kesalahan. Coba lagi.', isError: true);
@@ -296,9 +295,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                     elevation: 0,
                                   ),
                                   child: Text(
-                                    _isSent
-                                        ? 'Terkirim!'
-                                        : 'Kirim Link Reset',
+                                    _isSent ? 'Terkirim!' : 'Kirim Link Reset',
                                     style: const TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w700,

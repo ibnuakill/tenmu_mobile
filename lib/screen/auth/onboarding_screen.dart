@@ -32,9 +32,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (widget.onCompleted != null) {
       widget.onCompleted!();
     } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const AuthGate()),
-      );
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const AuthGate()));
     }
   }
 
@@ -53,10 +53,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0D121F),
-              Color(0xFF134C57),
-            ],
+            colors: [Color(0xFF0D121F), Color(0xFF134C57)],
           ),
         ),
         child: SafeArea(
@@ -71,10 +68,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     onPressed: _completeOnboarding,
                     child: const Text(
                       'Skip',
-                      style: TextStyle(
-                        color: Color(0xB3EAF5F7),
-                        fontSize: 15,
-                      ),
+                      style: TextStyle(color: Color(0xB3EAF5F7), fontSize: 15),
                     ),
                   ),
                 ),

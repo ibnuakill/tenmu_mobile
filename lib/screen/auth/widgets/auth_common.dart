@@ -2,24 +2,70 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/app_colors.dart' as ac;
+import '../../../core/app_colors_light.dart' as acl;
+import '../../../core/theme_provider.dart';
 import 'legal_sheet.dart';
 
 /// Palet & widget bersama untuk semua layar auth (Login, Daftar, OTP, Lupa Password).
 /// Tujuan: tampilan konsisten dan kode tidak terduplikasi.
+///
+/// Palet ini **mengikuti tema aktif** ([ThemeProvider]) lewat [AuthPalette.of],
+/// supaya tombol ganti tema di halaman login langsung terlihat hasilnya dan
+/// pilihan itu (disimpan di `SharedPreferences` oleh [ThemeProvider]) ikut
+/// terbawa ke beranda setelah user masuk.
 class AuthPalette {
-  AuthPalette._();
+  const AuthPalette({
+    required this.bg,
+    required this.surface,
+    required this.ink,
+    required this.grey,
+    required this.hint,
+    required this.border,
+    required this.divider,
+    required this.btn,
+    required this.btnLabel,
+  });
 
-  static const Color bg = ac.AppColors.bgBase;
-  static const Color surface = ac.AppColors.bgElevated;
-  static const Color ink = ac.AppColors.textPrimary;
-  static const Color grey = ac.AppColors.textSecondary;
-  static const Color hint = ac.AppColors.textHint;
-  static const Color border = ac.AppColors.border;
-  static const Color divider = ac.AppColors.divider;
-  static const Color btn = ac.AppColors.btnPrimary;
-  static const Color btnLabel = ac.AppColors.btnLabel;
+  final Color bg;
+  final Color surface;
+  final Color ink;
+  final Color grey;
+  final Color hint;
+  final Color border;
+  final Color divider;
+  final Color btn;
+  final Color btnLabel;
+
+  static const AuthPalette dark = AuthPalette(
+    bg: ac.AppColors.bgBase,
+    surface: ac.AppColors.bgElevated,
+    ink: ac.AppColors.textPrimary,
+    grey: ac.AppColors.textSecondary,
+    hint: ac.AppColors.textHint,
+    border: ac.AppColors.border,
+    divider: ac.AppColors.divider,
+    btn: ac.AppColors.btnPrimary,
+    btnLabel: ac.AppColors.btnLabel,
+  );
+
+  static const AuthPalette light = AuthPalette(
+    bg: acl.AppColorsLight.bgBase,
+    surface: acl.AppColorsLight.bgElevated,
+    ink: acl.AppColorsLight.textPrimary,
+    grey: acl.AppColorsLight.textSecondary,
+    hint: acl.AppColorsLight.textHint,
+    border: acl.AppColorsLight.border,
+    divider: acl.AppColorsLight.divider,
+    btn: acl.AppColorsLight.btnPrimary,
+    btnLabel: acl.AppColorsLight.btnLabel,
+  );
+
+  /// Palet sesuai tema yang sedang aktif.
+  static AuthPalette of(BuildContext context) =>
+      context.watch<ThemeProvider>().isDarkMode ? dark : light;
 }
 
 /// Input field bergaya TenMu (dark) — dipakai di semua form auth.
@@ -61,13 +107,15 @@ class AuthTextField extends StatelessWidget {
     this.maxLength,
   });
 
-  OutlineInputBorder _border(Color color, [double width = 1]) => OutlineInputBorder(
+  OutlineInputBorder _border(Color color, [double width = 1]) =>
+      OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: color, width: width),
       );
 
   @override
   Widget build(BuildContext context) {
+    final p = AuthPalette.of(context);
     return TextField(
       controller: controller,
       enabled: enabled,
@@ -79,25 +127,28 @@ class AuthTextField extends StatelessWidget {
       autofillHints: autofillHints,
       autofocus: autofocus,
       maxLength: maxLength,
-      style: const TextStyle(color: AuthPalette.ink),
-      cursorColor: AuthPalette.btn,
+      style: TextStyle(color: p.ink),
+      cursorColor: p.btn,
       onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: AuthPalette.grey, fontSize: 14),
+        labelStyle: TextStyle(color: p.grey, fontSize: 14),
         hintText: hint,
-        hintStyle: const TextStyle(color: AuthPalette.hint),
+        hintStyle: TextStyle(color: p.hint),
         errorText: errorText,
         counterText: '',
-        prefixIcon: Icon(icon, color: AuthPalette.grey, size: 20),
+        prefixIcon: Icon(icon, color: p.grey, size: 20),
         suffixIcon: suffixIcon,
         filled: true,
-        fillColor: AuthPalette.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: _border(AuthPalette.border),
-        enabledBorder: _border(AuthPalette.border),
-        disabledBorder: _border(AuthPalette.border.withValues(alpha: 0.5)),
-        focusedBorder: _border(AuthPalette.ink, 1.5),
+        fillColor: p.surface,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+        border: _border(p.border),
+        enabledBorder: _border(p.border),
+        disabledBorder: _border(p.border.withValues(alpha: 0.5)),
+        focusedBorder: _border(p.ink, 1.5),
         errorBorder: _border(Colors.redAccent),
         focusedErrorBorder: _border(Colors.redAccent, 1.5),
       ),
@@ -111,7 +162,11 @@ class AuthTermsCheckbox extends StatefulWidget {
   final bool value;
   final ValueChanged<bool?>? onChanged;
 
-  const AuthTermsCheckbox({super.key, required this.value, required this.onChanged});
+  const AuthTermsCheckbox({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
 
   @override
   State<AuthTermsCheckbox> createState() => _AuthTermsCheckboxState();
@@ -154,9 +209,10 @@ class _AuthTermsCheckboxState extends State<AuthTermsCheckbox> {
 
   @override
   Widget build(BuildContext context) {
+    final p = AuthPalette.of(context);
     final enabled = widget.onChanged != null;
-    const linkStyle = TextStyle(
-      color: AuthPalette.ink,
+    final linkStyle = TextStyle(
+      color: p.ink,
       fontWeight: FontWeight.w800,
       decoration: TextDecoration.underline,
     );
@@ -175,10 +231,12 @@ class _AuthTermsCheckboxState extends State<AuthTermsCheckbox> {
               child: Checkbox(
                 value: widget.value,
                 onChanged: widget.onChanged,
-                activeColor: AuthPalette.btn,
-                checkColor: AuthPalette.btnLabel,
-                side: const BorderSide(color: AuthPalette.hint, width: 1.6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                activeColor: p.btn,
+                checkColor: p.btnLabel,
+                side: BorderSide(color: p.hint, width: 1.6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
@@ -189,11 +247,7 @@ class _AuthTermsCheckboxState extends State<AuthTermsCheckbox> {
               padding: const EdgeInsets.only(top: 2),
               child: RichText(
                 text: TextSpan(
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AuthPalette.grey,
-                    height: 1.4,
-                  ),
+                  style: TextStyle(fontSize: 12, color: p.grey, height: 1.4),
                   children: [
                     TextSpan(
                       text: 'Dengan masuk, saya menyetujui ',
@@ -234,8 +288,10 @@ class AuthPrimaryButton extends StatelessWidget {
   final String loadingLabel;
   final bool isLoading;
   final VoidCallback? onPressed;
-  final Color background;
-  final Color foreground;
+
+  /// Warna opsional; kalau null ikut palet tema aktif.
+  final Color? background;
+  final Color? foreground;
 
   const AuthPrimaryButton({
     super.key,
@@ -243,24 +299,29 @@ class AuthPrimaryButton extends StatelessWidget {
     this.loadingLabel = 'Memproses...',
     required this.isLoading,
     required this.onPressed,
-    this.background = AuthPalette.btn,
-    this.foreground = AuthPalette.btnLabel,
+    this.background,
+    this.foreground,
   });
 
   @override
   Widget build(BuildContext context) {
+    final p = AuthPalette.of(context);
+    final bg = background ?? p.btn;
+    final fg = foreground ?? p.btnLabel;
     return SizedBox(
       width: double.infinity,
       height: 54,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: background,
-          foregroundColor: foreground,
-          disabledBackgroundColor: background.withValues(alpha: 0.4),
-          disabledForegroundColor: foreground.withValues(alpha: 0.7),
+          backgroundColor: bg,
+          foregroundColor: fg,
+          disabledBackgroundColor: bg.withValues(alpha: 0.4),
+          disabledForegroundColor: fg.withValues(alpha: 0.7),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
         ),
         child: isLoading
             ? Row(
@@ -269,18 +330,29 @@ class AuthPrimaryButton extends StatelessWidget {
                   SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(color: foreground, strokeWidth: 2.2),
+                    child: CircularProgressIndicator(
+                      color: fg,
+                      strokeWidth: 2.2,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Text(
                     loadingLabel,
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: foreground),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: fg,
+                    ),
                   ),
                 ],
               )
             : Text(
                 label,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: foreground),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                ),
               ),
       ),
     );
@@ -289,18 +361,19 @@ class AuthPrimaryButton extends StatelessWidget {
 
 /// Garis pemisah "atau".
 class AuthOrDivider extends StatelessWidget {
-  const AuthOrDivider({super.key});
+  AuthOrDivider({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final p = AuthPalette.of(context);
     return Row(
-      children: const [
-        Expanded(child: Divider(color: AuthPalette.divider)),
+      children: [
+        Expanded(child: Divider(color: p.divider)),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 12),
-          child: Text('atau', style: TextStyle(color: AuthPalette.hint, fontSize: 13)),
+          child: Text('atau', style: TextStyle(color: p.hint, fontSize: 13)),
         ),
-        Expanded(child: Divider(color: AuthPalette.divider)),
+        Expanded(child: Divider(color: p.divider)),
       ],
     );
   }
@@ -354,8 +427,10 @@ class _AuthTopBannerState extends State<_AuthTopBanner>
       vsync: this,
       duration: const Duration(milliseconds: 260),
     );
-    _slide = Tween<Offset>(begin: const Offset(0, -1.4), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
+    _slide = Tween<Offset>(
+      begin: const Offset(0, -1.4),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
     _ctrl.forward();
     _timer = Timer(const Duration(seconds: 4), _dismiss);
   }
@@ -377,7 +452,9 @@ class _AuthTopBannerState extends State<_AuthTopBanner>
 
   @override
   Widget build(BuildContext context) {
-    final color = widget.isError ? const Color(0xFFD32F2F) : const Color(0xFF1DB954);
+    final color = widget.isError
+        ? const Color(0xFFD32F2F)
+        : const Color(0xFF1DB954);
 
     return Positioned(
       top: 0,
@@ -393,7 +470,10 @@ class _AuthTopBannerState extends State<_AuthTopBanner>
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     color: color,
                     borderRadius: BorderRadius.circular(14),
@@ -446,62 +526,78 @@ Future<void> showAuthErrorDialog(
   return showDialog(
     context: context,
     barrierDismissible: true,
-    builder: (ctx) => Dialog(
-      backgroundColor: AuthPalette.bg,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: AuthPalette.border),
-      ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFF0F0F5),
-                border: Border.all(color: Colors.red.withValues(alpha: 0.4), width: 1.5),
-              ),
-              child: const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 28),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AuthPalette.ink),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13.5, height: 1.5, color: AuthPalette.grey),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AuthPalette.btn,
-                  foregroundColor: AuthPalette.btnLabel,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                ),
-                child: const Text(
-                  'Mengerti',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-          ],
+    builder: (ctx) {
+      final p = AuthPalette.of(ctx);
+      return Dialog(
+        backgroundColor: p.bg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: p.border),
         ),
-      ),
-    ),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFF0F0F5),
+                  border: Border.all(
+                    color: Colors.red.withValues(alpha: 0.4),
+                    width: 1.5,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.error_outline_rounded,
+                  color: Colors.redAccent,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: p.ink,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13.5, height: 1.5, color: p.grey),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: p.btn,
+                    foregroundColor: p.btnLabel,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  child: const Text(
+                    'Mengerti',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
   );
 }
 
@@ -571,9 +667,10 @@ class _SuccessSheetState extends State<_SuccessSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final p = AuthPalette.of(context);
     return Container(
-      decoration: const BoxDecoration(
-        color: AuthPalette.bg,
+      decoration: BoxDecoration(
+        color: p.bg,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
@@ -584,7 +681,7 @@ class _SuccessSheetState extends State<_SuccessSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: AuthPalette.divider,
+              color: p.divider,
               borderRadius: BorderRadius.circular(99),
             ),
           ),
@@ -594,26 +691,26 @@ class _SuccessSheetState extends State<_SuccessSheet> {
             height: 96,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AuthPalette.btn.withValues(alpha: 0.15),
-              border: Border.all(color: AuthPalette.btn, width: 2),
+              color: p.btn.withValues(alpha: 0.15),
+              border: Border.all(color: p.btn, width: 2),
             ),
-            child: const Icon(Icons.check_rounded, color: AuthPalette.btn, size: 52),
+            child: Icon(Icons.check_rounded, color: p.btn, size: 52),
           ),
           const SizedBox(height: 20),
           Text(
             widget.title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
-              color: AuthPalette.ink,
+              color: p.ink,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             widget.subtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13.5, height: 1.5, color: AuthPalette.grey),
+            style: TextStyle(fontSize: 13.5, height: 1.5, color: p.grey),
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -622,10 +719,12 @@ class _SuccessSheetState extends State<_SuccessSheet> {
             child: ElevatedButton(
               onPressed: widget.onContinue,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AuthPalette.btn,
-                foregroundColor: AuthPalette.btnLabel,
+                backgroundColor: p.btn,
+                foregroundColor: p.btnLabel,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(28),
+                ),
               ),
               child: const Text(
                 'Lanjutkan',
