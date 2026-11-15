@@ -1,0 +1,1 @@
+Hardening pasca-audit: repository layer lib/data/ (write terverifikasi jumlah baris), fix sort terdekat, featured carousel, owner_id pada edit, RLS artikel pakai is_admin(), migrasi dirapikan, test + CI GitHub hijau.
