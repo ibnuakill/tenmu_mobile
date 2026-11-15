@@ -38,6 +38,25 @@ jobs:
       - name: Ambil dependency
         run: flutter pub get
 
+      # `.env` di-gitignore (tidak boleh masuk repo), padahal pubspec.yaml
+      # mendaftarkannya sebagai asset. Tanpa file ini `flutter analyze` sudah
+      # gagal: "warning • The asset file '.env' doesn't exist". Nilai di sini
+      # placeholder — hanya untuk membuktikan proyek bisa dianalisis &
+      # dikompilasi, bukan untuk build rilis.
+      - name: Buat .env placeholder
+        run: |
+          if [ -f .env ]; then
+            echo ".env sudah ada."
+          else
+            {
+              echo "SUPABASE_URL=https://ci-placeholder.supabase.co"
+              echo "SUPABASE_ANON_KEY=ci-placeholder-anon-key"
+              echo "ONESIGNAL_APP_ID=ci-placeholder-onesignal"
+              echo "MAPTILER_KEY=ci-placeholder-maptiler"
+            } > .env
+            echo "Placeholder .env dibuat."
+          fi
+
       # `flutter analyze` mengembalikan exit code != 0 kalau ada error ATAU
       # warning. Infos (lint gaya) tidak menggagalkan build — jumlahnya ratusan
       # dan tidak relevan untuk gate merge.
@@ -76,24 +95,6 @@ jobs:
 
       - name: Test
         run: flutter test --reporter expanded
-
-      # `.env` di-gitignore (tidak boleh masuk repo), padahal pubspec.yaml
-      # mendaftarkannya sebagai asset — tanpa file ini `flutter build` gagal.
-      # Nilai di sini placeholder: hanya untuk membuktikan proyek bisa
-      # dikompilasi, bukan untuk build rilis.
-      - name: Buat .env placeholder (build debug saja)
-        run: |
-          if [ -f .env ]; then
-            echo ".env sudah ada."
-          else
-            {
-              echo "SUPABASE_URL=https://ci-placeholder.supabase.co"
-              echo "SUPABASE_ANON_KEY=ci-placeholder-anon-key"
-              echo "ONESIGNAL_APP_ID=ci-placeholder-onesignal"
-              echo "MAPTILER_KEY=ci-placeholder-maptiler"
-            } > .env
-            echo "Placeholder .env dibuat untuk build CI."
-          fi
 
       # Build debug APK membuktikan proyek benar-benar bisa dikompilasi
       # (analyze saja tidak menangkap error plugin Android).
