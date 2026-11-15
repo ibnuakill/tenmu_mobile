@@ -99,7 +99,17 @@ jobs:
       # Build debug APK membuktikan proyek benar-benar bisa dikompilasi
       # (analyze saja tidak menangkap error plugin Android).
       - name: Build APK debug
-        run: flutter build apk --debug
+        run: |
+          set +e
+          flutter build apk --debug 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "::error::flutter build apk gagal (exit $status); 30 baris terakhir:"
+            tail -30 build.log | while IFS= read -r line; do
+              [ -n "$line" ] && echo "::error::$line"
+            done
+          fi
+          exit "$status"
 
   migrations-lint:
     name: Cek migrasi SQL
